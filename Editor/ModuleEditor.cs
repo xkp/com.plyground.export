@@ -325,18 +325,8 @@ public partial class ModuleExporter : EditorWindow
 		return hash;
 	}
 
-	private void ExportModule()
+	private ExportedModule BuildExportedModule()
 	{
-		UpdateExportAssets();
-
-		//AskForExportFolder();
-		string moduleFolder = GetModuleFolder();
-		Directory.CreateDirectory(moduleFolder);
-
-/*		//Copy custom assets into 
-		DirectoryCopy(GetAssetModuleFolder(), moduleFolder, true);
-*/
-		//export
 		ExportedModule mod = new ExportedModule();
 		if (string.IsNullOrEmpty(moduleId))
 			moduleId = System.Guid.NewGuid().ToString().ToUpper();
@@ -394,6 +384,38 @@ public partial class ModuleExporter : EditorWindow
 			mod.itemGroups.Add(eg);
 		}
 
+		return mod;
+	}
+
+	private string SaveModule()
+	{
+		ExportedModule mod = BuildExportedModule();
+
+		string jsonFilePath = loadedModuleFilePath;
+		if (string.IsNullOrEmpty(jsonFilePath))
+		{
+			jsonFilePath = loadedModuleFilePath = Path.Combine(Application.dataPath, "module.bgm");
+		}
+
+		string json = JsonUtility.ToJson(mod, true);
+		File.WriteAllText(jsonFilePath, json);
+		Debug.Log("Saved module JSON to " + jsonFilePath);
+		return jsonFilePath;
+	}
+
+	private void ExportModule()
+	{
+		UpdateExportAssets();
+
+		//AskForExportFolder();
+		string moduleFolder = GetModuleFolder();
+		Directory.CreateDirectory(moduleFolder);
+
+/*		//Copy custom assets into 
+		DirectoryCopy(GetAssetModuleFolder(), moduleFolder, true);
+*/
+		ExportedModule mod = BuildExportedModule();
+
 		if (moduleType == "Game")
 		{
 			string projectRoot = Directory.GetParent(Application.dataPath).FullName;
@@ -437,17 +459,8 @@ public partial class ModuleExporter : EditorWindow
 		}
 
 
-		string jsonFilePath = loadedModuleFilePath;
-		if (string.IsNullOrEmpty(jsonFilePath))
-		{
-			jsonFilePath = loadedModuleFilePath = Path.Combine(Application.dataPath, "module.bgm");
-		}
-
-		string json = JsonUtility.ToJson(mod, true);
-		File.WriteAllText(jsonFilePath, json);
-		Debug.Log("Exported module JSON to " + jsonFilePath);
-
-		File.Copy(loadedModuleFilePath, Path.Combine(moduleFolder, "module.bgm"), true);
+		string jsonFilePath = SaveModule();
+		File.Copy(jsonFilePath, Path.Combine(moduleFolder, "module.bgm"), true);
 
 		//export assets
 		var assetsFromGroups = new List<string>();

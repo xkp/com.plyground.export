@@ -105,9 +105,9 @@ public partial class ModuleExporter
 		EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
 		activeTab = (ModuleEditorTab)GUILayout.Toolbar((int)activeTab, topTabs, EditorStyles.toolbarButton);
 		GUILayout.FlexibleSpace();
-		if (GUILayout.Button("Export Module", EditorStyles.toolbarButton, GUILayout.Width(110f)))
+		if (GUILayout.Button("Save", EditorStyles.toolbarButton, GUILayout.Width(110f)))
 		{
-			ExportModule();
+			SaveModule();
 		}
 		EditorGUILayout.EndHorizontal();
 		EditorGUILayout.Space(8f);
@@ -117,7 +117,9 @@ public partial class ModuleExporter
 	{
 		DrawModuleSettingsSection();
 		EditorGUILayout.Space();
-		DrawGeneralSection();
+		DrawPackagesSection();
+		EditorGUILayout.Space();
+		DrawDependenciesSection();
 	}
 
 	private void DrawModuleSettingsSection()
@@ -151,9 +153,17 @@ public partial class ModuleExporter
 		EditorGUILayout.EndHorizontal();
 	}
 
-	private void DrawGeneralSection()
+	private void DrawPackagesSection()
 	{
-		GUILayout.Label("GENERAL", EditorStyles.boldLabel);
+		GUILayout.Label("PACKAGES", EditorStyles.boldLabel);
+		EditorGUILayout.BeginVertical("box");
+		DrawUnityPackageList();
+		EditorGUILayout.EndVertical();
+	}
+
+	private void DrawDependenciesSection()
+	{
+		GUILayout.Label("DEPENDENCIES", EditorStyles.boldLabel);
 		EditorGUILayout.BeginHorizontal();
 		DrawModulePropertiesEditor();
 		DrawSupportAssetsEditor();
@@ -240,8 +250,6 @@ public partial class ModuleExporter
 	private void DrawSupportAssetsEditor()
 	{
 		EditorGUILayout.BeginVertical("box");
-		DrawUnityPackageList();
-		EditorGUILayout.Space(6f);
 		DrawDependencyList();
 		EditorGUILayout.Space(6f);
 		DrawCustomEditorList();
@@ -362,7 +370,11 @@ public partial class ModuleExporter
 
 		if (GUILayout.Button("Add Item Group") && !string.IsNullOrEmpty(moduleName))
 		{
-			itemGroups.Add(new ItemGroup());
+			itemGroups.Add(new ItemGroup
+			{
+				name = $"New Group {itemGroups.Count + 1}",
+				isExpanded = true
+			});
 		}
 
 		EditorGUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));
@@ -732,7 +744,7 @@ public partial class ModuleExporter
 		GUI.enabled = !string.IsNullOrWhiteSpace(moduleName);
 		if (GUILayout.Button("EXPORT MODULE", GUILayout.Height(52f)))
 		{
-			ExportModule();
+			EditorUtility.DisplayDialog("Export Module", "Export behavior is still to be defined.", "OK");
 		}
 		GUI.enabled = true;
 	}
