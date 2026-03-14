@@ -48,6 +48,7 @@ public partial class ModuleExporter : EditorWindow
 	[System.Serializable]
 	public class PackageDefinition
 	{
+		public string name = "";
 		public string fileName = "";
 		public string assetFolder = "";
 	}
@@ -97,10 +98,10 @@ public partial class ModuleExporter : EditorWindow
 		public bool isExpanded = true;
 	}
 
-	[MenuItem("Tools/Big Game Exporter")]
+	[MenuItem("Plyground/Module Exporter")]
 	public static void ShowWindow()
 	{
-		ModuleExporter window = GetWindow<ModuleExporter>("Big Game Exporter");
+		ModuleExporter window = GetWindow<ModuleExporter>("Plyground Exporter");
 		window.minSize = new Vector2(600, 400);
 		window.InitModule();
 	}
@@ -144,6 +145,7 @@ public partial class ModuleExporter : EditorWindow
 			{
 				unityPackages.Add(new PackageDefinition
 				{
+					name = pkg.name,
 					fileName = pkg.fileName,
 					assetFolder = pkg.assetFolder
 				});
@@ -244,7 +246,7 @@ public partial class ModuleExporter : EditorWindow
 
 	private void AskForExportFolder()
 	{
-		exportPath = Path.Combine(Application.persistentDataPath, "BigGame");
+		exportPath = Path.Combine(Application.persistentDataPath, "Plyground");
 
 		if (!Directory.Exists(exportPath))
 			Directory.CreateDirectory(exportPath);
@@ -348,6 +350,7 @@ public partial class ModuleExporter : EditorWindow
 		mod.packages = unityPackages
 			.Select(package => new PackageDefinition
 			{
+				name = package.name,
 				fileName = package.fileName,
 				assetFolder = package.assetFolder
 			})
@@ -1260,7 +1263,7 @@ public partial class ModuleExporter : EditorWindow
 
 	private string GetAssetModuleFolder()
 	{
-		return Path.Combine(Application.dataPath, "Big Game/Module");
+		return Path.Combine(Application.dataPath, "Plyground/Module");
 	}
 
 	private Mesh GetLowestLODMesh(GameObject prefab)

@@ -84,7 +84,7 @@ public partial class ModuleExporter
 		EditorGUILayout.BeginHorizontal();
 
 		EditorGUILayout.BeginVertical();
-		GUILayout.Label("BIG GAME EXPORTER", brandTitleStyle);
+		GUILayout.Label("Plyground EXPORTER", brandTitleStyle);
 		GUILayout.Label("Build module metadata, curate item groups, and export from one branded workspace.", brandSubtitleStyle);
 		EditorGUILayout.EndVertical();
 
@@ -255,6 +255,7 @@ public partial class ModuleExporter
 		{
 			unityPackages.Add(new PackageDefinition
 			{
+				name = string.Empty,
 				fileName = string.Empty,
 				assetFolder = string.Empty
 			});
@@ -277,6 +278,7 @@ public partial class ModuleExporter
 			}
 			EditorGUILayout.EndHorizontal();
 
+			package.name = EditorGUILayout.TextField("Name", package.name);
 			package.fileName = EditorGUILayout.TextField("File Name", package.fileName);
 			package.assetFolder = EditorGUILayout.TextField("Asset Folder", package.assetFolder);
 
