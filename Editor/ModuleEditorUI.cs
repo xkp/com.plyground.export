@@ -868,7 +868,7 @@ public partial class ModuleExporter
 		GUI.enabled = !string.IsNullOrWhiteSpace(moduleName);
 		if (GUILayout.Button("EXPORT MODULE", GUILayout.Height(52f)))
 		{
-			EditorUtility.DisplayDialog("Export Module", "Export behavior is still to be defined.", "OK");
+			ExportModule();
 		}
 		GUI.enabled = true;
 	}
