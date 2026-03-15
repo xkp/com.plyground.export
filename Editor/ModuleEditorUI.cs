@@ -9,17 +9,19 @@ public partial class ModuleExporter
 	private enum ModuleEditorTab
 	{
 		Overview,
+		Files,
 		Items,
 		Export
 	}
 
-	private readonly string[] topTabs = { "Overview", "Items", "Export" };
+	private readonly string[] topTabs = { "Overview", "Files", "Items", "Export" };
 
 	private ModuleEditorTab activeTab;
 	private Vector2 _assetScroll;
 	private GUIStyle brandCardStyle;
 	private GUIStyle brandTitleStyle;
 	private GUIStyle brandSubtitleStyle;
+	private Texture2D brandLogoTexture;
 
 	private void OnGUI()
 	{
@@ -40,6 +42,9 @@ public partial class ModuleExporter
 		{
 			case ModuleEditorTab.Overview:
 				DrawOverviewTab();
+				break;
+			case ModuleEditorTab.Files:
+				DrawFilesTab();
 				break;
 			case ModuleEditorTab.Items:
 				DrawItemsTab();
@@ -76,12 +81,20 @@ public partial class ModuleExporter
 			fontSize = 11,
 			wordWrap = true
 		};
+
+		brandLogoTexture = CreateBrandLogoTexture();
 	}
 
 	private void DrawBrandHeader()
 	{
 		EditorGUILayout.BeginVertical(brandCardStyle);
 		EditorGUILayout.BeginHorizontal();
+
+		if (brandLogoTexture != null)
+		{
+			GUILayout.Label(brandLogoTexture, GUILayout.Width(44f), GUILayout.Height(72f));
+			GUILayout.Space(10f);
+		}
 
 		EditorGUILayout.BeginVertical();
 		GUILayout.Label("Plyground EXPORTER", brandTitleStyle);
@@ -98,6 +111,102 @@ public partial class ModuleExporter
 
 		EditorGUILayout.EndHorizontal();
 		EditorGUILayout.EndVertical();
+	}
+
+	private Texture2D CreateBrandLogoTexture()
+	{
+		const int width = 88;
+		const int height = 144;
+
+		Texture2D texture = new Texture2D(width, height, TextureFormat.RGBA32, false)
+		{
+			hideFlags = HideFlags.HideAndDontSave,
+			filterMode = FilterMode.Bilinear,
+			wrapMode = TextureWrapMode.Clamp
+		};
+
+		Color clear = new Color(0f, 0f, 0f, 0f);
+		Color leftBottom = new Color32(61, 120, 128, 255);
+		Color leftTop = new Color32(39, 166, 131, 255);
+		Color rightBottom = new Color32(69, 195, 124, 255);
+		Color rightTop = new Color32(28, 193, 122, 255);
+
+		for (int y = 0; y < height; y++)
+		{
+			for (int x = 0; x < width; x++)
+			{
+				texture.SetPixel(x, y, clear);
+			}
+		}
+
+		for (int y = 8; y < height - 8; y++)
+		{
+			for (int x = 4; x < 26; x++)
+			{
+				if (IsInsideRoundedRect(x, y, 4, 8, 22, height - 16, 10f))
+				{
+					texture.SetPixel(x, y, Color.Lerp(leftBottom, leftTop, y / (float)(height - 1)));
+				}
+			}
+		}
+
+		for (int y = 8; y < height - 8; y++)
+		{
+			for (int x = 36; x < width - 4; x++)
+			{
+				if (!IsInsideRoundedRect(x, y, 36, 8, width - 40, height - 16, 10f))
+				{
+					continue;
+				}
+
+				bool inOuterArc = IsInsideCircle(x, y, 52f, 72f, 38f) || IsInsideCircle(x, y, 52f, 116f, 38f);
+				bool inInnerCut = IsInsideRoundedRect(x, y, 50, 28, 18, 88, 8f);
+				if ((x < 60 || inOuterArc) && !inInnerCut)
+				{
+					float tx = Mathf.InverseLerp(36f, width - 4f, x);
+					float ty = Mathf.InverseLerp(8f, height - 8f, y);
+					Color horizontal = Color.Lerp(leftTop, rightTop, tx);
+					Color vertical = Color.Lerp(rightBottom, horizontal, ty);
+					texture.SetPixel(x, y, vertical);
+				}
+			}
+		}
+
+		texture.Apply();
+		return texture;
+	}
+
+	private static bool IsInsideRoundedRect(int x, int y, int rectX, int rectY, int rectWidth, int rectHeight, float radius)
+	{
+		float minX = rectX;
+		float maxX = rectX + rectWidth - 1;
+		float minY = rectY;
+		float maxY = rectY + rectHeight - 1;
+		float px = x + 0.5f;
+		float py = y + 0.5f;
+
+		if (px >= minX + radius && px <= maxX - radius)
+		{
+			return py >= minY && py <= maxY;
+		}
+
+		if (py >= minY + radius && py <= maxY - radius)
+		{
+			return px >= minX && px <= maxX;
+		}
+
+		float cornerX = px < minX + radius ? minX + radius : maxX - radius;
+		float cornerY = py < minY + radius ? minY + radius : maxY - radius;
+		float dx = px - cornerX;
+		float dy = py - cornerY;
+		return dx * dx + dy * dy <= radius * radius;
+	}
+
+	private static bool IsInsideCircle(int x, int y, float centerX, float centerY, float radius)
+	{
+		float dx = x + 0.5f - centerX;
+		float dy = y + 0.5f - centerY;
+		return dx * dx + dy * dy <= radius * radius;
 	}
 
 	private void DrawTabs()
@@ -117,9 +226,7 @@ public partial class ModuleExporter
 	{
 		DrawModuleSettingsSection();
 		EditorGUILayout.Space();
-		DrawPackagesSection();
-		EditorGUILayout.Space();
-		DrawDependenciesSection();
+		DrawModulePropertiesSection();
 	}
 
 	private void DrawModuleSettingsSection()
@@ -132,10 +239,6 @@ public partial class ModuleExporter
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(sectionWidth));
 		moduleName = EditorGUILayout.TextField("Module Name", moduleName);
 		controllerClass = EditorGUILayout.TextField("Controller Class", controllerClass);
-		GUILayout.Label("Description", EditorStyles.miniBoldLabel);
-		description = EditorGUILayout.TextArea(description, GUILayout.MinHeight(54f));
-		GUILayout.Label("Match Description", EditorStyles.miniBoldLabel);
-		matchDescription = EditorGUILayout.TextArea(matchDescription, GUILayout.MinHeight(54f));
 
 		int moduleTypeIndex = System.Array.IndexOf(allowedModuleTypes, moduleType);
 		if (moduleTypeIndex < 0)
@@ -146,6 +249,17 @@ public partial class ModuleExporter
 
 		moduleTypeIndex = EditorGUILayout.Popup("Module Type", moduleTypeIndex, allowedModuleTypes);
 		moduleType = allowedModuleTypes[moduleTypeIndex];
+		EditorGUILayout.Space(6f);
+		EditorGUILayout.BeginHorizontal();
+		EditorGUILayout.BeginVertical();
+		GUILayout.Label("Description", EditorStyles.miniBoldLabel);
+		description = EditorGUILayout.TextArea(description, GUILayout.MinHeight(70f));
+		EditorGUILayout.EndVertical();
+		EditorGUILayout.BeginVertical();
+		GUILayout.Label("Match Description", EditorStyles.miniBoldLabel);
+		matchDescription = EditorGUILayout.TextArea(matchDescription, GUILayout.MinHeight(70f));
+		EditorGUILayout.EndVertical();
+		EditorGUILayout.EndHorizontal();
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.BeginVertical("box");
@@ -169,9 +283,14 @@ public partial class ModuleExporter
 		EditorGUILayout.EndVertical();
 	}
 
-	private void DrawDependenciesSection()
+	private void DrawFilesTab()
 	{
-		GUILayout.Label("DEPENDENCIES", EditorStyles.boldLabel);
+		DrawPackagesSection();
+	}
+
+	private void DrawModulePropertiesSection()
+	{
+		GUILayout.Label("MODULE PROPERTIES", EditorStyles.boldLabel);
 		DrawModulePropertiesEditor();
 	}
 
