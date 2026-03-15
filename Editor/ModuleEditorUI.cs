@@ -22,6 +22,8 @@ public partial class ModuleExporter
 	private GUIStyle brandTitleStyle;
 	private GUIStyle brandSubtitleStyle;
 	private Texture2D brandLogoTexture;
+	private const string PackageLogoAssetPath = "Packages/com.plyground.export/Editor/Branding/plyground-logo.png";
+	private const string LocalLogoAssetPath = "Editor/Branding/plyground-logo.png";
 
 	private void OnGUI()
 	{
@@ -115,6 +117,18 @@ public partial class ModuleExporter
 
 	private Texture2D CreateBrandLogoTexture()
 	{
+		Texture2D logo = AssetDatabase.LoadAssetAtPath<Texture2D>(PackageLogoAssetPath);
+		if (logo != null)
+		{
+			return logo;
+		}
+
+		logo = AssetDatabase.LoadAssetAtPath<Texture2D>(LocalLogoAssetPath);
+		if (logo != null)
+		{
+			return logo;
+		}
+
 		const int width = 88;
 		const int height = 144;
 
@@ -250,22 +264,17 @@ public partial class ModuleExporter
 		moduleTypeIndex = EditorGUILayout.Popup("Module Type", moduleTypeIndex, allowedModuleTypes);
 		moduleType = allowedModuleTypes[moduleTypeIndex];
 		EditorGUILayout.Space(6f);
-		EditorGUILayout.BeginHorizontal();
-		EditorGUILayout.BeginVertical();
 		GUILayout.Label("Description", EditorStyles.miniBoldLabel);
 		description = EditorGUILayout.TextArea(description, GUILayout.MinHeight(70f));
 		EditorGUILayout.EndVertical();
-		EditorGUILayout.BeginVertical();
-		GUILayout.Label("Match Description", EditorStyles.miniBoldLabel);
-		matchDescription = EditorGUILayout.TextArea(matchDescription, GUILayout.MinHeight(70f));
-		EditorGUILayout.EndVertical();
-		EditorGUILayout.EndHorizontal();
-		EditorGUILayout.EndVertical();
 
-		EditorGUILayout.BeginVertical("box");
+		EditorGUILayout.BeginVertical("box", GUILayout.Width(sectionWidth));
 		author = EditorGUILayout.TextField("Author", author);
 		url = EditorGUILayout.TextField("URL", url);
 		GUILayout.Label($"Module ID: {(string.IsNullOrEmpty(moduleId) ? "Generated on export" : moduleId)}", EditorStyles.miniLabel);
+		EditorGUILayout.Space(6f);
+		GUILayout.Label("Match Description", EditorStyles.miniBoldLabel);
+		matchDescription = EditorGUILayout.TextArea(matchDescription, GUILayout.MinHeight(70f));
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.EndHorizontal();
