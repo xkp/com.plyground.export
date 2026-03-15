@@ -132,6 +132,10 @@ public partial class ModuleExporter
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(sectionWidth));
 		moduleName = EditorGUILayout.TextField("Module Name", moduleName);
 		controllerClass = EditorGUILayout.TextField("Controller Class", controllerClass);
+		GUILayout.Label("Description", EditorStyles.miniBoldLabel);
+		description = EditorGUILayout.TextArea(description, GUILayout.MinHeight(54f));
+		GUILayout.Label("Match Description", EditorStyles.miniBoldLabel);
+		matchDescription = EditorGUILayout.TextArea(matchDescription, GUILayout.MinHeight(54f));
 
 		int moduleTypeIndex = System.Array.IndexOf(allowedModuleTypes, moduleType);
 		if (moduleTypeIndex < 0)
@@ -158,16 +162,17 @@ public partial class ModuleExporter
 		GUILayout.Label("PACKAGES", EditorStyles.boldLabel);
 		EditorGUILayout.BeginVertical("box");
 		DrawUnityPackageList();
+		EditorGUILayout.Space(6f);
+		DrawDependencyList();
+		EditorGUILayout.Space(6f);
+		DrawCustomEditorList();
 		EditorGUILayout.EndVertical();
 	}
 
 	private void DrawDependenciesSection()
 	{
 		GUILayout.Label("DEPENDENCIES", EditorStyles.boldLabel);
-		EditorGUILayout.BeginHorizontal();
 		DrawModulePropertiesEditor();
-		DrawSupportAssetsEditor();
-		EditorGUILayout.EndHorizontal();
 	}
 
 	private void DrawModulePropertiesEditor()
@@ -247,15 +252,6 @@ public partial class ModuleExporter
 		EditorGUILayout.EndVertical();
 	}
 
-	private void DrawSupportAssetsEditor()
-	{
-		EditorGUILayout.BeginVertical("box");
-		DrawDependencyList();
-		EditorGUILayout.Space(6f);
-		DrawCustomEditorList();
-		EditorGUILayout.EndVertical();
-	}
-
 	private void DrawUnityPackageList()
 	{
 		GUILayout.Label("Packages", EditorStyles.boldLabel);
@@ -292,7 +288,7 @@ public partial class ModuleExporter
 
 			if (!string.IsNullOrWhiteSpace(package.assetFolder) && !IsDirectAssetsChildFolder(package.assetFolder))
 			{
-				EditorGUILayout.HelpBox("Asset Folder should be a direct child of Assets, for example Assets/MyPackage.", MessageType.Warning);
+				EditorGUILayout.HelpBox("Asset Folder should match a folder directly under Assets, for example entering MyPackage for Assets/MyPackage.", MessageType.Warning);
 			}
 
 			EditorGUILayout.EndVertical();

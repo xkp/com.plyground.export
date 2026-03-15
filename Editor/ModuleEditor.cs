@@ -14,6 +14,8 @@ public partial class ModuleExporter : EditorWindow
 
 	private string moduleName = "";
 	private string controllerClass = "";
+	private string description = "";
+	private string matchDescription = "";
 	private string author = "";
 	private string url = "";
 
@@ -134,6 +136,8 @@ public partial class ModuleExporter : EditorWindow
 		moduleName = mod.name;
 		moduleType = mod.type;
 		controllerClass = mod.controller;
+		description = mod.description;
+		matchDescription = mod.matchDescription;
 		author = mod.author;
 		url = mod.url;
 
@@ -296,20 +300,31 @@ public partial class ModuleExporter : EditorWindow
 		return "Assets" + fullPath.Substring(assetsPath.Length);
 	}
 
-	private bool IsDirectAssetsChildFolder(string unityPath)
+	private string GetPackageAssetFolderPath(string folderName)
 	{
-		if (string.IsNullOrWhiteSpace(unityPath))
+		if (string.IsNullOrWhiteSpace(folderName))
 		{
-			return false;
+			return string.Empty;
 		}
 
-		string normalized = unityPath.Replace("\\", "/").TrimEnd('/');
-		if (!normalized.StartsWith("Assets/"))
+		string normalized = folderName.Replace("\\", "/").Trim('/');
+		if (normalized.StartsWith("Assets/"))
 		{
-			return false;
+			normalized = normalized.Substring("Assets/".Length);
 		}
 
-		return normalized.Count(c => c == '/') == 1;
+		if (string.IsNullOrWhiteSpace(normalized) || normalized.Contains("/"))
+		{
+			return string.Empty;
+		}
+
+		return "Assets/" + normalized;
+	}
+
+	private bool IsDirectAssetsChildFolder(string folderName)
+	{
+		string assetPath = GetPackageAssetFolderPath(folderName);
+		return !string.IsNullOrEmpty(assetPath) && AssetDatabase.IsValidFolder(assetPath);
 	}
 
 	public static uint ComputeFNV1aHash(string text)
@@ -335,6 +350,8 @@ public partial class ModuleExporter : EditorWindow
 		mod.name = moduleName;
 		mod.type = moduleType;
 		mod.controller = controllerClass;
+		mod.description = description;
+		mod.matchDescription = matchDescription;
 		mod.author = author;
 		mod.url = url;
 		mod.packages = unityPackages
@@ -427,7 +444,7 @@ public partial class ModuleExporter : EditorWindow
 			var excludedPackageFolders = new HashSet<string>(
 				unityPackages
 					.Where(package => IsDirectAssetsChildFolder(package.assetFolder))
-					.Select(package => Path.GetFileName(package.assetFolder.Replace("\\", "/").TrimEnd('/'))));
+					.Select(package => Path.GetFileName(GetPackageAssetFolderPath(package.assetFolder))));
 
 			DirectoryCopy(sourceAssets, Path.Combine(destTemplateFolder, "Assets"), true, excludedPackageFolders);
 			if (Directory.Exists(sourceProjectSettings))
@@ -636,6 +653,8 @@ public partial class ModuleExporter : EditorWindow
 		public string name;
 		public string type;
 		public string controller;
+		public string description;
+		public string matchDescription;
 		public string author;
 		public string url;
 
