@@ -1324,6 +1324,22 @@ public partial class ModuleExporter : EditorWindow
 		}
 	}
 
+	private void RecalculateGroupThumbnailsWithUnity(ItemGroup group)
+	{
+		if (group == null)
+		{
+			return;
+		}
+
+		foreach (Item item in group.items)
+		{
+			if (item?.prefab != null)
+			{
+				RecalculateThumbnailWithUnity(item);
+			}
+		}
+	}
+
 	private string CopyCustomIcon(string imagePath)
 	{
 		string moduleFolder = GetAssetModuleFolder();

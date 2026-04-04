@@ -581,6 +581,11 @@ public partial class ModuleExporter
 			}
 		}
 
+		if (GUILayout.Button("Refresh Group Images"))
+		{
+			RecalculateGroupThumbnailsWithUnity(activeGroup);
+		}
+
 		if (GUILayout.Button("Create Custom Item"))
 		{
 			CreateCustomItem(activeGroup);
