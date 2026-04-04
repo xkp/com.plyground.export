@@ -18,10 +18,12 @@ public partial class ModuleExporter
 
 	private ModuleEditorTab activeTab;
 	private Vector2 _assetScroll;
+	private Vector2 _itemGridScroll;
 	private GUIStyle brandCardStyle;
 	private GUIStyle brandTitleStyle;
 	private GUIStyle brandSubtitleStyle;
 	private Texture2D brandLogoTexture;
+	private int activeItemGroupIndex;
 	private const string PackageLogoAssetPath = "Packages/com.plyground.export/Editor/Branding/plyground-logo.png";
 	private const string LocalLogoAssetPath = "Editor/Branding/plyground-logo.png";
 
@@ -499,8 +501,10 @@ public partial class ModuleExporter
 				name = $"New Group {itemGroups.Count + 1}",
 				isExpanded = true
 			});
+			activeItemGroupIndex = itemGroups.Count - 1;
 		}
 
+		ValidateActiveItemGroup();
 		EditorGUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));
 		DrawItemGroupBrowser();
 		ValidateSelectedItem();
@@ -511,57 +515,83 @@ public partial class ModuleExporter
 	private void DrawItemGroupBrowser()
 	{
 		EditorGUILayout.BeginVertical(GUILayout.Width(position.width * 0.6f));
-		List<ItemGroup> groupsToRemove = new List<ItemGroup>();
-
-		for (int i = 0; i < itemGroups.Count; i++)
+		if (itemGroups.Count == 0)
 		{
-			ItemGroup group = itemGroups[i];
-			EditorGUILayout.BeginHorizontal();
-			group.isExpanded = EditorGUILayout.Foldout(group.isExpanded, string.IsNullOrEmpty(group.name) ? "New Group" : group.name, true);
-			if (GUILayout.Button("Remove Group", GUILayout.Width(100f)))
+			EditorGUILayout.HelpBox("Add an item group to start curating prefabs.", MessageType.Info);
+			EditorGUILayout.EndVertical();
+			return;
+		}
+
+		string[] groupTabs = itemGroups.Select(group => string.IsNullOrEmpty(group.name) ? "New Group" : group.name).ToArray();
+		activeItemGroupIndex = GUILayout.Toolbar(activeItemGroupIndex, groupTabs);
+
+		ItemGroup activeGroup = itemGroups[activeItemGroupIndex];
+		EditorGUILayout.BeginVertical("box");
+		EditorGUILayout.BeginHorizontal();
+		GUILayout.Label("Group Details", EditorStyles.boldLabel);
+		GUILayout.FlexibleSpace();
+		if (GUILayout.Button("Remove Group", GUILayout.Width(110f)))
+		{
+			if (selectedItem != null && activeGroup.items.Contains(selectedItem))
 			{
-				groupsToRemove.Add(group);
+				selectedItem = null;
 			}
+
+			itemGroups.RemoveAt(activeItemGroupIndex);
+			activeItemGroupIndex = Mathf.Clamp(activeItemGroupIndex, 0, Mathf.Max(0, itemGroups.Count - 1));
 			EditorGUILayout.EndHorizontal();
-
-			if (!group.isExpanded)
-			{
-				continue;
-			}
-
-			EditorGUI.indentLevel++;
-			group.name = EditorGUILayout.TextField("Name", group.name);
-			group.icon = IconPickerUI.DrawIconField(group.icon, CopyCustomIcon);
-			group.category = EditorGUILayout.TextField("Category", group.category);
-
-			if (string.IsNullOrEmpty(group.name))
-			{
-				EditorGUILayout.HelpBox("Set a name before adding items to this group.", MessageType.Warning);
-			}
-
-			if (GUILayout.Button("Add Items from Folder") && !string.IsNullOrEmpty(group.name))
-			{
-				string folderPath = EditorUtility.OpenFolderPanel("Select Prefab Folder", "", "");
-				if (!string.IsNullOrEmpty(folderPath))
-				{
-					AddItemsFromFolder(group, folderPath);
-					UpdateAssets();
-				}
-			}
-
-			if (GUILayout.Button("Create Custom Item") && !string.IsNullOrEmpty(group.name))
-			{
-				CreateCustomItem(group);
-			}
-
-			DrawItemGrid(group);
-			EditorGUI.indentLevel--;
+			EditorGUILayout.EndVertical();
+			EditorGUILayout.EndVertical();
+			return;
 		}
+		EditorGUILayout.EndHorizontal();
 
-		foreach (ItemGroup group in groupsToRemove)
+		activeGroup.name = EditorGUILayout.TextField("Name", activeGroup.name);
+		activeGroup.icon = IconPickerUI.DrawIconField(activeGroup.icon, CopyCustomIcon);
+		activeGroup.category = EditorGUILayout.TextField("Category", activeGroup.category);
+
+		if (string.IsNullOrEmpty(activeGroup.name))
 		{
-			itemGroups.Remove(group);
+			EditorGUILayout.HelpBox("Set a name before adding items to this group.", MessageType.Warning);
 		}
+
+		EditorGUILayout.BeginHorizontal();
+		GUI.enabled = !string.IsNullOrEmpty(activeGroup.name);
+		if (GUILayout.Button("Add Items from Folder"))
+		{
+			string folderPath = EditorUtility.OpenFolderPanel("Select Prefab Folder", "", "");
+			if (!string.IsNullOrEmpty(folderPath))
+			{
+				AddItemsFromFolder(activeGroup, folderPath);
+				UpdateAssets();
+			}
+		}
+
+		if (GUILayout.Button("Add Selected Prefabs"))
+		{
+			List<string> selectedAssets = new List<string>();
+			AssetSelectorWindow.OpenWindow(selectedAssets);
+			List<string> prefabPaths = selectedAssets
+				.Where(path => AssetDatabase.GetMainAssetTypeAtPath(path) == typeof(GameObject))
+				.ToList();
+			if (prefabPaths.Count > 0)
+			{
+				AddItemsFromAssetPaths(activeGroup, prefabPaths);
+				UpdateAssets();
+			}
+		}
+
+		if (GUILayout.Button("Create Custom Item"))
+		{
+			CreateCustomItem(activeGroup);
+		}
+		GUI.enabled = true;
+		EditorGUILayout.EndHorizontal();
+
+		_itemGridScroll = EditorGUILayout.BeginScrollView(_itemGridScroll, GUILayout.ExpandHeight(true));
+		DrawItemGrid(activeGroup);
+		EditorGUILayout.EndScrollView();
+		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.EndVertical();
 	}
@@ -621,13 +651,24 @@ public partial class ModuleExporter
 
 		foreach (ItemGroup group in itemGroups)
 		{
-			if (group.isExpanded && group.items.Contains(selectedItem))
+			if (group.items.Contains(selectedItem))
 			{
 				return;
 			}
 		}
 
 		selectedItem = null;
+	}
+
+	private void ValidateActiveItemGroup()
+	{
+		if (itemGroups.Count == 0)
+		{
+			activeItemGroupIndex = 0;
+			return;
+		}
+
+		activeItemGroupIndex = Mathf.Clamp(activeItemGroupIndex, 0, itemGroups.Count - 1);
 	}
 
 	private void DrawSelectedItemEditor()

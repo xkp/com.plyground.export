@@ -725,22 +725,52 @@ public partial class ModuleExporter : EditorWindow
 		foreach (string guid in guids)
 		{
 			string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-			GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
-			if (prefab != null)
-			{
-				group.items.Add(new Item
-				{
-					id = System.Guid.NewGuid().ToString().ToUpper(),
-					name = prefab.name,
-					prefab = prefab,
-					prefabPath = assetPath,
-					properties = new List<Property>(),
-					exportTranslation = Vector3.zero,
-					exportRotation = Vector3.zero,
-					exportScale = Vector3.one
-				});
-			}
+			AddPrefabToGroup(group, assetPath);
 		}
+	}
+
+	private void AddItemsFromAssetPaths(ItemGroup group, IEnumerable<string> assetPaths)
+	{
+		if (group == null || assetPaths == null)
+		{
+			return;
+		}
+
+		foreach (string assetPath in assetPaths)
+		{
+			AddPrefabToGroup(group, assetPath);
+		}
+	}
+
+	private void AddPrefabToGroup(ItemGroup group, string assetPath)
+	{
+		if (group == null || string.IsNullOrEmpty(assetPath))
+		{
+			return;
+		}
+
+		GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
+		if (prefab == null)
+		{
+			return;
+		}
+
+		if (group.items.Any(existing => existing.prefabPath == assetPath))
+		{
+			return;
+		}
+
+		group.items.Add(new Item
+		{
+			id = System.Guid.NewGuid().ToString().ToUpper(),
+			name = prefab.name,
+			prefab = prefab,
+			prefabPath = assetPath,
+			properties = new List<Property>(),
+			exportTranslation = Vector3.zero,
+			exportRotation = Vector3.zero,
+			exportScale = Vector3.one
+		});
 	}
 
 	private void UpdateAssets()
