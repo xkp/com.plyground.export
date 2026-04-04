@@ -1407,7 +1407,7 @@ public partial class ModuleExporter : EditorWindow
 
 		Quaternion rotation = Quaternion.Euler(item.exportRotation);
 		Vector3 scaledBottomCenter = Vector3.Scale(bottomCenter, item.exportScale);
-		return -(rotation * scaledBottomCenter);
+		return rotation * scaledBottomCenter;
 	}
 
 	private Vector3 GetPrefabBottomCenter(GameObject prefab, string prefabPath)
