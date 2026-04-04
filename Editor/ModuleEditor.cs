@@ -46,6 +46,7 @@ public partial class ModuleExporter : EditorWindow
 	private Dictionary<string, bool> propertyFoldouts = new Dictionary<string, bool>();
 
 	private List<Property> moduleProperties = new List<Property>();
+	private readonly Dictionary<string, Vector3> prefabBottomCenterCache = new Dictionary<string, Vector3>();
 
 	[System.Serializable]
 	public class PackageDefinition
@@ -387,7 +388,7 @@ public partial class ModuleExporter : EditorWindow
 				ei.prefab = item.prefabPath;
 				ei.icon = item.icon;
 				ei.icon3d = item.modelPath;
-				ei.exportTranslation = item.exportTranslation;
+				ei.exportTranslation = GetEffectiveExportTranslation(item);
 				ei.exportRotation = item.exportRotation;
 				ei.exportScale = item.exportScale;
 
@@ -852,7 +853,7 @@ public partial class ModuleExporter : EditorWindow
 
 		GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(item.prefab);
 		instance.hideFlags = HideFlags.DontSave;
-		instance.transform.position = item.exportTranslation;
+		instance.transform.position = GetEffectiveExportTranslation(item);
 		instance.transform.rotation = Quaternion.Euler(item.exportRotation);
 		instance.transform.localScale = item.exportScale;
 
@@ -1216,21 +1217,21 @@ public partial class ModuleExporter : EditorWindow
 		return dst;
 	}
 
-	private void GenerateThumbnail(Item item)
+	private bool TryGenerateUnityThumbnail(Item item, float timeoutSeconds = 2f)
 	{
-
 		if (item.prefab == null)
-			return;
+			return false;
+
 		string moduleFolder = GetModuleFolder();
 		string assetsDirectory = Path.Combine(moduleFolder, "Assets");
 		Directory.CreateDirectory(assetsDirectory);
 		string thumbDirectory = Path.Combine(assetsDirectory, "Thumbnails");
 		Directory.CreateDirectory(thumbDirectory);
+
 		Texture2D preview = AssetPreview.GetAssetPreview(item.prefab);
 		if (preview == null)
 		{
 			double start = EditorApplication.timeSinceStartup;
-			float timeoutSeconds = 2f;
 			// Poll without blocking editor message pump
 			while (AssetPreview.IsLoadingAssetPreview(item.prefab.GetInstanceID()))
 			{
@@ -1245,14 +1246,6 @@ public partial class ModuleExporter : EditorWindow
 				if (EditorApplication.timeSinceStartup - start > timeoutSeconds)
 					break;
 			}
-
-			// Fallback: a tiny icon so you at least have something
-			//preview ??= AssetPreview.GetMiniThumbnail(item.prefab);
-		}
-
-		if (preview == null)
-		{
-			//preview = EditorGUIUtility.IconContent("DefaultAsset Icon").image as Texture2D;
 		}
 
 		if (preview != null)
@@ -1266,16 +1259,38 @@ public partial class ModuleExporter : EditorWindow
 					File.WriteAllBytes(thumbPath, pngData);
 					string relativeThumbPath = Path.Combine("Assets", "Thumbnails", item.name + ".png");
 					item.icon = relativeThumbPath;
+					return true;
 				}
 			}
 			catch
 			{
 				item.icon = string.Empty;
+				return false;
 			}
 		}
-		else
+
+		return false;
+	}
+
+	private void GenerateThumbnail(Item item)
+	{
+		if (!TryGenerateUnityThumbnail(item))
 		{
 			GenerateExportThumbnail(item);
+		}
+	}
+
+	private void RecalculateThumbnailWithUnity(Item item)
+	{
+		if (item?.prefab == null)
+		{
+			Debug.LogWarning("Cannot recalculate thumbnail without a prefab.");
+			return;
+		}
+
+		if (!TryGenerateUnityThumbnail(item, 5f))
+		{
+			Debug.LogWarning($"Unity thumbnail generation did not complete for item: {item.name}");
 		}
 	}
 
@@ -1318,6 +1333,82 @@ public partial class ModuleExporter : EditorWindow
 		catch
 		{
 			return null;
+		}
+	}
+
+	private Vector3 GetEffectiveExportTranslation(Item item)
+	{
+		if (item == null)
+		{
+			return Vector3.zero;
+		}
+
+		return item.exportTranslation + GetAutoPivotOffset(item);
+	}
+
+	private Vector3 GetAutoPivotOffset(Item item)
+	{
+		if (item?.prefab == null)
+		{
+			return Vector3.zero;
+		}
+
+		Vector3 bottomCenter = GetPrefabBottomCenter(item.prefab, item.prefabPath);
+		if (bottomCenter == Vector3.zero)
+		{
+			return Vector3.zero;
+		}
+
+		Quaternion rotation = Quaternion.Euler(item.exportRotation);
+		Vector3 scaledBottomCenter = Vector3.Scale(bottomCenter, item.exportScale);
+		return -(rotation * scaledBottomCenter);
+	}
+
+	private Vector3 GetPrefabBottomCenter(GameObject prefab, string prefabPath)
+	{
+		string cacheKey = !string.IsNullOrEmpty(prefabPath) ? prefabPath : prefab.GetInstanceID().ToString();
+		if (prefabBottomCenterCache.TryGetValue(cacheKey, out Vector3 cachedBottomCenter))
+		{
+			return cachedBottomCenter;
+		}
+
+		GameObject instance = null;
+		try
+		{
+			instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+			instance.hideFlags = HideFlags.DontSave;
+			instance.transform.position = Vector3.zero;
+			instance.transform.rotation = Quaternion.identity;
+			instance.transform.localScale = Vector3.one;
+
+			Collider[] colliders = instance
+				.GetComponentsInChildren<Collider>(true)
+				.Where(c => c != null && c.enabled && c.gameObject.activeInHierarchy)
+				.ToArray();
+			if (colliders.Length == 0)
+			{
+				prefabBottomCenterCache[cacheKey] = Vector3.zero;
+				return Vector3.zero;
+			}
+
+			Bounds combinedBounds = colliders[0].bounds;
+			for (int i = 1; i < colliders.Length; i++)
+			{
+				combinedBounds.Encapsulate(colliders[i].bounds);
+			}
+
+			Vector3 bottomCenter = instance.transform.InverseTransformPoint(
+				new Vector3(combinedBounds.center.x, combinedBounds.min.y, combinedBounds.center.z));
+			prefabBottomCenterCache[cacheKey] = bottomCenter;
+			return bottomCenter;
+		}
+		finally
+		{
+			if (instance != null)
+			{
+				if (Application.isEditor) UnityEngine.Object.DestroyImmediate(instance);
+				else UnityEngine.Object.Destroy(instance);
+			}
 		}
 	}
 

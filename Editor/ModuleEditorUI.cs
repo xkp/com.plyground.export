@@ -650,6 +650,12 @@ public partial class ModuleExporter
 		selectedItem.exportTranslation = EditorGUILayout.Vector3Field("Translation", selectedItem.exportTranslation);
 		selectedItem.exportRotation = EditorGUILayout.Vector3Field("Rotation", selectedItem.exportRotation);
 		selectedItem.exportScale = EditorGUILayout.Vector3Field("Scale", selectedItem.exportScale);
+		GUI.enabled = selectedItem.prefab != null;
+		if (GUILayout.Button("Recalculate Image"))
+		{
+			RecalculateThumbnailWithUnity(selectedItem);
+		}
+		GUI.enabled = true;
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.EndHorizontal();
