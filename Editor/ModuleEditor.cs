@@ -388,7 +388,7 @@ public partial class ModuleExporter : EditorWindow
 				ei.prefab = item.prefabPath;
 				ei.icon = item.icon;
 				ei.icon3d = item.modelPath;
-				ei.exportTranslation = GetEffectiveExportTranslation(item);
+				ei.exportTranslation = item.exportTranslation;
 				ei.exportRotation = item.exportRotation;
 				ei.exportScale = item.exportScale;
 
