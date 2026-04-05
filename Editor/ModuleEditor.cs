@@ -1388,7 +1388,7 @@ public partial class ModuleExporter : EditorWindow
 			return Vector3.zero;
 		}
 
-		return item.exportTranslation - PivotOffset(item.prefab);
+		return item.exportTranslation + PivotOffset(item.prefab);
 	}
 
 	private Vector3 PivotOffset(GameObject prefab)
