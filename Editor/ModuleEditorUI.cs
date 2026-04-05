@@ -707,7 +707,7 @@ public partial class ModuleExporter
 		GUI.enabled = selectedItem.prefab != null;
 		if (GUILayout.Button("Project Pivot To Bottom"))
 		{
-			SetExportTranslationToBottomPivot(selectedItem);
+			SetPivotOffsetToBottom(selectedItem);
 		}
 		if (GUILayout.Button("Recalculate Image"))
 		{

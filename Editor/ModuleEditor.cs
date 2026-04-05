@@ -73,6 +73,7 @@ public partial class ModuleExporter : EditorWindow
 		// For manual properties, we generate a unique key.
 		public List<Property> properties = new List<Property>();
 
+		public Vector3 pivotOffset = Vector3.zero;
 		public Vector3 exportTranslation = Vector3.zero;
 		public Vector3 exportRotation = Vector3.zero;
 		public Vector3 exportScale = Vector3.one;
@@ -217,6 +218,7 @@ public partial class ModuleExporter : EditorWindow
 					item.prefab = AssetDatabase.LoadAssetAtPath<GameObject>(item.prefabPath);
 					item.icon = exportedItem.icon;
 					item.modelPath = exportedItem.icon3d;
+					item.pivotOffset = exportedItem.pivotOffset;
 					item.exportTranslation = exportedItem.exportTranslation;
 					item.exportRotation = exportedItem.exportRotation;
 					item.exportScale = exportedItem.exportScale;
@@ -387,6 +389,7 @@ public partial class ModuleExporter : EditorWindow
 				ei.prefab = item.prefabPath;
 				ei.icon = item.icon;
 				ei.icon3d = item.modelPath;
+				ei.pivotOffset = item.pivotOffset;
 				ei.exportTranslation = item.exportTranslation;
 				ei.exportRotation = item.exportRotation;
 				ei.exportScale = item.exportScale;
@@ -688,6 +691,7 @@ public partial class ModuleExporter : EditorWindow
 		public string icon;
 		public string icon3d;
 		public List<ExportedProperty> properties;
+		public Vector3 pivotOffset = Vector3.zero;
 		public Vector3 exportTranslation = Vector3.zero;
 		public Vector3 exportRotation = Vector3.zero;
 		public Vector3 exportScale = Vector3.one;
@@ -711,6 +715,7 @@ public partial class ModuleExporter : EditorWindow
 		newItem.icon = "";
 		newItem.modelPath = "";
 		newItem.properties = new List<Property>();
+		newItem.pivotOffset = Vector3.zero;
 		newItem.exportTranslation = Vector3.zero;
 		newItem.exportRotation = Vector3.zero;
 		newItem.exportScale = Vector3.one;
@@ -766,6 +771,7 @@ public partial class ModuleExporter : EditorWindow
 			prefab = prefab,
 			prefabPath = assetPath,
 			properties = new List<Property>(),
+			pivotOffset = Vector3.zero,
 			exportTranslation = Vector3.zero,
 			exportRotation = Vector3.zero,
 			exportScale = Vector3.one
@@ -881,6 +887,7 @@ public partial class ModuleExporter : EditorWindow
 			item.exportTranslation = Vector3.zero;
 			item.exportRotation = Vector3.zero;
 			item.exportScale = Vector3.one;
+			item.pivotOffset = Vector3.zero;
 		}
 	}
 
@@ -898,7 +905,7 @@ public partial class ModuleExporter : EditorWindow
 				continue;
 			}
 
-			SetExportTranslationToBottomPivot(item);
+			SetPivotOffsetToBottom(item);
 		}
 	}
 
@@ -933,6 +940,8 @@ public partial class ModuleExporter : EditorWindow
 				return;
 			}
 
+			ApplyVertexOffset(merged.Mesh, item.pivotOffset);
+
 			if (format == ExportFormat.GLB)
 			{
 				string glbPath = Path.Combine(modelDirectory, item.name + ".glb");
@@ -955,6 +964,23 @@ public partial class ModuleExporter : EditorWindow
 			if (Application.isEditor) UnityEngine.Object.DestroyImmediate(instance);
 			else UnityEngine.Object.Destroy(instance);
 		}
+	}
+
+	private static void ApplyVertexOffset(Mesh mesh, Vector3 offset)
+	{
+		if (mesh == null || offset == Vector3.zero)
+		{
+			return;
+		}
+
+		var vertices = mesh.vertices;
+		for (int i = 0; i < vertices.Length; i++)
+		{
+			vertices[i] += offset;
+		}
+
+		mesh.vertices = vertices;
+		mesh.RecalculateBounds();
 	}
 
 	private class MergedMesh
@@ -1429,7 +1455,7 @@ public partial class ModuleExporter : EditorWindow
 		return item.exportTranslation;
 	}
 
-	private void SetExportTranslationToBottomPivot(Item item)
+	private void SetPivotOffsetToBottom(Item item)
 	{
 		if (item?.prefab == null)
 		{
@@ -1443,7 +1469,7 @@ public partial class ModuleExporter : EditorWindow
 		}
 
 		Vector3 projectedPivotOnBottomPlane = new Vector3(0f, bounds.min.y, 0f);
-		item.exportTranslation = -projectedPivotOnBottomPlane;
+		item.pivotOffset = -projectedPivotOnBottomPlane;
 	}
 
 	private bool TryGetPrefabRenderBounds(GameObject prefab, out Bounds bounds)
