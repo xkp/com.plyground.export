@@ -884,6 +884,24 @@ public partial class ModuleExporter : EditorWindow
 		}
 	}
 
+	private void ProjectGroupToBottomPivot(ItemGroup group)
+	{
+		if (group?.items == null)
+		{
+			return;
+		}
+
+		foreach (var item in group.items)
+		{
+			if (item == null)
+			{
+				continue;
+			}
+
+			SetExportTranslationToBottomPivot(item);
+		}
+	}
+
 	public enum ExportFormat { OBJ, GLB }
 
 	private void GenerateModel(Item item, ExportFormat format = ExportFormat.OBJ, bool includeMaterials = true, Dictionary<Texture2D, string> texCache = null)

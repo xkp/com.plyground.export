@@ -591,9 +591,12 @@ public partial class ModuleExporter
 			CreateCustomItem(activeGroup);
 		}
 
-		if (GUILayout.Button("Reset Group Transforms"))
+		if (GUILayout.Button("Transform"))
 		{
-			ResetTransformsForGroup(activeGroup);
+			GenericMenu transformMenu = new GenericMenu();
+			transformMenu.AddItem(new GUIContent("Reset"), false, () => ResetTransformsForGroup(activeGroup));
+			transformMenu.AddItem(new GUIContent("Project To Bottom"), false, () => ProjectGroupToBottomPivot(activeGroup));
+			transformMenu.DropDown(GUILayoutUtility.GetLastRect());
 		}
 		GUI.enabled = true;
 		EditorGUILayout.EndHorizontal();
