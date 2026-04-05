@@ -915,8 +915,6 @@ public partial class ModuleExporter : EditorWindow
 				return;
 			}
 
-			ApplyVertexOffset(merged.Mesh, PivotOffset(item.prefab));
-
 			if (format == ExportFormat.GLB)
 			{
 				string glbPath = Path.Combine(modelDirectory, item.name + ".glb");
@@ -939,23 +937,6 @@ public partial class ModuleExporter : EditorWindow
 			if (Application.isEditor) UnityEngine.Object.DestroyImmediate(instance);
 			else UnityEngine.Object.Destroy(instance);
 		}
-	}
-
-	private static void ApplyVertexOffset(Mesh mesh, Vector3 offset)
-	{
-		if (mesh == null || offset == Vector3.zero)
-		{
-			return;
-		}
-
-		var vertices = mesh.vertices;
-		for (int i = 0; i < vertices.Length; i++)
-		{
-			vertices[i] += offset;
-		}
-
-		mesh.vertices = vertices;
-		mesh.RecalculateBounds();
 	}
 
 	private class MergedMesh

@@ -1,6 +1,6 @@
 {
     "name": "com.plyground.export",
-    "version": "0.8.3",
+    "version": "0.8.31",
     "displayName": "Plyground Module Exporter",
     "description": "An asset exporter to the plyground platform",
     "unity": "2020.3",
