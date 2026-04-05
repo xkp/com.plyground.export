@@ -915,8 +915,6 @@ public partial class ModuleExporter : EditorWindow
 				return;
 			}
 
-			ApplyVertexOffset(merged.Mesh, -PivotOffset(item.prefab));
-
 			if (format == ExportFormat.GLB)
 			{
 				string glbPath = Path.Combine(modelDirectory, item.name + ".glb");
@@ -939,23 +937,6 @@ public partial class ModuleExporter : EditorWindow
 			if (Application.isEditor) UnityEngine.Object.DestroyImmediate(instance);
 			else UnityEngine.Object.Destroy(instance);
 		}
-	}
-
-	private static void ApplyVertexOffset(Mesh mesh, Vector3 offset)
-	{
-		if (mesh == null || offset == Vector3.zero)
-		{
-			return;
-		}
-
-		var vertices = mesh.vertices;
-		for (int i = 0; i < vertices.Length; i++)
-		{
-			vertices[i] += offset;
-		}
-
-		mesh.vertices = vertices;
-		mesh.RecalculateBounds();
 	}
 
 	private class MergedMesh
@@ -1430,15 +1411,66 @@ public partial class ModuleExporter : EditorWindow
 		return item.exportTranslation;
 	}
 
-	private Vector3 PivotOffset(GameObject prefab)
+	private void SetExportTranslationToBottomPivot(Item item)
 	{
-		if (prefab == null)
+		if (item?.prefab == null)
 		{
-			return Vector3.zero;
+			return;
 		}
 
-		CapsuleCollider capsule = prefab.GetComponentInChildren<CapsuleCollider>(true);
-		return capsule != null ? capsule.center : Vector3.zero;
+		if (!TryGetPrefabRenderBounds(item.prefab, out Bounds bounds))
+		{
+			Debug.LogWarning($"Could not determine render bounds for item: {item.name}");
+			return;
+		}
+
+		Vector3 projectedPivotOnBottomPlane = new Vector3(0f, bounds.min.y, 0f);
+		item.exportTranslation = -projectedPivotOnBottomPlane;
+	}
+
+	private bool TryGetPrefabRenderBounds(GameObject prefab, out Bounds bounds)
+	{
+		bounds = default;
+		if (prefab == null)
+		{
+			return false;
+		}
+
+		GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+		instance.hideFlags = HideFlags.DontSave;
+		instance.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+		instance.transform.localScale = Vector3.one;
+
+		try
+		{
+			Renderer[] renderers = instance.GetComponentsInChildren<Renderer>(true);
+			bool hasBounds = false;
+
+			foreach (Renderer renderer in renderers)
+			{
+				if (renderer == null)
+				{
+					continue;
+				}
+
+				if (!hasBounds)
+				{
+					bounds = renderer.bounds;
+					hasBounds = true;
+				}
+				else
+				{
+					bounds.Encapsulate(renderer.bounds);
+				}
+			}
+
+			return hasBounds;
+		}
+		finally
+		{
+			if (Application.isEditor) UnityEngine.Object.DestroyImmediate(instance);
+			else UnityEngine.Object.Destroy(instance);
+		}
 	}
 
 	private Texture2D LoadTextureFromFile(string filePath)

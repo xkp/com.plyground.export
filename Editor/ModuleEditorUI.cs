@@ -702,6 +702,10 @@ public partial class ModuleExporter
 		selectedItem.exportRotation = EditorGUILayout.Vector3Field("Rotation", selectedItem.exportRotation);
 		selectedItem.exportScale = EditorGUILayout.Vector3Field("Scale", selectedItem.exportScale);
 		GUI.enabled = selectedItem.prefab != null;
+		if (GUILayout.Button("Project Pivot To Bottom"))
+		{
+			SetExportTranslationToBottomPivot(selectedItem);
+		}
 		if (GUILayout.Button("Recalculate Image"))
 		{
 			RecalculateThumbnailWithUnity(selectedItem);
