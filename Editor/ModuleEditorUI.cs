@@ -590,6 +590,11 @@ public partial class ModuleExporter
 		{
 			CreateCustomItem(activeGroup);
 		}
+
+		if (GUILayout.Button("Reset Group Transforms"))
+		{
+			ResetTransformsForGroup(activeGroup);
+		}
 		GUI.enabled = true;
 		EditorGUILayout.EndHorizontal();
 

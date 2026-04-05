@@ -864,6 +864,26 @@ public partial class ModuleExporter : EditorWindow
 		Debug.Log($"Models and thumbnails for group '{group.name}' extracted successfully!");
 	}
 
+	private void ResetTransformsForGroup(ItemGroup group)
+	{
+		if (group?.items == null)
+		{
+			return;
+		}
+
+		foreach (var item in group.items)
+		{
+			if (item == null)
+			{
+				continue;
+			}
+
+			item.exportTranslation = Vector3.zero;
+			item.exportRotation = Vector3.zero;
+			item.exportScale = Vector3.one;
+		}
+	}
+
 	public enum ExportFormat { OBJ, GLB }
 
 	private void GenerateModel(Item item, ExportFormat format = ExportFormat.OBJ, bool includeMaterials = true, Dictionary<Texture2D, string> texCache = null)
