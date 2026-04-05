@@ -46,7 +46,6 @@ public partial class ModuleExporter : EditorWindow
 	private Dictionary<string, bool> propertyFoldouts = new Dictionary<string, bool>();
 
 	private List<Property> moduleProperties = new List<Property>();
-	private readonly Dictionary<string, Vector3> prefabBottomCenterCache = new Dictionary<string, Vector3>();
 
 	[System.Serializable]
 	public class PackageDefinition
@@ -1389,73 +1388,18 @@ public partial class ModuleExporter : EditorWindow
 			return Vector3.zero;
 		}
 
-		return item.exportTranslation + GetAutoPivotOffset(item);
+		return item.exportTranslation + PivotOffset(item.prefab);
 	}
 
-	private Vector3 GetAutoPivotOffset(Item item)
+	private Vector3 PivotOffset(GameObject prefab)
 	{
-		if (item?.prefab == null)
+		if (prefab == null)
 		{
 			return Vector3.zero;
 		}
 
-		Vector3 bottomCenter = GetPrefabBottomCenter(item.prefab, item.prefabPath);
-		if (bottomCenter == Vector3.zero)
-		{
-			return Vector3.zero;
-		}
-
-		Quaternion rotation = Quaternion.Euler(item.exportRotation);
-		Vector3 scaledBottomCenter = Vector3.Scale(bottomCenter, item.exportScale);
-		return rotation * scaledBottomCenter;
-	}
-
-	private Vector3 GetPrefabBottomCenter(GameObject prefab, string prefabPath)
-	{
-		string cacheKey = !string.IsNullOrEmpty(prefabPath) ? prefabPath : prefab.GetInstanceID().ToString();
-		if (prefabBottomCenterCache.TryGetValue(cacheKey, out Vector3 cachedBottomCenter))
-		{
-			return cachedBottomCenter;
-		}
-
-		GameObject instance = null;
-		try
-		{
-			instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-			instance.hideFlags = HideFlags.DontSave;
-			instance.transform.position = Vector3.zero;
-			instance.transform.rotation = Quaternion.identity;
-			instance.transform.localScale = Vector3.one;
-
-			Collider[] colliders = instance
-				.GetComponentsInChildren<Collider>(true)
-				.Where(c => c != null && c.enabled && c.gameObject.activeInHierarchy)
-				.ToArray();
-			if (colliders.Length == 0)
-			{
-				prefabBottomCenterCache[cacheKey] = Vector3.zero;
-				return Vector3.zero;
-			}
-
-			Bounds combinedBounds = colliders[0].bounds;
-			for (int i = 1; i < colliders.Length; i++)
-			{
-				combinedBounds.Encapsulate(colliders[i].bounds);
-			}
-
-			Vector3 bottomCenter = instance.transform.InverseTransformPoint(
-				new Vector3(combinedBounds.center.x, combinedBounds.min.y, combinedBounds.center.z));
-			prefabBottomCenterCache[cacheKey] = bottomCenter;
-			return bottomCenter;
-		}
-		finally
-		{
-			if (instance != null)
-			{
-				if (Application.isEditor) UnityEngine.Object.DestroyImmediate(instance);
-				else UnityEngine.Object.Destroy(instance);
-			}
-		}
+		CapsuleCollider capsule = prefab.GetComponentInChildren<CapsuleCollider>(true);
+		return capsule != null ? capsule.center : Vector3.zero;
 	}
 
 	private Texture2D LoadTextureFromFile(string filePath)
