@@ -391,13 +391,15 @@ public partial class ModuleExporter
 			{
 				name = string.Empty,
 				fileName = string.Empty,
-				assetFolder = string.Empty
+				assetFolder = string.Empty,
+				filesToRemove = new List<string>()
 			});
 		}
 
 		for (int i = 0; i < unityPackages.Count; i++)
 		{
 			PackageDefinition package = unityPackages[i];
+			package.filesToRemove ??= new List<string>();
 			EditorGUILayout.BeginVertical("helpbox");
 			EditorGUILayout.BeginHorizontal();
 			GUILayout.Label($"Package {i + 1}", EditorStyles.miniBoldLabel);
@@ -419,6 +421,30 @@ public partial class ModuleExporter
 			if (!string.IsNullOrWhiteSpace(package.assetFolder) && !IsDirectAssetsChildFolder(package.assetFolder))
 			{
 				EditorGUILayout.HelpBox("Asset Folder should match a folder directly under Assets, for example entering MyPackage for Assets/MyPackage.", MessageType.Warning);
+			}
+
+			EditorGUILayout.Space(4f);
+			GUILayout.Label("Files To Remove On Install", EditorStyles.miniBoldLabel);
+			if (package.filesToRemove.Count == 0)
+			{
+				EditorGUILayout.HelpBox("Add project-relative file paths that should be deleted after this package is installed.", MessageType.Info);
+			}
+
+			for (int fileIndex = 0; fileIndex < package.filesToRemove.Count; fileIndex++)
+			{
+				EditorGUILayout.BeginHorizontal();
+				package.filesToRemove[fileIndex] = EditorGUILayout.TextField(package.filesToRemove[fileIndex]);
+				if (GUILayout.Button("Remove", GUILayout.Width(80f)))
+				{
+					package.filesToRemove.RemoveAt(fileIndex);
+					fileIndex--;
+				}
+				EditorGUILayout.EndHorizontal();
+			}
+
+			if (GUILayout.Button("Add File"))
+			{
+				package.filesToRemove.Add(string.Empty);
 			}
 
 			EditorGUILayout.EndVertical();

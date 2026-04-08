@@ -53,6 +53,7 @@ public partial class ModuleExporter : EditorWindow
 		public string name = "";
 		public string fileName = "";
 		public string assetFolder = "";
+		public List<string> filesToRemove = new List<string>();
 	}
 
 	[System.Serializable]
@@ -152,7 +153,8 @@ public partial class ModuleExporter : EditorWindow
 				{
 					name = pkg.name,
 					fileName = pkg.fileName,
-					assetFolder = pkg.assetFolder
+					assetFolder = pkg.assetFolder,
+					filesToRemove = pkg.filesToRemove != null ? new List<string>(pkg.filesToRemove) : new List<string>()
 				});
 			}
 		}
@@ -361,7 +363,8 @@ public partial class ModuleExporter : EditorWindow
 			{
 				name = package.name,
 				fileName = package.fileName,
-				assetFolder = package.assetFolder
+				assetFolder = package.assetFolder,
+				filesToRemove = package.filesToRemove != null ? new List<string>(package.filesToRemove) : new List<string>()
 			})
 			.ToList();
 		mod.dependencies = new List<string>(dependencies);
