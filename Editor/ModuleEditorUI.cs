@@ -288,11 +288,11 @@ public partial class ModuleExporter
 		EditorGUILayout.BeginVertical("box");
 		DrawUnityPackageList();
 		EditorGUILayout.Space(6f);
-		DrawFilesToRemoveSection();
-		EditorGUILayout.Space(6f);
 		DrawDependencyList();
 		EditorGUILayout.Space(6f);
 		DrawCustomEditorList();
+		EditorGUILayout.Space(6f);
+		DrawFilesToRemoveSection();
 		EditorGUILayout.EndVertical();
 	}
 
@@ -395,6 +395,7 @@ public partial class ModuleExporter
 				fileName = string.Empty,
 				assetFolder = string.Empty
 			});
+			packageFoldouts[unityPackages.Count - 1] = false;
 		}
 
 		for (int i = 0; i < unityPackages.Count; i++)
@@ -403,7 +404,7 @@ public partial class ModuleExporter
 
 			if (!packageFoldouts.ContainsKey(i))
 			{
-				packageFoldouts[i] = true;
+				packageFoldouts[i] = false;
 			}
 
 			string packageLabel = !string.IsNullOrWhiteSpace(package.name)
@@ -457,6 +458,11 @@ public partial class ModuleExporter
 		GUILayout.Label("Files To Remove", EditorStyles.boldLabel);
 		filesToRemove ??= new List<string>();
 
+		if (GUILayout.Button("Add File To Remove"))
+		{
+			filesToRemove.Add(string.Empty);
+		}
+
 		if (filesToRemove.Count == 0)
 		{
 			EditorGUILayout.HelpBox("Add project-relative file paths that should be deleted after package install.", MessageType.Info);
@@ -472,11 +478,6 @@ public partial class ModuleExporter
 				i--;
 			}
 			EditorGUILayout.EndHorizontal();
-		}
-
-		if (GUILayout.Button("Add File To Remove"))
-		{
-			filesToRemove.Add(string.Empty);
 		}
 	}
 
