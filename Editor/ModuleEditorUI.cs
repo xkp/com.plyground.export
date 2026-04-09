@@ -288,6 +288,8 @@ public partial class ModuleExporter
 		EditorGUILayout.BeginVertical("box");
 		DrawUnityPackageList();
 		EditorGUILayout.Space(6f);
+		DrawFilesToRemoveSection();
+		EditorGUILayout.Space(6f);
 		DrawDependencyList();
 		EditorGUILayout.Space(6f);
 		DrawCustomEditorList();
@@ -391,28 +393,51 @@ public partial class ModuleExporter
 			{
 				name = string.Empty,
 				fileName = string.Empty,
-				assetFolder = string.Empty,
-				filesToRemove = new List<string>()
+				assetFolder = string.Empty
 			});
 		}
 
 		for (int i = 0; i < unityPackages.Count; i++)
 		{
 			PackageDefinition package = unityPackages[i];
-			package.filesToRemove ??= new List<string>();
+
+			if (!packageFoldouts.ContainsKey(i))
+			{
+				packageFoldouts[i] = true;
+			}
+
+			string packageLabel = !string.IsNullOrWhiteSpace(package.name)
+				? package.name
+				: !string.IsNullOrWhiteSpace(package.fileName)
+					? package.fileName
+					: $"Package {i + 1}";
+
 			EditorGUILayout.BeginVertical("helpbox");
 			EditorGUILayout.BeginHorizontal();
-			GUILayout.Label($"Package {i + 1}", EditorStyles.miniBoldLabel);
+			packageFoldouts[i] = EditorGUILayout.Foldout(packageFoldouts[i], packageLabel, true);
 			GUILayout.FlexibleSpace();
 			if (GUILayout.Button("Remove", GUILayout.Width(80f)))
 			{
 				unityPackages.RemoveAt(i);
+				packageFoldouts.Remove(i);
+				var shiftedStates = new Dictionary<int, bool>();
+				foreach (var entry in packageFoldouts)
+				{
+					shiftedStates[entry.Key > i ? entry.Key - 1 : entry.Key] = entry.Value;
+				}
+				packageFoldouts = shiftedStates;
 				i--;
 				EditorGUILayout.EndHorizontal();
 				EditorGUILayout.EndVertical();
 				continue;
 			}
 			EditorGUILayout.EndHorizontal();
+
+			if (!packageFoldouts[i])
+			{
+				EditorGUILayout.EndVertical();
+				continue;
+			}
 
 			package.name = EditorGUILayout.TextField("Name", package.name);
 			package.fileName = EditorGUILayout.TextField("File Name", package.fileName);
@@ -423,31 +448,35 @@ public partial class ModuleExporter
 				EditorGUILayout.HelpBox("Asset Folder should match a folder directly under Assets, for example entering MyPackage for Assets/MyPackage.", MessageType.Warning);
 			}
 
-			EditorGUILayout.Space(4f);
-			GUILayout.Label("Files To Remove On Install", EditorStyles.miniBoldLabel);
-			if (package.filesToRemove.Count == 0)
-			{
-				EditorGUILayout.HelpBox("Add project-relative file paths that should be deleted after this package is installed.", MessageType.Info);
-			}
-
-			for (int fileIndex = 0; fileIndex < package.filesToRemove.Count; fileIndex++)
-			{
-				EditorGUILayout.BeginHorizontal();
-				package.filesToRemove[fileIndex] = EditorGUILayout.TextField(package.filesToRemove[fileIndex]);
-				if (GUILayout.Button("Remove", GUILayout.Width(80f)))
-				{
-					package.filesToRemove.RemoveAt(fileIndex);
-					fileIndex--;
-				}
-				EditorGUILayout.EndHorizontal();
-			}
-
-			if (GUILayout.Button("Add File"))
-			{
-				package.filesToRemove.Add(string.Empty);
-			}
-
 			EditorGUILayout.EndVertical();
+		}
+	}
+
+	private void DrawFilesToRemoveSection()
+	{
+		GUILayout.Label("Files To Remove", EditorStyles.boldLabel);
+		filesToRemove ??= new List<string>();
+
+		if (filesToRemove.Count == 0)
+		{
+			EditorGUILayout.HelpBox("Add project-relative file paths that should be deleted after package install.", MessageType.Info);
+		}
+
+		for (int i = 0; i < filesToRemove.Count; i++)
+		{
+			EditorGUILayout.BeginHorizontal();
+			filesToRemove[i] = EditorGUILayout.TextField(filesToRemove[i]);
+			if (GUILayout.Button("Remove", GUILayout.Width(80f)))
+			{
+				filesToRemove.RemoveAt(i);
+				i--;
+			}
+			EditorGUILayout.EndHorizontal();
+		}
+
+		if (GUILayout.Button("Add File To Remove"))
+		{
+			filesToRemove.Add(string.Empty);
 		}
 	}
 

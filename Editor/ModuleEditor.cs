@@ -32,6 +32,7 @@ public partial class ModuleExporter : EditorWindow
 	private List<string> assetsToExport = new List<string>();       // full paths to copied files
 	private List<string> customEditors = new List<string>();
 	private List<string> dependencies = new List<string>();
+	private List<string> filesToRemove = new List<string>();
 
 	private Vector2 scrollPosition;
 	private Item selectedItem = null;
@@ -44,6 +45,7 @@ public partial class ModuleExporter : EditorWindow
 
 	// NEW: A dictionary to track property foldout states (keyed by property key).
 	private Dictionary<string, bool> propertyFoldouts = new Dictionary<string, bool>();
+	private Dictionary<int, bool> packageFoldouts = new Dictionary<int, bool>();
 
 	private List<Property> moduleProperties = new List<Property>();
 
@@ -53,7 +55,6 @@ public partial class ModuleExporter : EditorWindow
 		public string name = "";
 		public string fileName = "";
 		public string assetFolder = "";
-		public List<string> filesToRemove = new List<string>();
 	}
 
 	[System.Serializable]
@@ -153,9 +154,17 @@ public partial class ModuleExporter : EditorWindow
 				{
 					name = pkg.name,
 					fileName = pkg.fileName,
-					assetFolder = pkg.assetFolder,
-					filesToRemove = pkg.filesToRemove != null ? new List<string>(pkg.filesToRemove) : new List<string>()
+					assetFolder = pkg.assetFolder
 				});
+			}
+		}
+
+		filesToRemove.Clear();
+		if (mod.filesToRemove != null)
+		{
+			foreach (var file in mod.filesToRemove)
+			{
+				filesToRemove.Add(file);
 			}
 		}
 
@@ -363,10 +372,10 @@ public partial class ModuleExporter : EditorWindow
 			{
 				name = package.name,
 				fileName = package.fileName,
-				assetFolder = package.assetFolder,
-				filesToRemove = package.filesToRemove != null ? new List<string>(package.filesToRemove) : new List<string>()
+				assetFolder = package.assetFolder
 			})
 			.ToList();
+		mod.filesToRemove = new List<string>(filesToRemove);
 		mod.dependencies = new List<string>(dependencies);
 		mod.customEditors = new List<string>(customEditors);
 		mod.moduleProperties = new List<Property>(moduleProperties);
@@ -665,6 +674,7 @@ public partial class ModuleExporter : EditorWindow
 		public string url;
 
 		public List<PackageDefinition> packages;
+		public List<string> filesToRemove;
 		public List<string> customEditors;
 		public List<string> dependencies;
 		public List<ExportedGroup> itemGroups;
