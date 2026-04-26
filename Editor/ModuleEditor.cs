@@ -48,6 +48,7 @@ public partial class ModuleExporter : EditorWindow
 	private Dictionary<int, bool> packageFoldouts = new Dictionary<int, bool>();
 
 	private List<Property> moduleProperties = new List<Property>();
+	private CapabilityManifest moduleCapabilities = new CapabilityManifest();
 
 	[System.Serializable]
 	public class PackageDefinition
@@ -74,6 +75,7 @@ public partial class ModuleExporter : EditorWindow
 		// For component properties, the key is typically "ComponentName.FieldName" and its Property.component is set.
 		// For manual properties, we generate a unique key.
 		public List<Property> properties = new List<Property>();
+		public ItemCapabilitySet capabilities = new ItemCapabilitySet();
 
 		public Vector3 pivotOffset = Vector3.zero;
 		public Vector3 exportTranslation = Vector3.zero;
@@ -195,6 +197,9 @@ public partial class ModuleExporter : EditorWindow
 			}
 		}
 
+		moduleCapabilities = CloneModuleCapabilities(mod.capabilities);
+		PopulateCapabilityModuleMetadata(moduleCapabilities);
+
 		dependencies.Clear();
 		if (mod.dependencies != null)
 		{
@@ -249,10 +254,21 @@ public partial class ModuleExporter : EditorWindow
 							});
 						}
 					}
+
+					item.capabilities = CloneItemCapabilities(exportedItem.capabilities);
+					if (!HasMeaningfulItemCapabilities(item.capabilities) && item.prefab != null)
+					{
+						item.capabilities = InferItemCapabilities(item);
+					}
 					group.items.Add(item);
 				}
 				itemGroups.Add(group);
 			}
+		}
+
+		if (!HasMeaningfulModuleCapabilities(moduleCapabilities))
+		{
+			moduleCapabilities = InferModuleCapabilities();
 		}
 
 
@@ -379,6 +395,8 @@ public partial class ModuleExporter : EditorWindow
 		mod.dependencies = new List<string>(dependencies);
 		mod.customEditors = new List<string>(customEditors);
 		mod.moduleProperties = new List<Property>(moduleProperties);
+		PrepareCapabilitiesForPersistence();
+		mod.capabilities = CloneModuleCapabilities(moduleCapabilities);
 
 		mod.itemGroups = new List<ExportedGroup>();
 		foreach (var group in itemGroups)
@@ -411,6 +429,8 @@ public partial class ModuleExporter : EditorWindow
 				{
 					ei.properties.Add(CopyProperty(kvp));
 				}
+
+				ei.capabilities = CloneItemCapabilities(item.capabilities);
 				eg.items.Add(ei);
 			}
 			mod.itemGroups.Add(eg);
@@ -679,6 +699,7 @@ public partial class ModuleExporter : EditorWindow
 		public List<string> dependencies;
 		public List<ExportedGroup> itemGroups;
 		public List<Property> moduleProperties;
+		public CapabilityManifest capabilities;
 	}
 
 	[System.Serializable]
@@ -704,6 +725,7 @@ public partial class ModuleExporter : EditorWindow
 		public string icon;
 		public string icon3d;
 		public List<ExportedProperty> properties;
+		public ItemCapabilitySet capabilities;
 		public Vector3 pivotOffset = Vector3.zero;
 		public Vector3 exportTranslation = Vector3.zero;
 		public Vector3 exportRotation = Vector3.zero;
@@ -728,6 +750,7 @@ public partial class ModuleExporter : EditorWindow
 		newItem.icon = "";
 		newItem.modelPath = "";
 		newItem.properties = new List<Property>();
+		newItem.capabilities = new ItemCapabilitySet();
 		newItem.pivotOffset = Vector3.zero;
 		newItem.exportTranslation = Vector3.zero;
 		newItem.exportRotation = Vector3.zero;
@@ -784,6 +807,7 @@ public partial class ModuleExporter : EditorWindow
 			prefab = prefab,
 			prefabPath = assetPath,
 			properties = new List<Property>(),
+			capabilities = InferItemCapabilities(prefab),
 			pivotOffset = Vector3.zero,
 			exportTranslation = Vector3.zero,
 			exportRotation = Vector3.zero,

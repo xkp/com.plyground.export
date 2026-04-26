@@ -11,10 +11,11 @@ public partial class ModuleExporter
 		Overview,
 		Files,
 		Items,
+		Capabilities,
 		Export
 	}
 
-	private readonly string[] topTabs = { "Overview", "Files", "Items", "Export" };
+	private readonly string[] topTabs = { "Overview", "Files", "Items", "Capabilities", "Export" };
 
 	private ModuleEditorTab activeTab;
 	private Vector2 _assetScroll;
@@ -24,6 +25,8 @@ public partial class ModuleExporter
 	private GUIStyle brandSubtitleStyle;
 	private Texture2D brandLogoTexture;
 	private int activeItemGroupIndex;
+	private int capabilityItemGroupIndex;
+	private int capabilityItemIndex;
 	private const string PackageLogoAssetPath = "Packages/com.plyground.export/Editor/Branding/plyground-logo.png";
 	private const string LocalLogoAssetPath = "Editor/Branding/plyground-logo.png";
 
@@ -55,6 +58,9 @@ public partial class ModuleExporter
 				break;
 			case ModuleEditorTab.Export:
 				DrawExportTab();
+				break;
+			case ModuleEditorTab.Capabilities:
+				DrawCapabilitiesTab();
 				break;
 		}
 
@@ -991,5 +997,278 @@ public partial class ModuleExporter
 			ExportModule();
 		}
 		GUI.enabled = true;
+	}
+
+	private void DrawCapabilitiesTab()
+	{
+		moduleCapabilities ??= new CapabilityManifest();
+		PopulateCapabilityModuleMetadata(moduleCapabilities);
+
+		GUILayout.Label("CAPABILITIES", EditorStyles.boldLabel);
+		EditorGUILayout.BeginVertical("box");
+		EditorGUILayout.HelpBox("Capability data is persisted inside this module's existing module.bgm document. Use inference to populate from controller types, prefab components, Unity callbacks, and serialized fields, then adjust anything manually before save/export.", MessageType.Info);
+
+		EditorGUILayout.BeginHorizontal();
+		if (GUILayout.Button("Infer Module Capabilities", GUILayout.Width(180f)))
+		{
+			moduleCapabilities = InferModuleCapabilities();
+			PopulateCapabilityModuleMetadata(moduleCapabilities);
+		}
+
+		if (GUILayout.Button("Infer All Item Capabilities", GUILayout.Width(180f)))
+		{
+			foreach (ItemGroup group in itemGroups)
+			{
+				foreach (Item item in group.items)
+				{
+					item.capabilities = item.prefab != null ? InferItemCapabilities(item) : new ItemCapabilitySet();
+				}
+			}
+		}
+
+		if (GUILayout.Button("Sync Metadata", GUILayout.Width(120f)))
+		{
+			PopulateCapabilityModuleMetadata(moduleCapabilities);
+		}
+		EditorGUILayout.EndHorizontal();
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.Space(6f);
+		DrawModuleCapabilityManifestEditor();
+		EditorGUILayout.Space(10f);
+		DrawItemCapabilityEditor();
+	}
+
+	private void DrawModuleCapabilityManifestEditor()
+	{
+		moduleCapabilities.module ??= new CapabilityModuleInfo();
+		moduleCapabilities.unity ??= new CapabilityUnityInfo();
+		moduleCapabilities.exportInfo ??= new CapabilityExportInfo();
+
+		GUILayout.Label("MODULE-WIDE MANIFEST", EditorStyles.boldLabel);
+		EditorGUILayout.BeginVertical("box");
+		moduleCapabilities.manifestVersion = EditorGUILayout.TextField("Manifest Version", moduleCapabilities.manifestVersion);
+		moduleCapabilities.module.displayName = EditorGUILayout.TextField("Display Name", moduleCapabilities.module.displayName);
+		moduleCapabilities.module.version = EditorGUILayout.TextField("Version", moduleCapabilities.module.version);
+		moduleCapabilities.module.category = EditorGUILayout.TextField("Category", moduleCapabilities.module.category);
+		moduleCapabilities.module.description = EditorGUILayout.TextField("Description", moduleCapabilities.module.description);
+		moduleCapabilities.module.codegenEnabled = EditorGUILayout.Toggle("Codegen Enabled", moduleCapabilities.module.codegenEnabled);
+		moduleCapabilities.module.availability.local = EditorGUILayout.Toggle("Available Local", moduleCapabilities.module.availability.local);
+		moduleCapabilities.module.availability.cloud = EditorGUILayout.Toggle("Available Cloud", moduleCapabilities.module.availability.cloud);
+		DrawStringListEditor("Assembly Names", moduleCapabilities.module.assemblyNames);
+		DrawStringListEditor("Namespace Roots", moduleCapabilities.module.namespaceRoots);
+		DrawStringListEditor("Dependencies", moduleCapabilities.module.dependencies);
+		DrawStringListEditor("Tags", moduleCapabilities.module.tags);
+		DrawStringListEditor("Supported Features", moduleCapabilities.supportedFeatures);
+		DrawCapabilityUnityEditor("Unity", moduleCapabilities.unity);
+		DrawStringListEditor("Constraints", moduleCapabilities.constraints);
+		DrawTypeListEditor(moduleCapabilities.types);
+		DrawEventListEditor(moduleCapabilities.events);
+		DrawMethodListEditor(moduleCapabilities.methods);
+		DrawParameterListEditor(moduleCapabilities.parameters);
+		EditorGUILayout.LabelField("Producer", moduleCapabilities.exportInfo.producerName);
+		EditorGUILayout.LabelField("Producer Version", moduleCapabilities.exportInfo.producerVersion);
+		EditorGUILayout.LabelField("Last Exported At", string.IsNullOrWhiteSpace(moduleCapabilities.exportInfo.exportedAt) ? "Not exported yet" : moduleCapabilities.exportInfo.exportedAt);
+		EditorGUILayout.EndVertical();
+	}
+
+	private void DrawItemCapabilityEditor()
+	{
+		GUILayout.Label("ITEM / PREFAB CAPABILITIES", EditorStyles.boldLabel);
+		if (itemGroups.Count == 0)
+		{
+			EditorGUILayout.HelpBox("Add item groups and prefabs in the Items tab to author item-level capabilities.", MessageType.Info);
+			return;
+		}
+
+		capabilityItemGroupIndex = Mathf.Clamp(capabilityItemGroupIndex, 0, itemGroups.Count - 1);
+		ItemGroup group = itemGroups[capabilityItemGroupIndex];
+		string[] groupNames = itemGroups.Select(itemGroup => string.IsNullOrWhiteSpace(itemGroup.name) ? "New Group" : itemGroup.name).ToArray();
+		capabilityItemGroupIndex = EditorGUILayout.Popup("Group", capabilityItemGroupIndex, groupNames);
+		group = itemGroups[capabilityItemGroupIndex];
+
+		if (group.items == null || group.items.Count == 0)
+		{
+			EditorGUILayout.HelpBox("The selected group has no items yet.", MessageType.Info);
+			return;
+		}
+
+		capabilityItemIndex = Mathf.Clamp(capabilityItemIndex, 0, group.items.Count - 1);
+		string[] itemNames = group.items.Select(item => string.IsNullOrWhiteSpace(item.name) ? "Unnamed Item" : item.name).ToArray();
+		capabilityItemIndex = EditorGUILayout.Popup("Item", capabilityItemIndex, itemNames);
+		Item itemToEdit = group.items[capabilityItemIndex];
+		selectedItem = itemToEdit;
+		itemToEdit.capabilities ??= itemToEdit.prefab != null ? InferItemCapabilities(itemToEdit) : new ItemCapabilitySet();
+
+		EditorGUILayout.BeginVertical("box");
+		EditorGUILayout.LabelField("Prefab", EditorStyles.miniBoldLabel);
+		EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(itemToEdit.prefabPath) ? "Custom / none" : itemToEdit.prefabPath, EditorStyles.wordWrappedLabel);
+		EditorGUILayout.BeginHorizontal();
+		GUI.enabled = itemToEdit.prefab != null;
+		if (GUILayout.Button("Infer Selected Item", GUILayout.Width(150f)))
+		{
+			itemToEdit.capabilities = InferItemCapabilities(itemToEdit);
+		}
+		GUI.enabled = true;
+		if (GUILayout.Button("Clear Item Capabilities", GUILayout.Width(150f)))
+		{
+			itemToEdit.capabilities = new ItemCapabilitySet();
+		}
+		EditorGUILayout.EndHorizontal();
+		DrawStringListEditor("Supported Features", itemToEdit.capabilities.supportedFeatures);
+		DrawCapabilityUnityEditor("Unity", itemToEdit.capabilities.unity);
+		DrawStringListEditor("Constraints", itemToEdit.capabilities.constraints);
+		EditorGUILayout.EndVertical();
+	}
+
+	private void DrawCapabilityUnityEditor(string label, CapabilityUnityInfo unity)
+	{
+		unity ??= new CapabilityUnityInfo();
+		GUILayout.Label(label, EditorStyles.miniBoldLabel);
+		EditorGUILayout.BeginVertical("helpbox");
+		DrawStringListEditor("Components", unity.components);
+		DrawStringListEditor("Systems", unity.systems);
+		DrawStringListEditor("GameObject Roles", unity.gameObjectRoles);
+		DrawStringListEditor("Behavior Shapes", unity.behaviorShapes);
+		EditorGUILayout.EndVertical();
+	}
+
+	private void DrawStringListEditor(string label, List<string> values)
+	{
+		values ??= new List<string>();
+		EditorGUILayout.BeginVertical("helpbox");
+		EditorGUILayout.BeginHorizontal();
+		GUILayout.Label(label, EditorStyles.miniBoldLabel);
+		GUILayout.FlexibleSpace();
+		if (GUILayout.Button("Add", GUILayout.Width(60f)))
+		{
+			values.Add(string.Empty);
+		}
+		EditorGUILayout.EndHorizontal();
+
+		if (values.Count == 0)
+		{
+			EditorGUILayout.LabelField("No entries", EditorStyles.miniLabel);
+		}
+
+		for (int i = 0; i < values.Count; i++)
+		{
+			EditorGUILayout.BeginHorizontal();
+			values[i] = EditorGUILayout.TextField(values[i]);
+			if (GUILayout.Button("X", GUILayout.Width(24f)))
+			{
+				values.RemoveAt(i);
+				i--;
+			}
+			EditorGUILayout.EndHorizontal();
+		}
+
+		EditorGUILayout.EndVertical();
+	}
+
+	private void DrawTypeListEditor(List<CapabilityTypeInfo> values)
+	{
+		values ??= new List<CapabilityTypeInfo>();
+		GUILayout.Label("Types", EditorStyles.miniBoldLabel);
+		if (GUILayout.Button("Add Type", GUILayout.Width(90f)))
+		{
+			values.Add(new CapabilityTypeInfo());
+		}
+		for (int i = 0; i < values.Count; i++)
+		{
+			CapabilityTypeInfo entry = values[i];
+			EditorGUILayout.BeginVertical("helpbox");
+			entry.name = EditorGUILayout.TextField("Name", entry.name);
+			entry.fullName = EditorGUILayout.TextField("Full Name", entry.fullName);
+			entry.assemblyName = EditorGUILayout.TextField("Assembly", entry.assemblyName);
+			entry.kind = EditorGUILayout.TextField("Kind", entry.kind);
+			entry.description = EditorGUILayout.TextField("Description", entry.description);
+			if (GUILayout.Button("Remove Type", GUILayout.Width(110f)))
+			{
+				values.RemoveAt(i);
+				i--;
+			}
+			EditorGUILayout.EndVertical();
+		}
+	}
+
+	private void DrawEventListEditor(List<CapabilityEventInfo> values)
+	{
+		values ??= new List<CapabilityEventInfo>();
+		GUILayout.Label("Events", EditorStyles.miniBoldLabel);
+		if (GUILayout.Button("Add Event", GUILayout.Width(90f)))
+		{
+			values.Add(new CapabilityEventInfo());
+		}
+		for (int i = 0; i < values.Count; i++)
+		{
+			CapabilityEventInfo entry = values[i];
+			EditorGUILayout.BeginVertical("helpbox");
+			entry.name = EditorGUILayout.TextField("Name", entry.name);
+			entry.declaringType = EditorGUILayout.TextField("Declaring Type", entry.declaringType);
+			entry.eventType = EditorGUILayout.TextField("Event Type", entry.eventType);
+			entry.source = EditorGUILayout.TextField("Source", entry.source);
+			entry.description = EditorGUILayout.TextField("Description", entry.description);
+			if (GUILayout.Button("Remove Event", GUILayout.Width(110f)))
+			{
+				values.RemoveAt(i);
+				i--;
+			}
+			EditorGUILayout.EndVertical();
+		}
+	}
+
+	private void DrawMethodListEditor(List<CapabilityMethodInfo> values)
+	{
+		values ??= new List<CapabilityMethodInfo>();
+		GUILayout.Label("Methods", EditorStyles.miniBoldLabel);
+		if (GUILayout.Button("Add Method", GUILayout.Width(100f)))
+		{
+			values.Add(new CapabilityMethodInfo());
+		}
+		for (int i = 0; i < values.Count; i++)
+		{
+			CapabilityMethodInfo entry = values[i];
+			EditorGUILayout.BeginVertical("helpbox");
+			entry.name = EditorGUILayout.TextField("Name", entry.name);
+			entry.declaringType = EditorGUILayout.TextField("Declaring Type", entry.declaringType);
+			entry.returnType = EditorGUILayout.TextField("Return Type", entry.returnType);
+			entry.signature = EditorGUILayout.TextField("Signature", entry.signature);
+			entry.source = EditorGUILayout.TextField("Source", entry.source);
+			entry.description = EditorGUILayout.TextField("Description", entry.description);
+			if (GUILayout.Button("Remove Method", GUILayout.Width(120f)))
+			{
+				values.RemoveAt(i);
+				i--;
+			}
+			EditorGUILayout.EndVertical();
+		}
+	}
+
+	private void DrawParameterListEditor(List<CapabilityParameterInfo> values)
+	{
+		values ??= new List<CapabilityParameterInfo>();
+		GUILayout.Label("Parameters", EditorStyles.miniBoldLabel);
+		if (GUILayout.Button("Add Parameter", GUILayout.Width(110f)))
+		{
+			values.Add(new CapabilityParameterInfo());
+		}
+		for (int i = 0; i < values.Count; i++)
+		{
+			CapabilityParameterInfo entry = values[i];
+			EditorGUILayout.BeginVertical("helpbox");
+			entry.name = EditorGUILayout.TextField("Name", entry.name);
+			entry.type = EditorGUILayout.TextField("Type", entry.type);
+			entry.source = EditorGUILayout.TextField("Source", entry.source);
+			entry.defaultValue = EditorGUILayout.TextField("Default Value", entry.defaultValue);
+			entry.description = EditorGUILayout.TextField("Description", entry.description);
+			entry.required = EditorGUILayout.Toggle("Required", entry.required);
+			if (GUILayout.Button("Remove Parameter", GUILayout.Width(130f)))
+			{
+				values.RemoveAt(i);
+				i--;
+			}
+			EditorGUILayout.EndVertical();
+		}
 	}
 }
