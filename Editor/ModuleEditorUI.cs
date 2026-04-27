@@ -27,6 +27,8 @@ public partial class ModuleExporter
 	private int activeItemGroupIndex;
 	private int capabilityItemGroupIndex;
 	private int capabilityItemIndex;
+	private int selectedModuleFeatureIndex;
+	private int selectedItemFeatureIndex;
 	private const string PackageLogoAssetPath = "Packages/com.plyground.export/Editor/Branding/plyground-logo.png";
 	private const string LocalLogoAssetPath = "Editor/Branding/plyground-logo.png";
 
@@ -1062,6 +1064,8 @@ public partial class ModuleExporter
 		{
 			moduleCapabilities = InferModuleCapabilities();
 			PopulateCapabilityModuleMetadata(moduleCapabilities);
+			NormalizeModuleCapabilities(moduleCapabilities);
+			selectedModuleFeatureIndex = 0;
 		}
 
 		if (GUILayout.Button("Infer All Item Capabilities", GUILayout.Width(180f)))
@@ -1071,8 +1075,10 @@ public partial class ModuleExporter
 				foreach (Item item in group.items)
 				{
 					item.capabilities = item.prefab != null ? InferItemCapabilities(item) : new ItemCapabilitySet();
+					NormalizeItemCapabilities(item.capabilities);
 				}
 			}
+			selectedItemFeatureIndex = 0;
 		}
 
 		if (GUILayout.Button("Sync Metadata", GUILayout.Width(120f)))
@@ -1093,7 +1099,6 @@ public partial class ModuleExporter
 		moduleCapabilities.module ??= new CapabilityModuleInfo();
 		moduleCapabilities.unity ??= new CapabilityUnityInfo();
 		moduleCapabilities.exportInfo ??= new CapabilityExportInfo();
-		NormalizeModuleCapabilities(moduleCapabilities);
 
 		GUILayout.Label("MODULE-WIDE MANIFEST", EditorStyles.boldLabel);
 		EditorGUILayout.BeginVertical("box");
@@ -1109,7 +1114,7 @@ public partial class ModuleExporter
 		DrawStringListEditor("Namespace Roots", moduleCapabilities.module.namespaceRoots);
 		DrawStringListEditor("Dependencies", moduleCapabilities.module.dependencies);
 		DrawStringListEditor("Tags", moduleCapabilities.module.tags);
-		DrawSupportedFeatureListEditor("Supported Features", moduleCapabilities.supportedFeatures);
+		DrawFeatureTileEditor("Supported Features", moduleCapabilities.supportedFeatures, ref selectedModuleFeatureIndex);
 		DrawConstraintListEditor("Constraints", moduleCapabilities.constraints);
 		DrawTypeListEditor(moduleCapabilities.types);
 		DrawEventListEditor(moduleCapabilities.events);
@@ -1148,6 +1153,7 @@ public partial class ModuleExporter
 		Item itemToEdit = group.items[capabilityItemIndex];
 		selectedItem = itemToEdit;
 		itemToEdit.capabilities ??= itemToEdit.prefab != null ? InferItemCapabilities(itemToEdit) : new ItemCapabilitySet();
+		NormalizeItemCapabilities(itemToEdit.capabilities);
 
 		EditorGUILayout.BeginVertical("box");
 		EditorGUILayout.LabelField("Prefab", EditorStyles.miniBoldLabel);
@@ -1157,19 +1163,22 @@ public partial class ModuleExporter
 		if (GUILayout.Button("Infer Selected Item", GUILayout.Width(150f)))
 		{
 			itemToEdit.capabilities = InferItemCapabilities(itemToEdit);
+			NormalizeItemCapabilities(itemToEdit.capabilities);
+			selectedItemFeatureIndex = 0;
 		}
 		GUI.enabled = true;
 		if (GUILayout.Button("Clear Item Capabilities", GUILayout.Width(150f)))
 		{
 			itemToEdit.capabilities = new ItemCapabilitySet();
+			selectedItemFeatureIndex = 0;
 		}
 		EditorGUILayout.EndHorizontal();
-		DrawSupportedFeatureListEditor("Supported Features", itemToEdit.capabilities.supportedFeatures);
+		DrawFeatureTileEditor("Supported Features", itemToEdit.capabilities.supportedFeatures, ref selectedItemFeatureIndex);
 		DrawConstraintListEditor("Constraints", itemToEdit.capabilities.constraints);
 		EditorGUILayout.EndVertical();
 	}
 
-	private void DrawSupportedFeatureListEditor(string label, List<CapabilityFeatureInfo> values)
+	private void DrawFeatureTileEditor(string label, List<CapabilityFeatureInfo> values, ref int selectedIndex)
 	{
 		values ??= new List<CapabilityFeatureInfo>();
 		EditorGUILayout.BeginVertical("helpbox");
@@ -1179,31 +1188,46 @@ public partial class ModuleExporter
 		if (GUILayout.Button("Add", GUILayout.Width(60f)))
 		{
 			values.Add(new CapabilityFeatureInfo());
+			selectedIndex = values.Count - 1;
 		}
 		EditorGUILayout.EndHorizontal();
 
 		if (values.Count == 0)
 		{
 			EditorGUILayout.LabelField("No entries", EditorStyles.miniLabel);
+			EditorGUILayout.EndVertical();
+			return;
 		}
 
+		selectedIndex = Mathf.Clamp(selectedIndex, 0, values.Count - 1);
+		EditorGUILayout.BeginHorizontal();
+		EditorGUILayout.BeginVertical(GUILayout.Width(Mathf.Max(180f, position.width * 0.28f)));
 		for (int i = 0; i < values.Count; i++)
 		{
 			CapabilityFeatureInfo entry = values[i];
-			EditorGUILayout.BeginVertical("box");
-			entry.featureId = EditorGUILayout.TextField("Feature Id", entry.featureId);
-			entry.description = EditorGUILayout.TextField("Description", entry.description);
-			entry.codegenAllowed = EditorGUILayout.Toggle("Codegen Allowed", entry.codegenAllowed);
-			DrawStringListEditor("Required Dependencies", entry.requiredDependencies);
-			DrawStringListEditor("Incompatible Features", entry.incompatibleFeatures);
-			DrawStringListEditor("Recommended Templates", entry.recommendedTemplates);
-			if (GUILayout.Button("Remove Feature", GUILayout.Width(120f)))
+			string tileLabel = string.IsNullOrWhiteSpace(entry.featureId) ? "New Feature" : entry.featureId;
+			if (GUILayout.Button(tileLabel, selectedIndex == i ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(32f)))
 			{
-				values.RemoveAt(i);
-				i--;
+				selectedIndex = i;
 			}
-			EditorGUILayout.EndVertical();
 		}
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true));
+		CapabilityFeatureInfo selectedFeature = values[selectedIndex];
+		selectedFeature.featureId = EditorGUILayout.TextField("Feature Id", selectedFeature.featureId);
+		selectedFeature.description = EditorGUILayout.TextField("Description", selectedFeature.description);
+		selectedFeature.codegenAllowed = EditorGUILayout.Toggle("Codegen Allowed", selectedFeature.codegenAllowed);
+		DrawStringListEditor("Required Dependencies", selectedFeature.requiredDependencies);
+		DrawStringListEditor("Incompatible Features", selectedFeature.incompatibleFeatures);
+		DrawStringListEditor("Recommended Templates", selectedFeature.recommendedTemplates);
+		if (GUILayout.Button("Remove Feature", GUILayout.Width(120f)))
+		{
+			values.RemoveAt(selectedIndex);
+			selectedIndex = Mathf.Clamp(selectedIndex - 1, 0, Mathf.Max(0, values.Count - 1));
+		}
+		EditorGUILayout.EndVertical();
+		EditorGUILayout.EndHorizontal();
 
 		EditorGUILayout.EndVertical();
 	}

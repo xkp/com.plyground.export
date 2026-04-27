@@ -199,6 +199,7 @@ public partial class ModuleExporter : EditorWindow
 
 		moduleCapabilities = CloneModuleCapabilities(mod.capabilities);
 		PopulateCapabilityModuleMetadata(moduleCapabilities);
+		NormalizeModuleCapabilities(moduleCapabilities);
 
 		dependencies.Clear();
 		if (mod.dependencies != null)
@@ -260,6 +261,7 @@ public partial class ModuleExporter : EditorWindow
 					{
 						item.capabilities = InferItemCapabilities(item);
 					}
+					NormalizeItemCapabilities(item.capabilities);
 					group.items.Add(item);
 				}
 				itemGroups.Add(group);
