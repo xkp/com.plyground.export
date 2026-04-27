@@ -34,6 +34,7 @@ public partial class ModuleExporter
 	private int selectedComponentIndex = -1;
 	private int selectedComponentArtifactIndex = -1;
 	private Dictionary<string, bool> capabilitySectionFoldouts = new Dictionary<string, bool>();
+	private Dictionary<string, bool> componentNamespaceFoldouts = new Dictionary<string, bool>();
 	private const string PackageLogoAssetPath = "Packages/com.plyground.export/Editor/Branding/plyground-logo.png";
 	private const string LocalLogoAssetPath = "Editor/Branding/plyground-logo.png";
 
@@ -1231,16 +1232,7 @@ public partial class ModuleExporter
 
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(220f, position.width * 0.22f)));
 		GUILayout.Label("Component List", EditorStyles.boldLabel);
-		for (int i = 0; i < components.Count; i++)
-		{
-			UnityCapabilityComponentInfo entry = components[i];
-			string label = string.IsNullOrWhiteSpace(entry.componentId) ? "New Component" : entry.componentId;
-			if (GUILayout.Button(label, selectedComponentIndex == i ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(30f)))
-			{
-				selectedComponentIndex = i;
-				selectedComponentArtifactIndex = -1;
-			}
-		}
+		DrawComponentNamespaceTree(components);
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(220f, position.width * 0.22f)));
@@ -1323,6 +1315,141 @@ public partial class ModuleExporter
 			selectedComponentIndex = Mathf.Clamp(selectedComponentIndex - 1, 0, Mathf.Max(0, components.Count - 1));
 			selectedComponentArtifactIndex = -1;
 		}
+	}
+
+	private void DrawComponentNamespaceTree(List<UnityCapabilityComponentInfo> components)
+	{
+		List<ComponentNamespaceNode> roots = BuildComponentNamespaceTreeNodes(components);
+		if (roots.Count == 0)
+		{
+			EditorGUILayout.LabelField("No components", EditorStyles.miniLabel);
+			return;
+		}
+
+		foreach (ComponentNamespaceNode root in roots)
+		{
+			DrawComponentNamespaceNode(root, components, 0);
+		}
+	}
+
+	private void DrawComponentNamespaceNode(ComponentNamespaceNode node, List<UnityCapabilityComponentInfo> components, int depth)
+	{
+		if (node == null)
+		{
+			return;
+		}
+
+		if (!string.IsNullOrWhiteSpace(node.fullPath))
+		{
+			if (!componentNamespaceFoldouts.ContainsKey(node.fullPath))
+			{
+				componentNamespaceFoldouts[node.fullPath] = true;
+			}
+
+			EditorGUILayout.BeginHorizontal();
+			GUILayout.Space(depth * 14f);
+			componentNamespaceFoldouts[node.fullPath] = EditorGUILayout.Foldout(componentNamespaceFoldouts[node.fullPath], node.label, true);
+			EditorGUILayout.EndHorizontal();
+
+			if (!componentNamespaceFoldouts[node.fullPath])
+			{
+				return;
+			}
+		}
+
+		foreach (ComponentNamespaceNode child in node.children.OrderBy(child => child.label))
+		{
+			DrawComponentNamespaceNode(child, components, depth + (string.IsNullOrWhiteSpace(node.fullPath) ? 0 : 1));
+		}
+
+		foreach (int componentIndex in node.componentIndexes)
+		{
+			if (componentIndex < 0 || componentIndex >= components.Count)
+			{
+				continue;
+			}
+
+			UnityCapabilityComponentInfo entry = components[componentIndex];
+			string label = string.IsNullOrWhiteSpace(entry.typeName)
+				? (string.IsNullOrWhiteSpace(entry.componentId) ? "New Component" : entry.componentId)
+				: GetLeafTypeName(entry.typeName);
+			EditorGUILayout.BeginHorizontal();
+			GUILayout.Space((depth + (string.IsNullOrWhiteSpace(node.fullPath) ? 0 : 1)) * 14f);
+			if (GUILayout.Button(label, selectedComponentIndex == componentIndex ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(26f)))
+			{
+				selectedComponentIndex = componentIndex;
+				selectedComponentArtifactIndex = -1;
+			}
+			EditorGUILayout.EndHorizontal();
+		}
+	}
+
+	private List<ComponentNamespaceNode> BuildComponentNamespaceTreeNodes(List<UnityCapabilityComponentInfo> components)
+	{
+		ComponentNamespaceNode root = new ComponentNamespaceNode
+		{
+			label = "",
+			fullPath = ""
+		};
+
+		for (int i = 0; i < components.Count; i++)
+		{
+			UnityCapabilityComponentInfo component = components[i];
+			string typeName = !string.IsNullOrWhiteSpace(component.typeName) ? component.typeName : component.componentId;
+			string[] namespaceParts = GetNamespaceParts(typeName);
+			ComponentNamespaceNode current = root;
+
+			for (int partIndex = 0; partIndex < namespaceParts.Length; partIndex++)
+			{
+				string part = namespaceParts[partIndex];
+				string path = string.Join(".", namespaceParts.Take(partIndex + 1).ToArray());
+				ComponentNamespaceNode child = current.children.FirstOrDefault(existing => existing.fullPath == path);
+				if (child == null)
+				{
+					child = new ComponentNamespaceNode
+					{
+						label = part,
+						fullPath = path
+					};
+					current.children.Add(child);
+				}
+
+				current = child;
+			}
+
+			current.componentIndexes.Add(i);
+		}
+
+		return root.children;
+	}
+
+	private string[] GetNamespaceParts(string typeName)
+	{
+		if (string.IsNullOrWhiteSpace(typeName) || !typeName.Contains("."))
+		{
+			return Array.Empty<string>();
+		}
+
+		string[] parts = typeName.Split('.');
+		if (parts.Length <= 1)
+		{
+			return Array.Empty<string>();
+		}
+
+		return parts.Take(parts.Length - 1).ToArray();
+	}
+
+	private string GetLeafTypeName(string typeName)
+	{
+		if (string.IsNullOrWhiteSpace(typeName))
+		{
+			return "New Component";
+		}
+
+		int lastDot = typeName.LastIndexOf('.');
+		return lastDot >= 0 && lastDot < typeName.Length - 1
+			? typeName.Substring(lastDot + 1)
+			: typeName;
 	}
 
 	private void DrawSelectedComponentArtifactEditor(UnityCapabilityComponentInfo component, ComponentArtifactEntry artifact)
@@ -1455,6 +1582,14 @@ public partial class ModuleExporter
 		public CapabilityMethodInfo method;
 		public CapabilityEventInfo eventInfo;
 		public CapabilityParameterInfo parameter;
+	}
+
+	private class ComponentNamespaceNode
+	{
+		public string label;
+		public string fullPath;
+		public List<ComponentNamespaceNode> children = new List<ComponentNamespaceNode>();
+		public List<int> componentIndexes = new List<int>();
 	}
 
 	private void DrawItemCapabilityEditor()
