@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using UnityEditor;
 using UnityEditor.PackageManager;
 using UnityEngine;
@@ -19,6 +20,10 @@ public partial class ModuleExporter
 		"OnCollisionEnter", "OnCollisionExit", "OnTriggerEnter", "OnTriggerExit",
 		"OnMouseDown", "OnMouseUp", "OnAnimatorMove", "OnAudioFilterRead"
 	};
+	private static readonly Dictionary<string, CachedSourceScriptInfo> SourceScriptCache = new Dictionary<string, CachedSourceScriptInfo>(StringComparer.OrdinalIgnoreCase);
+	private static Assembly RoslynAssembly;
+	private static Assembly RoslynCSharpAssembly;
+	private static bool RoslynLoadAttempted;
 
 	[Serializable]
 	public class CapabilityManifest
@@ -239,6 +244,51 @@ public partial class ModuleExporter
 		public string sourceEnvironment = CapabilitySourceEnvironment;
 	}
 
+	private class CachedSourceScriptInfo
+	{
+		public DateTime lastWriteUtc;
+		public SourceScriptInfo info;
+	}
+
+	private class SourceScriptInfo
+	{
+		public string assetPath = "";
+		public string namespaceName = "";
+		public string className = "";
+		public string fullName = "";
+		public string baseTypeName = "";
+		public string summary = "";
+		public bool isComponent;
+		public List<SourceMethodInfo> methods = new List<SourceMethodInfo>();
+		public List<SourceFieldInfo> fields = new List<SourceFieldInfo>();
+		public List<SourceEventInfo> events = new List<SourceEventInfo>();
+	}
+
+	private class SourceMethodInfo
+	{
+		public string name = "";
+		public string returnType = "";
+		public List<CapabilityMethodParameterInfo> parameters = new List<CapabilityMethodParameterInfo>();
+		public string summary = "";
+		public bool isStatic;
+	}
+
+	private class SourceFieldInfo
+	{
+		public string name = "";
+		public string type = "";
+		public string summary = "";
+		public bool required;
+		public bool serialized;
+	}
+
+	private class SourceEventInfo
+	{
+		public string name = "";
+		public string payloadType = "";
+		public string summary = "";
+	}
+
 	private void PrepareCapabilitiesForPersistence()
 	{
 		moduleCapabilities ??= new CapabilityManifest();
@@ -321,6 +371,8 @@ public partial class ModuleExporter
 	{
 		CapabilityManifest manifest = new CapabilityManifest();
 		PopulateCapabilityModuleMetadata(manifest);
+		List<SourceScriptInfo> sourceScripts = GetAllLocalSourceScripts();
+		HashSet<string> relevantNamespaceRoots = GetRelevantNamespaceRoots(sourceScripts);
 
 		Dictionary<string, CapabilityTypeInfo> typeMap = new Dictionary<string, CapabilityTypeInfo>(StringComparer.OrdinalIgnoreCase);
 		Dictionary<string, CapabilityMethodInfo> methodMap = new Dictionary<string, CapabilityMethodInfo>(StringComparer.OrdinalIgnoreCase);
@@ -431,6 +483,46 @@ public partial class ModuleExporter
 			}
 		}
 
+		foreach (SourceScriptInfo sourceInfo in GetRelevantSourceComponents(sourceScripts, relevantNamespaceRoots))
+		{
+			UnityCapabilityComponentInfo componentInfo = BuildUnityComponentInfo(sourceInfo);
+			AddComponent(componentMap, componentInfo);
+			AddFeature(featureMap, new CapabilityFeatureInfo
+			{
+				featureId = "component:" + sourceInfo.className,
+				description = string.IsNullOrWhiteSpace(sourceInfo.summary) ? "Declared in source" : sourceInfo.summary
+			});
+
+			foreach (CapabilityMethodInfo method in componentInfo.methods)
+			{
+				AddMethod(methodMap, method);
+			}
+
+			foreach (CapabilityEventInfo eventInfo in componentInfo.events)
+			{
+				AddEvent(eventMap, eventInfo);
+			}
+
+			foreach (CapabilityParameterInfo parameter in componentInfo.parameters)
+			{
+				AddParameter(parameterMap, parameter);
+			}
+
+			Type resolvedType = ResolveTypeByName(sourceInfo.fullName);
+			if (resolvedType != null)
+			{
+				AddTypeMetadata(resolvedType, typeMap, assemblyNames, namespaceRoots);
+			}
+			else
+			{
+				typeMap[sourceInfo.fullName] = BuildTypeInfo(sourceInfo);
+				if (!string.IsNullOrWhiteSpace(sourceInfo.namespaceName))
+				{
+					namespaceRoots.Add(GetNamespaceRoot(sourceInfo.namespaceName));
+				}
+			}
+		}
+
 		manifest.types = typeMap.Values.OrderBy(info => info.fullName).ToList();
 		manifest.methods = methodMap.Values.OrderBy(info => info.declaringType).ThenBy(info => info.name).ToList();
 		manifest.events = eventMap.Values.OrderBy(info => info.declaringType).ThenBy(info => info.name).ToList();
@@ -476,7 +568,8 @@ public partial class ModuleExporter
 				continue;
 			}
 
-			UnityCapabilityComponentInfo componentInfo = BuildUnityComponentInfo(componentType, component);
+			SourceScriptInfo sourceInfo = GetSourceScriptInfoForType(componentType);
+			UnityCapabilityComponentInfo componentInfo = BuildUnityComponentInfo(componentType, component, sourceInfo);
 			AddComponent(componentMap, componentInfo);
 
 			foreach (string featureId in componentInfo.allowedFeatures)
@@ -507,17 +600,22 @@ public partial class ModuleExporter
 
 	private UnityCapabilityComponentInfo BuildUnityComponentInfo(Type componentType, Component instance)
 	{
+		return BuildUnityComponentInfo(componentType, instance, GetSourceScriptInfoForType(componentType));
+	}
+
+	private UnityCapabilityComponentInfo BuildUnityComponentInfo(Type componentType, Component instance, SourceScriptInfo sourceInfo)
+	{
 		UnityCapabilityComponentInfo componentInfo = new UnityCapabilityComponentInfo
 		{
 			componentId = componentType.FullName ?? componentType.Name,
 			typeName = componentType.FullName ?? componentType.Name,
 			baseType = GetBaseTypeLabel(componentType),
 			attachTarget = "self",
-			description = "Component inferred from Assets/ script",
+			description = sourceInfo != null && !string.IsNullOrWhiteSpace(sourceInfo.summary) ? sourceInfo.summary : "Component inferred from Assets/ script",
 			requiredComponents = BuildRequiredComponentNames(componentType),
-			methods = BuildMethodInfos(componentType),
-			events = BuildEventInfos(componentType),
-			parameters = BuildParameterInfos(componentType, instance),
+			methods = BuildMethodInfos(componentType, sourceInfo),
+			events = BuildEventInfos(componentType, sourceInfo),
+			parameters = BuildParameterInfos(componentType, instance, sourceInfo),
 			tags = DistinctStrings(new[] { "component-first", "unity-exporter" }),
 			codegenAllowed = true
 		};
@@ -541,6 +639,27 @@ public partial class ModuleExporter
 		}
 
 		componentInfo.allowedFeatures = allowedFeatures.OrderBy(value => value).ToList();
+		return componentInfo;
+	}
+
+	private UnityCapabilityComponentInfo BuildUnityComponentInfo(SourceScriptInfo sourceInfo)
+	{
+		UnityCapabilityComponentInfo componentInfo = new UnityCapabilityComponentInfo
+		{
+			componentId = sourceInfo.fullName,
+			typeName = sourceInfo.fullName,
+			baseType = GetBaseTypeLabel(sourceInfo.baseTypeName),
+			attachTarget = "self",
+			description = sourceInfo.summary,
+			requiredComponents = new List<string>(),
+			methods = BuildMethodInfos(sourceInfo),
+			events = BuildEventInfos(sourceInfo),
+			parameters = BuildParameterInfos(sourceInfo),
+			tags = DistinctStrings(new[] { "component-first", "unity-exporter", "source-derived" }),
+			codegenAllowed = true,
+			allowedFeatures = BuildAllowedFeatures(sourceInfo)
+		};
+
 		return componentInfo;
 	}
 
@@ -622,7 +741,15 @@ public partial class ModuleExporter
 
 	private List<CapabilityMethodInfo> BuildMethodInfos(Type type)
 	{
+		return BuildMethodInfos(type, GetSourceScriptInfoForType(type));
+	}
+
+	private List<CapabilityMethodInfo> BuildMethodInfos(Type type, SourceScriptInfo sourceInfo)
+	{
 		List<CapabilityMethodInfo> methods = new List<CapabilityMethodInfo>();
+		Dictionary<string, SourceMethodInfo> sourceMethodMap = sourceInfo != null
+			? sourceInfo.methods.ToDictionary(method => method.name, method => method, StringComparer.OrdinalIgnoreCase)
+			: new Dictionary<string, SourceMethodInfo>(StringComparer.OrdinalIgnoreCase);
 		foreach (MethodInfo method in type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
 		{
 			if (method.IsSpecialName)
@@ -630,20 +757,14 @@ public partial class ModuleExporter
 				continue;
 			}
 
+			sourceMethodMap.TryGetValue(method.Name, out SourceMethodInfo sourceMethod);
+
 			methods.Add(new CapabilityMethodInfo
 			{
 				name = method.Name,
 				declaringType = type.FullName ?? type.Name,
-				description = "Reflected from " + type.Name,
-				parameters = method.GetParameters()
-					.Select(parameter => new CapabilityMethodParameterInfo
-					{
-						name = parameter.Name,
-						type = GetFriendlyTypeName(parameter.ParameterType),
-						description = "",
-						required = !parameter.IsOptional
-					})
-					.ToList(),
+				description = sourceMethod != null && !string.IsNullOrWhiteSpace(sourceMethod.summary) ? sourceMethod.summary : "Reflected from " + type.Name,
+				parameters = BuildMethodParameters(method, sourceMethod),
 				returnType = GetFriendlyTypeName(method.ReturnType),
 				isStatic = method.IsStatic,
 				allowedForCodegen = true,
@@ -655,18 +776,45 @@ public partial class ModuleExporter
 		return methods;
 	}
 
+	private List<CapabilityMethodInfo> BuildMethodInfos(SourceScriptInfo sourceInfo)
+	{
+		return sourceInfo.methods
+			.Select(method => new CapabilityMethodInfo
+			{
+				name = method.name,
+				declaringType = sourceInfo.fullName,
+				description = method.summary,
+				parameters = method.parameters != null ? CloneMethodParameterList(method.parameters) : new List<CapabilityMethodParameterInfo>(),
+				returnType = string.IsNullOrWhiteSpace(method.returnType) ? "void" : method.returnType,
+				isStatic = method.isStatic,
+				allowedForCodegen = true,
+				constraints = new List<string>(),
+				tags = new List<string> { "source" }
+			})
+			.ToList();
+	}
+
 	private List<CapabilityEventInfo> BuildEventInfos(Type type)
 	{
+		return BuildEventInfos(type, GetSourceScriptInfoForType(type));
+	}
+
+	private List<CapabilityEventInfo> BuildEventInfos(Type type, SourceScriptInfo sourceInfo)
+	{
 		List<CapabilityEventInfo> events = new List<CapabilityEventInfo>();
+		Dictionary<string, SourceEventInfo> sourceEventMap = sourceInfo != null
+			? sourceInfo.events.ToDictionary(eventInfo => eventInfo.name, eventInfo => eventInfo, StringComparer.OrdinalIgnoreCase)
+			: new Dictionary<string, SourceEventInfo>(StringComparer.OrdinalIgnoreCase);
 		foreach (EventInfo eventInfo in type.GetEvents(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
 		{
+			sourceEventMap.TryGetValue(eventInfo.Name, out SourceEventInfo sourceEvent);
 			events.Add(new CapabilityEventInfo
 			{
 				name = eventInfo.Name,
 				direction = "publishes",
 				payloadType = eventInfo.EventHandlerType != null ? GetFriendlyTypeName(eventInfo.EventHandlerType) : "",
 				declaringType = type.FullName ?? type.Name,
-				description = "Reflected from " + type.Name,
+				description = sourceEvent != null && !string.IsNullOrWhiteSpace(sourceEvent.summary) ? sourceEvent.summary : "Reflected from " + type.Name,
 				allowedForCodegen = true,
 				scope = "",
 				authority = "",
@@ -698,18 +846,45 @@ public partial class ModuleExporter
 		return events;
 	}
 
+	private List<CapabilityEventInfo> BuildEventInfos(SourceScriptInfo sourceInfo)
+	{
+		return sourceInfo.events
+			.Select(eventInfo => new CapabilityEventInfo
+			{
+				name = eventInfo.name,
+				direction = "publishes",
+				payloadType = eventInfo.payloadType,
+				declaringType = sourceInfo.fullName,
+				description = eventInfo.summary,
+				allowedForCodegen = true,
+				scope = "",
+				authority = "",
+				tags = new List<string> { "source" }
+			})
+			.ToList();
+	}
+
 	private List<CapabilityParameterInfo> BuildParameterInfos(Type type, Component instance)
 	{
+		return BuildParameterInfos(type, instance, GetSourceScriptInfoForType(type));
+	}
+
+	private List<CapabilityParameterInfo> BuildParameterInfos(Type type, Component instance, SourceScriptInfo sourceInfo)
+	{
 		List<CapabilityParameterInfo> parameters = new List<CapabilityParameterInfo>();
+		Dictionary<string, SourceFieldInfo> sourceFieldMap = sourceInfo != null
+			? sourceInfo.fields.ToDictionary(field => field.name, field => field, StringComparer.OrdinalIgnoreCase)
+			: new Dictionary<string, SourceFieldInfo>(StringComparer.OrdinalIgnoreCase);
 		foreach (FieldInfo field in GetSerializedFields(type))
 		{
+			sourceFieldMap.TryGetValue(field.Name, out SourceFieldInfo sourceField);
 			parameters.Add(new CapabilityParameterInfo
 			{
 				name = field.Name,
 				type = GetFriendlyTypeName(field.FieldType),
 				required = false,
 				@default = instance != null && field.GetValue(instance) != null ? field.GetValue(instance).ToString() : "",
-				description = "Serialized field",
+				description = sourceField != null && !string.IsNullOrWhiteSpace(sourceField.summary) ? sourceField.summary : "Serialized field",
 				moduleScoped = false,
 				featureId = "serialized-field:" + type.Name + "." + field.Name,
 				enumValues = field.FieldType.IsEnum ? Enum.GetNames(field.FieldType).ToList() : new List<string>(),
@@ -718,6 +893,25 @@ public partial class ModuleExporter
 		}
 
 		return parameters;
+	}
+
+	private List<CapabilityParameterInfo> BuildParameterInfos(SourceScriptInfo sourceInfo)
+	{
+		return sourceInfo.fields
+			.Where(field => field.serialized)
+			.Select(field => new CapabilityParameterInfo
+			{
+				name = field.name,
+				type = field.type,
+				required = field.required,
+				@default = "",
+				description = field.summary,
+				moduleScoped = false,
+				featureId = "serialized-field:" + sourceInfo.className + "." + field.name,
+				enumValues = new List<string>(),
+				tags = new List<string> { "source" }
+			})
+			.ToList();
 	}
 
 	private List<CapabilityConstraintInfo> BuildConstraintInfos(Type type)
@@ -755,20 +949,21 @@ public partial class ModuleExporter
 
 	private CapabilityTypeInfo BuildTypeInfo(Type type)
 	{
+		SourceScriptInfo sourceInfo = GetSourceScriptInfoForType(type);
 		CapabilityTypeInfo info = new CapabilityTypeInfo
 		{
 			name = type.Name,
 			fullName = type.FullName ?? type.Name,
 			kind = GetTypeKind(type),
 			@namespace = type.Namespace ?? "",
-			description = "User script type",
+			description = sourceInfo != null && !string.IsNullOrWhiteSpace(sourceInfo.summary) ? sourceInfo.summary : "User script type",
 			exposed = true,
 			fields = GetSerializedFields(type)
 				.Select(field => new CapabilityTypeFieldInfo
 				{
 					name = field.Name,
 					type = GetFriendlyTypeName(field.FieldType),
-					description = "Serialized field",
+					description = sourceInfo != null ? GetSourceFieldSummary(sourceInfo, field.Name) : "Serialized field",
 					required = false
 				})
 				.ToList()
@@ -780,6 +975,30 @@ public partial class ModuleExporter
 		}
 
 		return info;
+	}
+
+	private CapabilityTypeInfo BuildTypeInfo(SourceScriptInfo sourceInfo)
+	{
+		return new CapabilityTypeInfo
+		{
+			name = sourceInfo.className,
+			fullName = sourceInfo.fullName,
+			kind = "component",
+			@namespace = sourceInfo.namespaceName,
+			description = sourceInfo.summary,
+			exposed = true,
+			fields = sourceInfo.fields
+				.Where(field => field.serialized)
+				.Select(field => new CapabilityTypeFieldInfo
+				{
+					name = field.name,
+					type = field.type,
+					description = field.summary,
+					required = field.required
+				})
+				.ToList(),
+			enumValues = new List<string>()
+		};
 	}
 
 	private void AddFeature(Dictionary<string, CapabilityFeatureInfo> map, CapabilityFeatureInfo feature)
@@ -1103,6 +1322,840 @@ public partial class ModuleExporter
 
 		MonoScript script = FindMonoScriptForType(type);
 		return script != null && IsAssetsPath(AssetDatabase.GetAssetPath(script));
+	}
+
+	private SourceScriptInfo GetSourceScriptInfoForType(Type type)
+	{
+		MonoScript script = FindMonoScriptForType(type);
+		if (script == null)
+		{
+			return null;
+		}
+
+		string assetPath = AssetDatabase.GetAssetPath(script);
+		return ParseSourceScript(assetPath, type);
+	}
+
+	private List<SourceScriptInfo> GetAllLocalSourceScripts()
+	{
+		List<SourceScriptInfo> scripts = new List<SourceScriptInfo>();
+		foreach (string guid in AssetDatabase.FindAssets("t:MonoScript", new[] { "Assets" }))
+		{
+			string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+			if (!assetPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+			{
+				continue;
+			}
+
+			MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(assetPath);
+			Type scriptType = script != null ? script.GetClass() : null;
+			SourceScriptInfo sourceInfo = ParseSourceScript(assetPath, scriptType);
+			if (sourceInfo != null && sourceInfo.isComponent)
+			{
+				scripts.Add(sourceInfo);
+			}
+		}
+
+		return scripts;
+	}
+
+	private SourceScriptInfo ParseSourceScript(string assetPath, Type scriptType)
+	{
+		if (string.IsNullOrWhiteSpace(assetPath))
+		{
+			return null;
+		}
+
+		string fullPath = Path.GetFullPath(assetPath);
+		if (!File.Exists(fullPath))
+		{
+			return null;
+		}
+
+		DateTime lastWriteUtc = File.GetLastWriteTimeUtc(fullPath);
+		if (SourceScriptCache.TryGetValue(fullPath, out CachedSourceScriptInfo cached) && cached.lastWriteUtc == lastWriteUtc)
+		{
+			return cached.info;
+		}
+
+		SourceScriptInfo info = ParseSourceText(File.ReadAllLines(fullPath), assetPath, scriptType);
+		SourceScriptCache[fullPath] = new CachedSourceScriptInfo
+		{
+			lastWriteUtc = lastWriteUtc,
+			info = info
+		};
+		return info;
+	}
+
+	private SourceScriptInfo ParseSourceText(string[] lines, string assetPath, Type scriptType)
+	{
+		SourceScriptInfo roslynInfo = TryParseSourceWithRoslyn(lines, assetPath, scriptType);
+		if (roslynInfo != null)
+		{
+			return roslynInfo;
+		}
+
+		SourceScriptInfo info = new SourceScriptInfo
+		{
+			assetPath = assetPath,
+			namespaceName = scriptType != null ? scriptType.Namespace ?? "" : "",
+			className = scriptType != null ? scriptType.Name : "",
+			fullName = scriptType != null ? scriptType.FullName ?? "" : "",
+			baseTypeName = scriptType != null && scriptType.BaseType != null ? scriptType.BaseType.Name : "",
+			isComponent = scriptType != null && typeof(Component).IsAssignableFrom(scriptType)
+		};
+
+		List<string> commentBuffer = new List<string>();
+		for (int i = 0; i < lines.Length; i++)
+		{
+			string trimmed = lines[i].Trim();
+			if (trimmed.StartsWith("///", StringComparison.Ordinal))
+			{
+				commentBuffer.Add(trimmed.Substring(3).Trim().Trim('<', '>', '/', ' '));
+				continue;
+			}
+
+			if (trimmed.StartsWith("//", StringComparison.Ordinal))
+			{
+				commentBuffer.Add(trimmed.Substring(2).Trim());
+				continue;
+			}
+
+			if (string.IsNullOrWhiteSpace(trimmed))
+			{
+				continue;
+			}
+
+			if (trimmed.StartsWith("namespace ", StringComparison.Ordinal))
+			{
+				info.namespaceName = trimmed.Substring("namespace ".Length).Trim().Trim('{', ' ');
+				if (string.IsNullOrWhiteSpace(info.fullName) && !string.IsNullOrWhiteSpace(info.className))
+				{
+					info.fullName = info.namespaceName + "." + info.className;
+				}
+				commentBuffer.Clear();
+				continue;
+			}
+
+			if (trimmed.Contains(" class "))
+			{
+				info.summary = JoinCommentBuffer(commentBuffer);
+				string classLine = trimmed.Replace("{", " ");
+				int classIndex = classLine.IndexOf(" class ", StringComparison.Ordinal);
+				string afterClass = classLine.Substring(classIndex + " class ".Length).Trim();
+				string[] classParts = afterClass.Split(new[] { ':', ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+				if (classParts.Length > 0)
+				{
+					info.className = classParts[0];
+				}
+
+				int colonIndex = afterClass.IndexOf(':');
+				if (colonIndex >= 0)
+				{
+					string basePart = afterClass.Substring(colonIndex + 1).Trim();
+					string[] bases = basePart.Split(new[] { ',', ' ', '\t', '{' }, StringSplitOptions.RemoveEmptyEntries);
+					if (bases.Length > 0)
+					{
+						info.baseTypeName = bases[0];
+					}
+				}
+
+				if (string.IsNullOrWhiteSpace(info.fullName))
+				{
+					info.fullName = string.IsNullOrWhiteSpace(info.namespaceName) ? info.className : info.namespaceName + "." + info.className;
+				}
+				commentBuffer.Clear();
+				continue;
+			}
+
+			if (trimmed.Contains(" event ") && trimmed.EndsWith(";"))
+			{
+				info.events.Add(ParseSourceEvent(trimmed, JoinCommentBuffer(commentBuffer)));
+				commentBuffer.Clear();
+				continue;
+			}
+
+			if (LooksLikeMethodSignature(trimmed))
+			{
+				info.methods.Add(ParseSourceMethod(trimmed, JoinCommentBuffer(commentBuffer)));
+				commentBuffer.Clear();
+				continue;
+			}
+
+			if (LooksLikeFieldDeclaration(trimmed))
+			{
+				info.fields.Add(ParseSourceField(trimmed, JoinCommentBuffer(commentBuffer)));
+				commentBuffer.Clear();
+				continue;
+			}
+
+			commentBuffer.Clear();
+		}
+
+		if (!info.isComponent && string.Equals(info.baseTypeName, "MonoBehaviour", StringComparison.Ordinal))
+		{
+			info.isComponent = true;
+		}
+
+		return info;
+	}
+
+	private SourceScriptInfo TryParseSourceWithRoslyn(string[] lines, string assetPath, Type scriptType)
+	{
+		if (!TryEnsureRoslynAssemblies())
+		{
+			return null;
+		}
+
+		try
+		{
+			Type syntaxTreeType = RoslynCSharpAssembly.GetType("Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree");
+			if (syntaxTreeType == null)
+			{
+				return null;
+			}
+
+			string sourceText = string.Join("\n", lines);
+			MethodInfo parseTextMethod = syntaxTreeType
+				.GetMethods(BindingFlags.Public | BindingFlags.Static)
+				.FirstOrDefault(method => method.Name == "ParseText" && method.GetParameters().Length >= 1 && method.GetParameters()[0].ParameterType == typeof(string));
+			if (parseTextMethod == null)
+			{
+				return null;
+			}
+
+			object syntaxTree = parseTextMethod.Invoke(null, new object[] { sourceText, null, assetPath, System.Text.Encoding.UTF8, null });
+			if (syntaxTree == null)
+			{
+				return null;
+			}
+
+			MethodInfo getRootMethod = syntaxTree.GetType().GetMethod("GetRoot", Type.EmptyTypes);
+			object root = getRootMethod != null ? getRootMethod.Invoke(syntaxTree, null) : null;
+			if (root == null)
+			{
+				return null;
+			}
+
+			SourceScriptInfo info = new SourceScriptInfo
+			{
+				assetPath = assetPath,
+				namespaceName = scriptType != null ? scriptType.Namespace ?? "" : "",
+				className = scriptType != null ? scriptType.Name : "",
+				fullName = scriptType != null ? scriptType.FullName ?? "" : "",
+				baseTypeName = scriptType != null && scriptType.BaseType != null ? scriptType.BaseType.Name : "",
+				isComponent = scriptType != null && typeof(Component).IsAssignableFrom(scriptType)
+			};
+
+			PopulateRoslynSourceInfo(root, info, scriptType);
+			return info;
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private void PopulateRoslynSourceInfo(object root, SourceScriptInfo info, Type scriptType)
+	{
+		IEnumerable<object> descendants = EnumerateRoslynNodes(root);
+		object targetClass = null;
+		string targetFullName = scriptType != null ? scriptType.FullName ?? "" : "";
+
+		foreach (object node in descendants)
+		{
+			string nodeTypeName = node.GetType().Name;
+			if (nodeTypeName == "FileScopedNamespaceDeclarationSyntax" || nodeTypeName == "NamespaceDeclarationSyntax")
+			{
+				if (string.IsNullOrWhiteSpace(info.namespaceName))
+				{
+					info.namespaceName = GetRoslynPropertyString(node, "Name");
+				}
+				continue;
+			}
+
+			if (nodeTypeName != "ClassDeclarationSyntax")
+			{
+				continue;
+			}
+
+			string className = GetRoslynPropertyString(node, "Identifier");
+			string namespaceName = FindRoslynNamespace(node);
+			string fullName = string.IsNullOrWhiteSpace(namespaceName) ? className : namespaceName + "." + className;
+			if (!string.IsNullOrWhiteSpace(targetFullName))
+			{
+				if (!string.Equals(fullName, targetFullName, StringComparison.Ordinal))
+				{
+					continue;
+				}
+			}
+			else if (!string.IsNullOrWhiteSpace(info.className) && !string.Equals(className, info.className, StringComparison.Ordinal))
+			{
+				continue;
+			}
+
+			targetClass = node;
+			info.className = className;
+			info.namespaceName = namespaceName;
+			info.fullName = fullName;
+			info.summary = GetRoslynLeadingComment(node);
+			info.baseTypeName = GetRoslynBaseTypeName(node);
+			info.isComponent = info.isComponent || string.Equals(info.baseTypeName, "MonoBehaviour", StringComparison.Ordinal) || string.Equals(info.baseTypeName, "ScriptableObject", StringComparison.Ordinal);
+			break;
+		}
+
+		if (targetClass == null)
+		{
+			return;
+		}
+
+		object members = GetRoslynPropertyValue(targetClass, "Members");
+		foreach (object member in EnumerateRoslynList(members))
+		{
+			string memberTypeName = member.GetType().Name;
+			if (memberTypeName == "MethodDeclarationSyntax")
+			{
+				info.methods.Add(ParseRoslynMethod(member));
+			}
+			else if (memberTypeName == "FieldDeclarationSyntax")
+			{
+				info.fields.AddRange(ParseRoslynFields(member));
+			}
+			else if (memberTypeName == "EventFieldDeclarationSyntax")
+			{
+				info.events.AddRange(ParseRoslynEventFields(member));
+			}
+			else if (memberTypeName == "EventDeclarationSyntax")
+			{
+				SourceEventInfo eventInfo = ParseRoslynEvent(member);
+				if (eventInfo != null)
+				{
+					info.events.Add(eventInfo);
+				}
+			}
+		}
+	}
+
+	private SourceMethodInfo ParseRoslynMethod(object methodNode)
+	{
+		SourceMethodInfo method = new SourceMethodInfo
+		{
+			name = GetRoslynPropertyString(methodNode, "Identifier"),
+			returnType = GetRoslynPropertyString(methodNode, "ReturnType"),
+			summary = GetRoslynLeadingComment(methodNode),
+			isStatic = RoslynHasModifier(methodNode, "static")
+		};
+
+		object parameterList = GetRoslynPropertyValue(methodNode, "ParameterList");
+		object parameters = GetRoslynPropertyValue(parameterList, "Parameters");
+		foreach (object parameterNode in EnumerateRoslynList(parameters))
+		{
+			method.parameters.Add(new CapabilityMethodParameterInfo
+			{
+				name = GetRoslynPropertyString(parameterNode, "Identifier"),
+				type = GetRoslynPropertyString(parameterNode, "Type"),
+				description = "",
+				required = GetRoslynPropertyValue(parameterNode, "Default") == null
+			});
+		}
+
+		return method;
+	}
+
+	private List<SourceFieldInfo> ParseRoslynFields(object fieldNode)
+	{
+		List<SourceFieldInfo> fields = new List<SourceFieldInfo>();
+		string typeName = GetRoslynPropertyString(GetRoslynPropertyValue(fieldNode, "Declaration"), "Type");
+		string summary = GetRoslynLeadingComment(fieldNode);
+		bool serialized = RoslynHasModifier(fieldNode, "public") || RoslynHasAttribute(fieldNode, "SerializeField");
+		object variables = GetRoslynPropertyValue(GetRoslynPropertyValue(fieldNode, "Declaration"), "Variables");
+		foreach (object variableNode in EnumerateRoslynList(variables))
+		{
+			fields.Add(new SourceFieldInfo
+			{
+				name = GetRoslynPropertyString(variableNode, "Identifier"),
+				type = typeName,
+				summary = summary,
+				required = false,
+				serialized = serialized
+			});
+		}
+
+		return fields;
+	}
+
+	private List<SourceEventInfo> ParseRoslynEventFields(object eventNode)
+	{
+		List<SourceEventInfo> events = new List<SourceEventInfo>();
+		string payloadType = GetRoslynPropertyString(GetRoslynPropertyValue(eventNode, "Declaration"), "Type");
+		string summary = GetRoslynLeadingComment(eventNode);
+		object variables = GetRoslynPropertyValue(GetRoslynPropertyValue(eventNode, "Declaration"), "Variables");
+		foreach (object variableNode in EnumerateRoslynList(variables))
+		{
+			events.Add(new SourceEventInfo
+			{
+				name = GetRoslynPropertyString(variableNode, "Identifier"),
+				payloadType = payloadType,
+				summary = summary
+			});
+		}
+
+		return events;
+	}
+
+	private SourceEventInfo ParseRoslynEvent(object eventNode)
+	{
+		return new SourceEventInfo
+		{
+			name = GetRoslynPropertyString(eventNode, "Identifier"),
+			payloadType = GetRoslynPropertyString(eventNode, "Type"),
+			summary = GetRoslynLeadingComment(eventNode)
+		};
+	}
+
+	private bool TryEnsureRoslynAssemblies()
+	{
+		if (RoslynLoadAttempted)
+		{
+			return RoslynAssembly != null && RoslynCSharpAssembly != null;
+		}
+
+		RoslynLoadAttempted = true;
+		RoslynAssembly = FindOrLoadAssembly("Microsoft.CodeAnalysis");
+		RoslynCSharpAssembly = FindOrLoadAssembly("Microsoft.CodeAnalysis.CSharp");
+		return RoslynAssembly != null && RoslynCSharpAssembly != null;
+	}
+
+	private static Assembly FindOrLoadAssembly(string assemblyName)
+	{
+		Assembly loaded = AppDomain.CurrentDomain.GetAssemblies()
+			.FirstOrDefault(assembly => string.Equals(assembly.GetName().Name, assemblyName, StringComparison.OrdinalIgnoreCase));
+		if (loaded != null)
+		{
+			return loaded;
+		}
+
+		try
+		{
+			return Assembly.Load(assemblyName);
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private IEnumerable<object> EnumerateRoslynNodes(object root)
+	{
+		if (root == null)
+		{
+			yield break;
+		}
+
+		yield return root;
+		MethodInfo descendantsMethod = root.GetType().GetMethod("DescendantNodes", Type.EmptyTypes);
+		if (descendantsMethod == null)
+		{
+			yield break;
+		}
+
+		foreach (object node in EnumerateRoslynList(descendantsMethod.Invoke(root, null)))
+		{
+			yield return node;
+		}
+	}
+
+	private IEnumerable<object> EnumerateRoslynList(object enumerable)
+	{
+		if (!(enumerable is System.Collections.IEnumerable sequence))
+		{
+			yield break;
+		}
+
+		foreach (object item in sequence)
+		{
+			yield return item;
+		}
+	}
+
+	private object GetRoslynPropertyValue(object target, string propertyName)
+	{
+		return target == null ? null : target.GetType().GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public)?.GetValue(target, null);
+	}
+
+	private string GetRoslynPropertyString(object target, string propertyName)
+	{
+		object value = GetRoslynPropertyValue(target, propertyName);
+		return value != null ? value.ToString() : "";
+	}
+
+	private string FindRoslynNamespace(object node)
+	{
+		object current = node;
+		while (current != null)
+		{
+			string currentTypeName = current.GetType().Name;
+			if (currentTypeName == "NamespaceDeclarationSyntax" || currentTypeName == "FileScopedNamespaceDeclarationSyntax")
+			{
+				return GetRoslynPropertyString(current, "Name");
+			}
+
+			current = GetRoslynPropertyValue(current, "Parent");
+		}
+
+		return "";
+	}
+
+	private string GetRoslynLeadingComment(object node)
+	{
+		if (node == null)
+		{
+			return "";
+		}
+
+		MethodInfo leadingTriviaMethod = node.GetType().GetMethod("GetLeadingTrivia", Type.EmptyTypes);
+		object triviaList = leadingTriviaMethod != null ? leadingTriviaMethod.Invoke(node, null) : null;
+		if (triviaList == null)
+		{
+			return "";
+		}
+
+		MethodInfo toFullStringMethod = triviaList.GetType().GetMethod("ToFullString", Type.EmptyTypes);
+		string raw = toFullStringMethod != null ? toFullStringMethod.Invoke(triviaList, null) as string : triviaList.ToString();
+		return CleanCommentText(raw);
+	}
+
+	private string GetRoslynBaseTypeName(object classNode)
+	{
+		object baseList = GetRoslynPropertyValue(classNode, "BaseList");
+		object types = GetRoslynPropertyValue(baseList, "Types");
+		object firstBase = EnumerateRoslynList(types).FirstOrDefault();
+		if (firstBase == null)
+		{
+			return "";
+		}
+
+		string typeName = GetRoslynPropertyString(firstBase, "Type");
+		int lastDot = typeName.LastIndexOf('.');
+		return lastDot >= 0 ? typeName.Substring(lastDot + 1) : typeName;
+	}
+
+	private bool RoslynHasModifier(object node, string modifierText)
+	{
+		object modifiers = GetRoslynPropertyValue(node, "Modifiers");
+		return EnumerateRoslynList(modifiers).Any(modifier =>
+			string.Equals(modifier.ToString(), modifierText, StringComparison.OrdinalIgnoreCase));
+	}
+
+	private bool RoslynHasAttribute(object node, string attributeName)
+	{
+		object attributeLists = GetRoslynPropertyValue(node, "AttributeLists");
+		foreach (object attributeList in EnumerateRoslynList(attributeLists))
+		{
+			object attributes = GetRoslynPropertyValue(attributeList, "Attributes");
+			foreach (object attribute in EnumerateRoslynList(attributes))
+			{
+				string name = GetRoslynPropertyString(attribute, "Name");
+				if (string.Equals(name, attributeName, StringComparison.Ordinal) || string.Equals(name, attributeName + "Attribute", StringComparison.Ordinal))
+				{
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	private string CleanCommentText(string rawComment)
+	{
+		if (string.IsNullOrWhiteSpace(rawComment))
+		{
+			return "";
+		}
+
+		StringBuilder builder = new StringBuilder();
+		foreach (string rawLine in rawComment.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+		{
+			string line = rawLine.Trim();
+			if (line.StartsWith("///", StringComparison.Ordinal))
+			{
+				line = line.Substring(3).Trim();
+			}
+			else if (line.StartsWith("//", StringComparison.Ordinal))
+			{
+				line = line.Substring(2).Trim();
+			}
+
+			line = line.Replace("<summary>", "").Replace("</summary>", "").Trim();
+			if (string.IsNullOrWhiteSpace(line))
+			{
+				continue;
+			}
+
+			if (builder.Length > 0)
+			{
+				builder.Append(' ');
+			}
+
+			builder.Append(line);
+		}
+
+		return builder.ToString().Trim();
+	}
+
+	private SourceMethodInfo ParseSourceMethod(string line, string summary)
+	{
+		SourceMethodInfo method = new SourceMethodInfo
+		{
+			summary = summary
+		};
+
+		int parenIndex = line.IndexOf('(');
+		int closeParenIndex = line.LastIndexOf(')');
+		string beforeParen = parenIndex > 0 ? line.Substring(0, parenIndex).Trim() : line;
+		string parameterBlock = parenIndex >= 0 && closeParenIndex > parenIndex ? line.Substring(parenIndex + 1, closeParenIndex - parenIndex - 1) : "";
+		string[] beforeParts = beforeParen.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+		if (beforeParts.Length >= 2)
+		{
+			method.name = beforeParts[beforeParts.Length - 1];
+			method.returnType = beforeParts[beforeParts.Length - 2];
+			method.isStatic = beforeParts.Any(part => string.Equals(part, "static", StringComparison.Ordinal));
+		}
+
+		foreach (string parameter in parameterBlock.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+		{
+			string cleaned = parameter.Trim();
+			if (string.IsNullOrWhiteSpace(cleaned))
+			{
+				continue;
+			}
+
+			string[] parameterParts = cleaned.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+			if (parameterParts.Length >= 2)
+			{
+				method.parameters.Add(new CapabilityMethodParameterInfo
+				{
+					name = parameterParts[parameterParts.Length - 1],
+					type = parameterParts[parameterParts.Length - 2],
+					description = "",
+					required = !cleaned.Contains("=")
+				});
+			}
+		}
+
+		return method;
+	}
+
+	private SourceFieldInfo ParseSourceField(string line, string summary)
+	{
+		SourceFieldInfo field = new SourceFieldInfo
+		{
+			summary = summary,
+			serialized = line.Contains("public ") || line.Contains("[SerializeField]")
+		};
+
+		string cleaned = line.Replace(";", "").Replace("=", " = ");
+		string[] parts = cleaned.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+		if (parts.Length >= 2)
+		{
+			field.name = parts[parts.Length - 1] == "=" && parts.Length >= 3 ? parts[parts.Length - 2] : parts[parts.Length - 1];
+			int nameIndex = Array.IndexOf(parts, field.name);
+			if (nameIndex > 0)
+			{
+				field.type = parts[nameIndex - 1];
+			}
+		}
+
+		return field;
+	}
+
+	private SourceEventInfo ParseSourceEvent(string line, string summary)
+	{
+		SourceEventInfo eventInfo = new SourceEventInfo
+		{
+			summary = summary
+		};
+
+		string cleaned = line.Replace(";", "");
+		string[] parts = cleaned.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+		int eventIndex = Array.IndexOf(parts, "event");
+		if (eventIndex >= 0 && parts.Length > eventIndex + 2)
+		{
+			eventInfo.payloadType = parts[eventIndex + 1];
+			eventInfo.name = parts[eventIndex + 2];
+		}
+
+		return eventInfo;
+	}
+
+	private bool LooksLikeMethodSignature(string line)
+	{
+		if (!line.Contains("(") || !line.Contains(")") || line.StartsWith("if ", StringComparison.Ordinal) || line.StartsWith("for ", StringComparison.Ordinal) || line.StartsWith("while ", StringComparison.Ordinal) || line.StartsWith("switch ", StringComparison.Ordinal))
+		{
+			return false;
+		}
+
+		return line.Contains("public ") || line.Contains("private ") || line.Contains("protected ") || line.Contains("internal ");
+	}
+
+	private bool LooksLikeFieldDeclaration(string line)
+	{
+		if (!line.EndsWith(";") || line.Contains("(") || line.IndexOf(" event ", StringComparison.Ordinal) >= 0)
+		{
+			return false;
+		}
+
+		return line.Contains("public ") || line.Contains("[SerializeField]") || line.Contains("private ") || line.Contains("protected ");
+	}
+
+	private string JoinCommentBuffer(List<string> commentBuffer)
+	{
+		if (commentBuffer == null || commentBuffer.Count == 0)
+		{
+			return "";
+		}
+
+		string joined = string.Join(" ", commentBuffer.Where(line => !string.IsNullOrWhiteSpace(line)));
+		commentBuffer.Clear();
+		return joined.Replace("summary", "").Trim();
+	}
+
+	private List<SourceScriptInfo> GetRelevantSourceComponents(List<SourceScriptInfo> sourceScripts, HashSet<string> relevantNamespaceRoots)
+	{
+		List<SourceScriptInfo> filtered = sourceScripts
+			.Where(sourceInfo => sourceInfo != null && sourceInfo.isComponent)
+			.Where(sourceInfo =>
+				relevantNamespaceRoots.Count == 0 ||
+				relevantNamespaceRoots.Any(root =>
+					!string.IsNullOrWhiteSpace(sourceInfo.namespaceName) &&
+					(sourceInfo.namespaceName.Equals(root, StringComparison.Ordinal) ||
+					sourceInfo.namespaceName.StartsWith(root + ".", StringComparison.Ordinal))))
+			.OrderBy(sourceInfo => sourceInfo.fullName)
+			.ToList();
+
+		return filtered.Count > 0 ? filtered : sourceScripts.Where(sourceInfo => sourceInfo != null && sourceInfo.isComponent).OrderBy(sourceInfo => sourceInfo.fullName).ToList();
+	}
+
+	private HashSet<string> GetRelevantNamespaceRoots(List<SourceScriptInfo> sourceScripts)
+	{
+		HashSet<string> roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		Type controllerType = ResolveTypeByName(controllerClass);
+		if (controllerType != null && !string.IsNullOrWhiteSpace(controllerType.Namespace))
+		{
+			roots.Add(GetNamespaceRoot(controllerType.Namespace));
+		}
+
+		foreach (Item item in itemGroups.SelectMany(group => group.items))
+		{
+			if (item?.prefab == null)
+			{
+				continue;
+			}
+
+			foreach (Component component in item.prefab.GetComponentsInChildren<Component>(true))
+			{
+				Type componentType = component != null ? component.GetType() : null;
+				if (componentType != null && IsAssetsType(componentType) && !string.IsNullOrWhiteSpace(componentType.Namespace))
+				{
+					roots.Add(GetNamespaceRoot(componentType.Namespace));
+				}
+			}
+		}
+
+		if (roots.Count == 0)
+		{
+			foreach (SourceScriptInfo sourceInfo in sourceScripts)
+			{
+				if (!string.IsNullOrWhiteSpace(sourceInfo.namespaceName))
+				{
+					roots.Add(GetNamespaceRoot(sourceInfo.namespaceName));
+				}
+			}
+		}
+
+		return roots;
+	}
+
+	private List<string> BuildAllowedFeatures(SourceScriptInfo sourceInfo)
+	{
+		HashSet<string> features = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+		{
+			"component:" + sourceInfo.className
+		};
+
+		foreach (SourceMethodInfo method in sourceInfo.methods)
+		{
+			if (Array.IndexOf(UnityCallbackNames, method.name) >= 0)
+			{
+				features.Add("callback:" + method.name);
+			}
+		}
+
+		foreach (SourceFieldInfo field in sourceInfo.fields.Where(field => field.serialized))
+		{
+			features.Add("serialized-field:" + sourceInfo.className + "." + field.name);
+		}
+
+		return features.OrderBy(value => value).ToList();
+	}
+
+	private string GetSourceFieldSummary(SourceScriptInfo sourceInfo, string fieldName)
+	{
+		if (sourceInfo == null)
+		{
+			return "Serialized field";
+		}
+
+		SourceFieldInfo field = sourceInfo.fields.FirstOrDefault(entry => string.Equals(entry.name, fieldName, StringComparison.Ordinal));
+		return field != null && !string.IsNullOrWhiteSpace(field.summary) ? field.summary : "Serialized field";
+	}
+
+	private List<CapabilityMethodParameterInfo> BuildMethodParameters(MethodInfo method, SourceMethodInfo sourceMethod)
+	{
+		ParameterInfo[] reflected = method.GetParameters();
+		List<CapabilityMethodParameterInfo> parameters = new List<CapabilityMethodParameterInfo>();
+		for (int index = 0; index < reflected.Length; index++)
+		{
+			ParameterInfo parameter = reflected[index];
+			CapabilityMethodParameterInfo sourceParameter = sourceMethod != null && sourceMethod.parameters.Count > index ? sourceMethod.parameters[index] : null;
+			parameters.Add(new CapabilityMethodParameterInfo
+			{
+				name = parameter.Name,
+				type = GetFriendlyTypeName(parameter.ParameterType),
+				description = sourceParameter != null ? sourceParameter.description : "",
+				required = !parameter.IsOptional
+			});
+		}
+
+		return parameters;
+	}
+
+	private List<CapabilityMethodParameterInfo> CloneMethodParameterList(List<CapabilityMethodParameterInfo> parameters)
+	{
+		return parameters == null
+			? new List<CapabilityMethodParameterInfo>()
+			: parameters.Select(parameter => new CapabilityMethodParameterInfo
+			{
+				name = parameter.name,
+				type = parameter.type,
+				description = parameter.description,
+				required = parameter.required
+			}).ToList();
+	}
+
+	private string GetBaseTypeLabel(string baseTypeName)
+	{
+		if (string.Equals(baseTypeName, "MonoBehaviour", StringComparison.Ordinal))
+		{
+			return "MonoBehaviour";
+		}
+
+		if (string.Equals(baseTypeName, "ScriptableObject", StringComparison.Ordinal))
+		{
+			return "ScriptableObject";
+		}
+
+		return string.IsNullOrWhiteSpace(baseTypeName) ? "PlainClass" : baseTypeName;
 	}
 
 	private static bool IsAssetBackedComponent(Type type, Component instance)
