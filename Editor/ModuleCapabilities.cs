@@ -7,6 +7,7 @@ using System.Text;
 using UnityEditor;
 using UnityEditor.PackageManager;
 using UnityEngine;
+using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 
 public partial class ModuleExporter
 {
