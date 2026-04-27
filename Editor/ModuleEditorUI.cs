@@ -31,6 +31,8 @@ public partial class ModuleExporter
 	private int selectedItemFeatureIndex;
 	private int selectedTypeIndex = -1;
 	private int selectedTypeFieldIndex = -1;
+	private int selectedComponentIndex = -1;
+	private int selectedComponentArtifactIndex = -1;
 	private Dictionary<string, bool> capabilitySectionFoldouts = new Dictionary<string, bool>();
 	private const string PackageLogoAssetPath = "Packages/com.plyground.export/Editor/Branding/plyground-logo.png";
 	private const string LocalLogoAssetPath = "Editor/Branding/plyground-logo.png";
@@ -1118,6 +1120,12 @@ public partial class ModuleExporter
 			EndCapabilitySection();
 		}
 
+		if (BeginCapabilitySection("manifest-components", "Components"))
+		{
+			DrawComponentBrowser(moduleCapabilities.unity.components);
+			EndCapabilitySection();
+		}
+
 		if (BeginCapabilitySection("manifest-assemblies", "Assembly Names"))
 		{
 			DrawStringListEditor("Assembly Names", moduleCapabilities.module.assemblyNames);
@@ -1154,12 +1162,6 @@ public partial class ModuleExporter
 			EndCapabilitySection();
 		}
 
-		if (BeginCapabilitySection("manifest-types", "Types"))
-		{
-			DrawTypeTreeEditor(moduleCapabilities.types);
-			EndCapabilitySection();
-		}
-
 		if (BeginCapabilitySection("manifest-events", "Events"))
 		{
 			DrawEventListEditor(moduleCapabilities.events);
@@ -1182,6 +1184,277 @@ public partial class ModuleExporter
 		EditorGUILayout.LabelField("Producer Version", moduleCapabilities.exportInfo.producerVersion);
 		EditorGUILayout.LabelField("Last Exported At", string.IsNullOrWhiteSpace(moduleCapabilities.exportInfo.exportedAt) ? "Not exported yet" : moduleCapabilities.exportInfo.exportedAt);
 		EditorGUILayout.EndVertical();
+	}
+
+	private void DrawComponentBrowser(List<UnityCapabilityComponentInfo> components)
+	{
+		components ??= new List<UnityCapabilityComponentInfo>();
+
+		EditorGUILayout.BeginHorizontal();
+		GUILayout.Label("Components", EditorStyles.miniBoldLabel);
+		GUILayout.FlexibleSpace();
+		if (GUILayout.Button("Add Component", GUILayout.Width(120f)))
+		{
+			components.Add(new UnityCapabilityComponentInfo());
+			selectedComponentIndex = components.Count - 1;
+			selectedComponentArtifactIndex = -1;
+		}
+		EditorGUILayout.EndHorizontal();
+
+		if (components.Count == 0)
+		{
+			EditorGUILayout.LabelField("No component records", EditorStyles.miniLabel);
+			return;
+		}
+
+		selectedComponentIndex = Mathf.Clamp(selectedComponentIndex < 0 ? 0 : selectedComponentIndex, 0, components.Count - 1);
+		UnityCapabilityComponentInfo selectedComponent = components[selectedComponentIndex];
+		selectedComponent.methods ??= new List<CapabilityMethodInfo>();
+		selectedComponent.events ??= new List<CapabilityEventInfo>();
+		selectedComponent.parameters ??= new List<CapabilityParameterInfo>();
+		selectedComponent.requiredComponents ??= new List<string>();
+		selectedComponent.optionalComponents ??= new List<string>();
+		selectedComponent.allowedFeatures ??= new List<string>();
+		selectedComponent.tags ??= new List<string>();
+
+		List<ComponentArtifactEntry> artifacts = BuildComponentArtifacts(selectedComponent);
+		if (artifacts.Count == 0)
+		{
+			selectedComponentArtifactIndex = -1;
+		}
+		else
+		{
+			selectedComponentArtifactIndex = Mathf.Clamp(selectedComponentArtifactIndex < 0 ? 0 : selectedComponentArtifactIndex, 0, artifacts.Count - 1);
+		}
+
+		EditorGUILayout.BeginHorizontal();
+
+		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(220f, position.width * 0.22f)));
+		GUILayout.Label("Component List", EditorStyles.boldLabel);
+		for (int i = 0; i < components.Count; i++)
+		{
+			UnityCapabilityComponentInfo entry = components[i];
+			string label = string.IsNullOrWhiteSpace(entry.componentId) ? "New Component" : entry.componentId;
+			if (GUILayout.Button(label, selectedComponentIndex == i ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(30f)))
+			{
+				selectedComponentIndex = i;
+				selectedComponentArtifactIndex = -1;
+			}
+		}
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(220f, position.width * 0.22f)));
+		GUILayout.Label("Artifacts", EditorStyles.boldLabel);
+		EditorGUILayout.BeginHorizontal();
+		if (GUILayout.Button("Add Method", GUILayout.Width(90f)))
+		{
+			selectedComponent.methods.Add(new CapabilityMethodInfo
+			{
+				declaringType = selectedComponent.typeName
+			});
+			artifacts = BuildComponentArtifacts(selectedComponent);
+			selectedComponentArtifactIndex = artifacts.FindIndex(artifact => artifact.kind == ComponentArtifactKind.Method && artifact.method == selectedComponent.methods.Last());
+		}
+		if (GUILayout.Button("Add Event", GUILayout.Width(90f)))
+		{
+			selectedComponent.events.Add(new CapabilityEventInfo
+			{
+				declaringType = selectedComponent.typeName
+			});
+			artifacts = BuildComponentArtifacts(selectedComponent);
+			selectedComponentArtifactIndex = artifacts.FindIndex(artifact => artifact.kind == ComponentArtifactKind.Event && artifact.eventInfo == selectedComponent.events.Last());
+		}
+		if (GUILayout.Button("Add Field", GUILayout.Width(90f)))
+		{
+			selectedComponent.parameters.Add(new CapabilityParameterInfo());
+			artifacts = BuildComponentArtifacts(selectedComponent);
+			selectedComponentArtifactIndex = artifacts.FindIndex(artifact => artifact.kind == ComponentArtifactKind.Parameter && artifact.parameter == selectedComponent.parameters.Last());
+		}
+		EditorGUILayout.EndHorizontal();
+
+		if (artifacts.Count == 0)
+		{
+			EditorGUILayout.LabelField("No artifacts", EditorStyles.miniLabel);
+		}
+		else
+		{
+			for (int i = 0; i < artifacts.Count; i++)
+			{
+				ComponentArtifactEntry artifact = artifacts[i];
+				string label = artifact.label;
+				if (GUILayout.Button(label, selectedComponentArtifactIndex == i ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(26f)))
+				{
+					selectedComponentArtifactIndex = i;
+				}
+			}
+		}
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true));
+		if (selectedComponentArtifactIndex >= 0 && selectedComponentArtifactIndex < artifacts.Count)
+		{
+			DrawSelectedComponentArtifactEditor(selectedComponent, artifacts[selectedComponentArtifactIndex]);
+		}
+		else
+		{
+			DrawSelectedComponentEditor(components, selectedComponent);
+		}
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.EndHorizontal();
+	}
+
+	private void DrawSelectedComponentEditor(List<UnityCapabilityComponentInfo> components, UnityCapabilityComponentInfo component)
+	{
+		GUILayout.Label("Component Properties", EditorStyles.boldLabel);
+		component.componentId = EditorGUILayout.TextField("Component Id", component.componentId);
+		component.typeName = EditorGUILayout.TextField("Type Name", component.typeName);
+		component.baseType = EditorGUILayout.TextField("Base Type", component.baseType);
+		component.attachTarget = EditorGUILayout.TextField("Attach Target", component.attachTarget);
+		component.description = EditorGUILayout.TextField("Description", component.description);
+		component.codegenAllowed = EditorGUILayout.Toggle("Codegen Allowed", component.codegenAllowed);
+		DrawStringListEditor("Required Components", component.requiredComponents);
+		DrawStringListEditor("Optional Components", component.optionalComponents);
+		DrawStringListEditor("Allowed Features", component.allowedFeatures);
+		DrawStringListEditor("Tags", component.tags);
+		if (GUILayout.Button("Remove Component", GUILayout.Width(140f)))
+		{
+			components.RemoveAt(selectedComponentIndex);
+			selectedComponentIndex = Mathf.Clamp(selectedComponentIndex - 1, 0, Mathf.Max(0, components.Count - 1));
+			selectedComponentArtifactIndex = -1;
+		}
+	}
+
+	private void DrawSelectedComponentArtifactEditor(UnityCapabilityComponentInfo component, ComponentArtifactEntry artifact)
+	{
+		switch (artifact.kind)
+		{
+			case ComponentArtifactKind.Method:
+				DrawMethodArtifactEditor(component, artifact.method);
+				break;
+			case ComponentArtifactKind.Event:
+				DrawEventArtifactEditor(component, artifact.eventInfo);
+				break;
+			case ComponentArtifactKind.Parameter:
+				DrawParameterArtifactEditor(component, artifact.parameter);
+				break;
+		}
+	}
+
+	private void DrawMethodArtifactEditor(UnityCapabilityComponentInfo component, CapabilityMethodInfo method)
+	{
+		GUILayout.Label("Method Properties", EditorStyles.boldLabel);
+		method.name = EditorGUILayout.TextField("Name", method.name);
+		method.declaringType = EditorGUILayout.TextField("Declaring Type", method.declaringType);
+		method.description = EditorGUILayout.TextField("Description", method.description);
+		method.returnType = EditorGUILayout.TextField("Return Type", method.returnType);
+		method.isStatic = EditorGUILayout.Toggle("Is Static", method.isStatic);
+		method.allowedForCodegen = EditorGUILayout.Toggle("Allowed For Codegen", method.allowedForCodegen);
+		DrawMethodParameterListEditor(method.parameters);
+		DrawStringListEditor("Constraints", method.constraints);
+		DrawStringListEditor("Tags", method.tags);
+		if (GUILayout.Button("Remove Method", GUILayout.Width(130f)))
+		{
+			component.methods.Remove(method);
+			selectedComponentArtifactIndex = -1;
+		}
+	}
+
+	private void DrawEventArtifactEditor(UnityCapabilityComponentInfo component, CapabilityEventInfo eventInfo)
+	{
+		GUILayout.Label("Event Properties", EditorStyles.boldLabel);
+		eventInfo.name = EditorGUILayout.TextField("Name", eventInfo.name);
+		eventInfo.direction = EditorGUILayout.TextField("Direction", eventInfo.direction);
+		eventInfo.payloadType = EditorGUILayout.TextField("Payload Type", eventInfo.payloadType);
+		eventInfo.declaringType = EditorGUILayout.TextField("Declaring Type", eventInfo.declaringType);
+		eventInfo.description = EditorGUILayout.TextField("Description", eventInfo.description);
+		eventInfo.allowedForCodegen = EditorGUILayout.Toggle("Allowed For Codegen", eventInfo.allowedForCodegen);
+		eventInfo.scope = EditorGUILayout.TextField("Scope", eventInfo.scope);
+		eventInfo.authority = EditorGUILayout.TextField("Authority", eventInfo.authority);
+		DrawStringListEditor("Tags", eventInfo.tags);
+		if (GUILayout.Button("Remove Event", GUILayout.Width(120f)))
+		{
+			component.events.Remove(eventInfo);
+			selectedComponentArtifactIndex = -1;
+		}
+	}
+
+	private void DrawParameterArtifactEditor(UnityCapabilityComponentInfo component, CapabilityParameterInfo parameter)
+	{
+		GUILayout.Label("Field Properties", EditorStyles.boldLabel);
+		parameter.name = EditorGUILayout.TextField("Name", parameter.name);
+		parameter.type = EditorGUILayout.TextField("Type", parameter.type);
+		parameter.required = EditorGUILayout.Toggle("Required", parameter.required);
+		parameter.@default = EditorGUILayout.TextField("Default", parameter.@default);
+		parameter.min = EditorGUILayout.FloatField("Min", parameter.min);
+		parameter.max = EditorGUILayout.FloatField("Max", parameter.max);
+		DrawStringListEditor("Enum Values", parameter.enumValues);
+		parameter.description = EditorGUILayout.TextField("Description", parameter.description);
+		parameter.moduleScoped = EditorGUILayout.Toggle("Module Scoped", parameter.moduleScoped);
+		parameter.featureId = EditorGUILayout.TextField("Feature Id", parameter.featureId);
+		DrawStringListEditor("Tags", parameter.tags);
+		if (GUILayout.Button("Remove Field", GUILayout.Width(120f)))
+		{
+			component.parameters.Remove(parameter);
+			selectedComponentArtifactIndex = -1;
+		}
+	}
+
+	private List<ComponentArtifactEntry> BuildComponentArtifacts(UnityCapabilityComponentInfo component)
+	{
+		List<ComponentArtifactEntry> artifacts = new List<ComponentArtifactEntry>();
+		if (component == null)
+		{
+			return artifacts;
+		}
+
+		foreach (CapabilityMethodInfo method in component.methods ?? new List<CapabilityMethodInfo>())
+		{
+			artifacts.Add(new ComponentArtifactEntry
+			{
+				kind = ComponentArtifactKind.Method,
+				method = method,
+				label = "[Method] " + (string.IsNullOrWhiteSpace(method.name) ? "New Method" : method.name)
+			});
+		}
+
+		foreach (CapabilityEventInfo eventInfo in component.events ?? new List<CapabilityEventInfo>())
+		{
+			artifacts.Add(new ComponentArtifactEntry
+			{
+				kind = ComponentArtifactKind.Event,
+				eventInfo = eventInfo,
+				label = "[Event] " + (string.IsNullOrWhiteSpace(eventInfo.name) ? "New Event" : eventInfo.name)
+			});
+		}
+
+		foreach (CapabilityParameterInfo parameter in component.parameters ?? new List<CapabilityParameterInfo>())
+		{
+			artifacts.Add(new ComponentArtifactEntry
+			{
+				kind = ComponentArtifactKind.Parameter,
+				parameter = parameter,
+				label = "[Field] " + (string.IsNullOrWhiteSpace(parameter.name) ? "New Field" : parameter.name)
+			});
+		}
+
+		return artifacts;
+	}
+
+	private enum ComponentArtifactKind
+	{
+		Method,
+		Event,
+		Parameter
+	}
+
+	private class ComponentArtifactEntry
+	{
+		public ComponentArtifactKind kind;
+		public string label;
+		public CapabilityMethodInfo method;
+		public CapabilityEventInfo eventInfo;
+		public CapabilityParameterInfo parameter;
 	}
 
 	private void DrawItemCapabilityEditor()
