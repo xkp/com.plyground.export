@@ -756,9 +756,9 @@ public partial class ModuleExporter
 	private List<CapabilityMethodInfo> BuildMethodInfos(Type type, SourceScriptInfo sourceInfo)
 	{
 		List<CapabilityMethodInfo> methods = new List<CapabilityMethodInfo>();
-		Dictionary<string, SourceMethodInfo> sourceMethodMap = sourceInfo != null
-			? sourceInfo.methods.ToDictionary(method => method.name, method => method, StringComparer.OrdinalIgnoreCase)
-			: new Dictionary<string, SourceMethodInfo>(StringComparer.OrdinalIgnoreCase);
+		Dictionary<string, SourceMethodInfo> sourceMethodMap = BuildSourceLookup(
+			sourceInfo != null ? sourceInfo.methods : null,
+			method => method.name);
 		foreach (MethodInfo method in type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
 		{
 			if (method.IsSpecialName)
@@ -811,9 +811,9 @@ public partial class ModuleExporter
 	private List<CapabilityEventInfo> BuildEventInfos(Type type, SourceScriptInfo sourceInfo)
 	{
 		List<CapabilityEventInfo> events = new List<CapabilityEventInfo>();
-		Dictionary<string, SourceEventInfo> sourceEventMap = sourceInfo != null
-			? sourceInfo.events.ToDictionary(eventInfo => eventInfo.name, eventInfo => eventInfo, StringComparer.OrdinalIgnoreCase)
-			: new Dictionary<string, SourceEventInfo>(StringComparer.OrdinalIgnoreCase);
+		Dictionary<string, SourceEventInfo> sourceEventMap = BuildSourceLookup(
+			sourceInfo != null ? sourceInfo.events : null,
+			eventInfo => eventInfo.name);
 		foreach (EventInfo eventInfo in type.GetEvents(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
 		{
 			sourceEventMap.TryGetValue(eventInfo.Name, out SourceEventInfo sourceEvent);
@@ -881,9 +881,9 @@ public partial class ModuleExporter
 	private List<CapabilityParameterInfo> BuildParameterInfos(Type type, Component instance, SourceScriptInfo sourceInfo)
 	{
 		List<CapabilityParameterInfo> parameters = new List<CapabilityParameterInfo>();
-		Dictionary<string, SourceFieldInfo> sourceFieldMap = sourceInfo != null
-			? sourceInfo.fields.ToDictionary(field => field.name, field => field, StringComparer.OrdinalIgnoreCase)
-			: new Dictionary<string, SourceFieldInfo>(StringComparer.OrdinalIgnoreCase);
+		Dictionary<string, SourceFieldInfo> sourceFieldMap = BuildSourceLookup(
+			sourceInfo != null ? sourceInfo.fields : null,
+			field => field.name);
 		foreach (FieldInfo field in GetSerializedFields(type))
 		{
 			sourceFieldMap.TryGetValue(field.Name, out SourceFieldInfo sourceField);
@@ -2181,6 +2181,37 @@ public partial class ModuleExporter
 				description = parameter.description,
 				required = parameter.required
 			}).ToList();
+	}
+
+	private Dictionary<string, T> BuildSourceLookup<T>(IEnumerable<T> entries, Func<T, string> keySelector)
+	{
+		Dictionary<string, T> map = new Dictionary<string, T>(StringComparer.OrdinalIgnoreCase);
+		if (entries == null || keySelector == null)
+		{
+			return map;
+		}
+
+		foreach (T entry in entries)
+		{
+			if (entry == null)
+			{
+				continue;
+			}
+
+			string key = keySelector(entry);
+			if (string.IsNullOrWhiteSpace(key))
+			{
+				continue;
+			}
+
+			key = key.Trim();
+			if (!map.ContainsKey(key))
+			{
+				map[key] = entry;
+			}
+		}
+
+		return map;
 	}
 
 	private string GetBaseTypeLabel(string baseTypeName)
