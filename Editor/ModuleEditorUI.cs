@@ -799,7 +799,7 @@ public partial class ModuleExporter
 		EditorGUILayout.BeginVertical("helpbox");
 		selectedItem.capabilities ??= selectedItem.prefab != null ? InferItemCapabilities(selectedItem) : new ItemCapabilitySet();
 		EditorGUILayout.LabelField("Supported Features", selectedItem.capabilities.supportedFeatures != null ? selectedItem.capabilities.supportedFeatures.Count.ToString() : "0");
-		EditorGUILayout.LabelField("Unity Components", selectedItem.capabilities.unity != null && selectedItem.capabilities.unity.components != null ? selectedItem.capabilities.unity.components.Count.ToString() : "0");
+		EditorGUILayout.LabelField("Component Records", selectedItem.capabilities.unity != null && selectedItem.capabilities.unity.components != null ? selectedItem.capabilities.unity.components.Count.ToString() : "0");
 		EditorGUILayout.LabelField("Constraints", selectedItem.capabilities.constraints != null ? selectedItem.capabilities.constraints.Count.ToString() : "0");
 		EditorGUILayout.BeginHorizontal();
 		GUI.enabled = selectedItem.prefab != null;
@@ -1093,6 +1093,7 @@ public partial class ModuleExporter
 		moduleCapabilities.module ??= new CapabilityModuleInfo();
 		moduleCapabilities.unity ??= new CapabilityUnityInfo();
 		moduleCapabilities.exportInfo ??= new CapabilityExportInfo();
+		NormalizeModuleCapabilities(moduleCapabilities);
 
 		GUILayout.Label("MODULE-WIDE MANIFEST", EditorStyles.boldLabel);
 		EditorGUILayout.BeginVertical("box");
@@ -1108,9 +1109,8 @@ public partial class ModuleExporter
 		DrawStringListEditor("Namespace Roots", moduleCapabilities.module.namespaceRoots);
 		DrawStringListEditor("Dependencies", moduleCapabilities.module.dependencies);
 		DrawStringListEditor("Tags", moduleCapabilities.module.tags);
-		DrawStringListEditor("Supported Features", moduleCapabilities.supportedFeatures);
-		DrawCapabilityUnityEditor("Unity", moduleCapabilities.unity);
-		DrawStringListEditor("Constraints", moduleCapabilities.constraints);
+		DrawSupportedFeatureListEditor("Supported Features", moduleCapabilities.supportedFeatures);
+		DrawConstraintListEditor("Constraints", moduleCapabilities.constraints);
 		DrawTypeListEditor(moduleCapabilities.types);
 		DrawEventListEditor(moduleCapabilities.events);
 		DrawMethodListEditor(moduleCapabilities.methods);
@@ -1164,21 +1164,85 @@ public partial class ModuleExporter
 			itemToEdit.capabilities = new ItemCapabilitySet();
 		}
 		EditorGUILayout.EndHorizontal();
-		DrawStringListEditor("Supported Features", itemToEdit.capabilities.supportedFeatures);
-		DrawCapabilityUnityEditor("Unity", itemToEdit.capabilities.unity);
-		DrawStringListEditor("Constraints", itemToEdit.capabilities.constraints);
+		DrawSupportedFeatureListEditor("Supported Features", itemToEdit.capabilities.supportedFeatures);
+		DrawConstraintListEditor("Constraints", itemToEdit.capabilities.constraints);
 		EditorGUILayout.EndVertical();
 	}
 
-	private void DrawCapabilityUnityEditor(string label, CapabilityUnityInfo unity)
+	private void DrawSupportedFeatureListEditor(string label, List<CapabilityFeatureInfo> values)
 	{
-		unity ??= new CapabilityUnityInfo();
-		GUILayout.Label(label, EditorStyles.miniBoldLabel);
+		values ??= new List<CapabilityFeatureInfo>();
 		EditorGUILayout.BeginVertical("helpbox");
-		DrawStringListEditor("Components", unity.components);
-		DrawStringListEditor("Systems", unity.systems);
-		DrawStringListEditor("GameObject Roles", unity.gameObjectRoles);
-		DrawStringListEditor("Behavior Shapes", unity.behaviorShapes);
+		EditorGUILayout.BeginHorizontal();
+		GUILayout.Label(label, EditorStyles.miniBoldLabel);
+		GUILayout.FlexibleSpace();
+		if (GUILayout.Button("Add", GUILayout.Width(60f)))
+		{
+			values.Add(new CapabilityFeatureInfo());
+		}
+		EditorGUILayout.EndHorizontal();
+
+		if (values.Count == 0)
+		{
+			EditorGUILayout.LabelField("No entries", EditorStyles.miniLabel);
+		}
+
+		for (int i = 0; i < values.Count; i++)
+		{
+			CapabilityFeatureInfo entry = values[i];
+			EditorGUILayout.BeginVertical("box");
+			entry.featureId = EditorGUILayout.TextField("Feature Id", entry.featureId);
+			entry.description = EditorGUILayout.TextField("Description", entry.description);
+			entry.codegenAllowed = EditorGUILayout.Toggle("Codegen Allowed", entry.codegenAllowed);
+			DrawStringListEditor("Required Dependencies", entry.requiredDependencies);
+			DrawStringListEditor("Incompatible Features", entry.incompatibleFeatures);
+			DrawStringListEditor("Recommended Templates", entry.recommendedTemplates);
+			if (GUILayout.Button("Remove Feature", GUILayout.Width(120f)))
+			{
+				values.RemoveAt(i);
+				i--;
+			}
+			EditorGUILayout.EndVertical();
+		}
+
+		EditorGUILayout.EndVertical();
+	}
+
+	private void DrawConstraintListEditor(string label, List<CapabilityConstraintInfo> values)
+	{
+		values ??= new List<CapabilityConstraintInfo>();
+		EditorGUILayout.BeginVertical("helpbox");
+		EditorGUILayout.BeginHorizontal();
+		GUILayout.Label(label, EditorStyles.miniBoldLabel);
+		GUILayout.FlexibleSpace();
+		if (GUILayout.Button("Add", GUILayout.Width(60f)))
+		{
+			values.Add(new CapabilityConstraintInfo());
+		}
+		EditorGUILayout.EndHorizontal();
+
+		if (values.Count == 0)
+		{
+			EditorGUILayout.LabelField("No entries", EditorStyles.miniLabel);
+		}
+
+		for (int i = 0; i < values.Count; i++)
+		{
+			CapabilityConstraintInfo entry = values[i];
+			EditorGUILayout.BeginVertical("box");
+			entry.code = EditorGUILayout.TextField("Code", entry.code);
+			entry.description = EditorGUILayout.TextField("Description", entry.description);
+			entry.severity = EditorGUILayout.TextField("Severity", entry.severity);
+			entry.appliesToType = EditorGUILayout.TextField("Applies To Type", entry.appliesToType);
+			entry.appliesToId = EditorGUILayout.TextField("Applies To Id", entry.appliesToId);
+			if (GUILayout.Button("Remove Constraint", GUILayout.Width(130f)))
+			{
+				values.RemoveAt(i);
+				i--;
+			}
+			EditorGUILayout.EndVertical();
+		}
+
 		EditorGUILayout.EndVertical();
 	}
 
@@ -1229,9 +1293,12 @@ public partial class ModuleExporter
 			EditorGUILayout.BeginVertical("helpbox");
 			entry.name = EditorGUILayout.TextField("Name", entry.name);
 			entry.fullName = EditorGUILayout.TextField("Full Name", entry.fullName);
-			entry.assemblyName = EditorGUILayout.TextField("Assembly", entry.assemblyName);
 			entry.kind = EditorGUILayout.TextField("Kind", entry.kind);
+			entry.@namespace = EditorGUILayout.TextField("Namespace", entry.@namespace);
 			entry.description = EditorGUILayout.TextField("Description", entry.description);
+			entry.exposed = EditorGUILayout.Toggle("Exposed", entry.exposed);
+			DrawTypeFieldListEditor(entry.fields);
+			DrawStringListEditor("Enum Values", entry.enumValues);
 			if (GUILayout.Button("Remove Type", GUILayout.Width(110f)))
 			{
 				values.RemoveAt(i);
@@ -1254,10 +1321,14 @@ public partial class ModuleExporter
 			CapabilityEventInfo entry = values[i];
 			EditorGUILayout.BeginVertical("helpbox");
 			entry.name = EditorGUILayout.TextField("Name", entry.name);
+			entry.direction = EditorGUILayout.TextField("Direction", entry.direction);
+			entry.payloadType = EditorGUILayout.TextField("Payload Type", entry.payloadType);
 			entry.declaringType = EditorGUILayout.TextField("Declaring Type", entry.declaringType);
-			entry.eventType = EditorGUILayout.TextField("Event Type", entry.eventType);
-			entry.source = EditorGUILayout.TextField("Source", entry.source);
 			entry.description = EditorGUILayout.TextField("Description", entry.description);
+			entry.allowedForCodegen = EditorGUILayout.Toggle("Allowed For Codegen", entry.allowedForCodegen);
+			entry.scope = EditorGUILayout.TextField("Scope", entry.scope);
+			entry.authority = EditorGUILayout.TextField("Authority", entry.authority);
+			DrawStringListEditor("Tags", entry.tags);
 			if (GUILayout.Button("Remove Event", GUILayout.Width(110f)))
 			{
 				values.RemoveAt(i);
@@ -1281,10 +1352,13 @@ public partial class ModuleExporter
 			EditorGUILayout.BeginVertical("helpbox");
 			entry.name = EditorGUILayout.TextField("Name", entry.name);
 			entry.declaringType = EditorGUILayout.TextField("Declaring Type", entry.declaringType);
-			entry.returnType = EditorGUILayout.TextField("Return Type", entry.returnType);
-			entry.signature = EditorGUILayout.TextField("Signature", entry.signature);
-			entry.source = EditorGUILayout.TextField("Source", entry.source);
 			entry.description = EditorGUILayout.TextField("Description", entry.description);
+			DrawMethodParameterListEditor(entry.parameters);
+			entry.returnType = EditorGUILayout.TextField("Return Type", entry.returnType);
+			entry.isStatic = EditorGUILayout.Toggle("Is Static", entry.isStatic);
+			entry.allowedForCodegen = EditorGUILayout.Toggle("Allowed For Codegen", entry.allowedForCodegen);
+			DrawStringListEditor("Constraints", entry.constraints);
+			DrawStringListEditor("Tags", entry.tags);
 			if (GUILayout.Button("Remove Method", GUILayout.Width(120f)))
 			{
 				values.RemoveAt(i);
@@ -1308,11 +1382,66 @@ public partial class ModuleExporter
 			EditorGUILayout.BeginVertical("helpbox");
 			entry.name = EditorGUILayout.TextField("Name", entry.name);
 			entry.type = EditorGUILayout.TextField("Type", entry.type);
-			entry.source = EditorGUILayout.TextField("Source", entry.source);
-			entry.defaultValue = EditorGUILayout.TextField("Default Value", entry.defaultValue);
+			entry.required = EditorGUILayout.Toggle("Required", entry.required);
+			entry.@default = EditorGUILayout.TextField("Default", entry.@default);
+			entry.min = EditorGUILayout.FloatField("Min", entry.min);
+			entry.max = EditorGUILayout.FloatField("Max", entry.max);
+			DrawStringListEditor("Enum Values", entry.enumValues);
+			entry.description = EditorGUILayout.TextField("Description", entry.description);
+			entry.moduleScoped = EditorGUILayout.Toggle("Module Scoped", entry.moduleScoped);
+			entry.featureId = EditorGUILayout.TextField("Feature Id", entry.featureId);
+			DrawStringListEditor("Tags", entry.tags);
+			if (GUILayout.Button("Remove Parameter", GUILayout.Width(130f)))
+			{
+				values.RemoveAt(i);
+				i--;
+			}
+			EditorGUILayout.EndVertical();
+		}
+	}
+
+	private void DrawTypeFieldListEditor(List<CapabilityTypeFieldInfo> values)
+	{
+		values ??= new List<CapabilityTypeFieldInfo>();
+		GUILayout.Label("Fields", EditorStyles.miniBoldLabel);
+		if (GUILayout.Button("Add Field", GUILayout.Width(90f)))
+		{
+			values.Add(new CapabilityTypeFieldInfo());
+		}
+		for (int i = 0; i < values.Count; i++)
+		{
+			CapabilityTypeFieldInfo entry = values[i];
+			EditorGUILayout.BeginVertical("helpbox");
+			entry.name = EditorGUILayout.TextField("Name", entry.name);
+			entry.type = EditorGUILayout.TextField("Type", entry.type);
 			entry.description = EditorGUILayout.TextField("Description", entry.description);
 			entry.required = EditorGUILayout.Toggle("Required", entry.required);
-			if (GUILayout.Button("Remove Parameter", GUILayout.Width(130f)))
+			if (GUILayout.Button("Remove Field", GUILayout.Width(110f)))
+			{
+				values.RemoveAt(i);
+				i--;
+			}
+			EditorGUILayout.EndVertical();
+		}
+	}
+
+	private void DrawMethodParameterListEditor(List<CapabilityMethodParameterInfo> values)
+	{
+		values ??= new List<CapabilityMethodParameterInfo>();
+		GUILayout.Label("Parameters", EditorStyles.miniBoldLabel);
+		if (GUILayout.Button("Add Method Parameter", GUILayout.Width(140f)))
+		{
+			values.Add(new CapabilityMethodParameterInfo());
+		}
+		for (int i = 0; i < values.Count; i++)
+		{
+			CapabilityMethodParameterInfo entry = values[i];
+			EditorGUILayout.BeginVertical("helpbox");
+			entry.name = EditorGUILayout.TextField("Name", entry.name);
+			entry.type = EditorGUILayout.TextField("Type", entry.type);
+			entry.description = EditorGUILayout.TextField("Description", entry.description);
+			entry.required = EditorGUILayout.Toggle("Required", entry.required);
+			if (GUILayout.Button("Remove Method Parameter", GUILayout.Width(170f)))
 			{
 				values.RemoveAt(i);
 				i--;
