@@ -795,6 +795,27 @@ public partial class ModuleExporter
 		DrawSelectedItemProperties();
 
 		EditorGUILayout.Space();
+		GUILayout.Label("CAPABILITIES", EditorStyles.boldLabel);
+		EditorGUILayout.BeginVertical("helpbox");
+		selectedItem.capabilities ??= selectedItem.prefab != null ? InferItemCapabilities(selectedItem) : new ItemCapabilitySet();
+		EditorGUILayout.LabelField("Supported Features", selectedItem.capabilities.supportedFeatures != null ? selectedItem.capabilities.supportedFeatures.Count.ToString() : "0");
+		EditorGUILayout.LabelField("Unity Components", selectedItem.capabilities.unity != null && selectedItem.capabilities.unity.components != null ? selectedItem.capabilities.unity.components.Count.ToString() : "0");
+		EditorGUILayout.LabelField("Constraints", selectedItem.capabilities.constraints != null ? selectedItem.capabilities.constraints.Count.ToString() : "0");
+		EditorGUILayout.BeginHorizontal();
+		GUI.enabled = selectedItem.prefab != null;
+		if (GUILayout.Button("Infer Item Capabilities"))
+		{
+			selectedItem.capabilities = InferItemCapabilities(selectedItem);
+		}
+		GUI.enabled = true;
+		if (GUILayout.Button("Open Capability Editor"))
+		{
+			FocusCapabilityEditorForSelectedItem();
+		}
+		EditorGUILayout.EndHorizontal();
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.Space();
 		EditorGUILayout.BeginHorizontal();
 		if (GUILayout.Button("Add Property"))
 		{
@@ -814,6 +835,34 @@ public partial class ModuleExporter
 		}
 		EditorGUILayout.EndHorizontal();
 		EditorGUILayout.EndVertical();
+	}
+
+	private void FocusCapabilityEditorForSelectedItem()
+	{
+		if (selectedItem == null)
+		{
+			return;
+		}
+
+		for (int groupIndex = 0; groupIndex < itemGroups.Count; groupIndex++)
+		{
+			ItemGroup group = itemGroups[groupIndex];
+			if (group?.items == null)
+			{
+				continue;
+			}
+
+			int itemIndex = group.items.IndexOf(selectedItem);
+			if (itemIndex >= 0)
+			{
+				capabilityItemGroupIndex = groupIndex;
+				capabilityItemIndex = itemIndex;
+				activeTab = ModuleEditorTab.Capabilities;
+				GUI.FocusControl(null);
+				Repaint();
+				return;
+			}
+		}
 	}
 
 	private void DrawSelectedItemProperties()

@@ -442,19 +442,9 @@ public partial class ModuleExporter
 	{
 		foreach (RequireComponent requireComponent in type.GetCustomAttributes(typeof(RequireComponent), true))
 		{
-			if (requireComponent.m_Type0 != null)
+			foreach (Type requiredType in GetRequireComponentTypes(requireComponent))
 			{
-				constraints.Add("requires-component:" + requireComponent.m_Type0.Name);
-			}
-
-			if (requireComponent.m_Type1 != null)
-			{
-				constraints.Add("requires-component:" + requireComponent.m_Type1.Name);
-			}
-
-			if (requireComponent.m_Type2 != null)
-			{
-				constraints.Add("requires-component:" + requireComponent.m_Type2.Name);
+				constraints.Add("requires-component:" + requiredType.Name);
 			}
 		}
 	}
@@ -814,5 +804,29 @@ public partial class ModuleExporter
 		}
 
 		return null;
+	}
+
+	private static IEnumerable<Type> GetRequireComponentTypes(RequireComponent requireComponent)
+	{
+		if (requireComponent == null)
+		{
+			yield break;
+		}
+
+		string[] fieldNames = { "m_Type0", "m_Type1", "m_Type2" };
+		foreach (string fieldName in fieldNames)
+		{
+			FieldInfo field = typeof(RequireComponent).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+			if (field == null)
+			{
+				continue;
+			}
+
+			Type requiredType = field.GetValue(requireComponent) as Type;
+			if (requiredType != null)
+			{
+				yield return requiredType;
+			}
+		}
 	}
 }
