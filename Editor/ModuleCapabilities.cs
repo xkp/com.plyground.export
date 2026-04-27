@@ -24,6 +24,7 @@ public partial class ModuleExporter
 	private static Assembly RoslynAssembly;
 	private static Assembly RoslynCSharpAssembly;
 	private static bool RoslynLoadAttempted;
+	private bool capabilityDebugLogging = true;
 
 	[Serializable]
 	public class CapabilityManifest
@@ -373,6 +374,10 @@ public partial class ModuleExporter
 		PopulateCapabilityModuleMetadata(manifest);
 		List<SourceScriptInfo> sourceScripts = GetAllLocalSourceScripts();
 		HashSet<string> relevantNamespaceRoots = GetRelevantNamespaceRoots(sourceScripts);
+		LogCapabilityDebug("Source discovery: scripts={0}, componentScripts={1}, namespaceRoots=[{2}]",
+			sourceScripts.Count,
+			sourceScripts.Count(sourceInfo => sourceInfo != null && sourceInfo.isComponent),
+			string.Join(", ", relevantNamespaceRoots.OrderBy(value => value).ToArray()));
 
 		Dictionary<string, CapabilityTypeInfo> typeMap = new Dictionary<string, CapabilityTypeInfo>(StringComparer.OrdinalIgnoreCase);
 		Dictionary<string, CapabilityMethodInfo> methodMap = new Dictionary<string, CapabilityMethodInfo>(StringComparer.OrdinalIgnoreCase);
@@ -483,7 +488,11 @@ public partial class ModuleExporter
 			}
 		}
 
-		foreach (SourceScriptInfo sourceInfo in GetRelevantSourceComponents(sourceScripts, relevantNamespaceRoots))
+		List<SourceScriptInfo> relevantSourceComponents = GetRelevantSourceComponents(sourceScripts, relevantNamespaceRoots);
+		LogCapabilityDebug("Relevant source components kept={0}. Sample=[{1}]",
+			relevantSourceComponents.Count,
+			string.Join(", ", relevantSourceComponents.Take(12).Select(sourceInfo => sourceInfo.fullName).ToArray()));
+		foreach (SourceScriptInfo sourceInfo in relevantSourceComponents)
 		{
 			UnityCapabilityComponentInfo componentInfo = BuildUnityComponentInfo(sourceInfo);
 			AddComponent(componentMap, componentInfo);
@@ -1339,7 +1348,9 @@ public partial class ModuleExporter
 	private List<SourceScriptInfo> GetAllLocalSourceScripts()
 	{
 		List<SourceScriptInfo> scripts = new List<SourceScriptInfo>();
-		foreach (string guid in AssetDatabase.FindAssets("t:MonoScript", new[] { "Assets" }))
+		string[] guids = AssetDatabase.FindAssets("t:MonoScript", new[] { "Assets" });
+		LogCapabilityDebug("AssetDatabase.FindAssets returned {0} MonoScript assets.", guids.Length);
+		foreach (string guid in guids)
 		{
 			string assetPath = AssetDatabase.GUIDToAssetPath(guid);
 			if (!assetPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
@@ -1355,6 +1366,10 @@ public partial class ModuleExporter
 				scripts.Add(sourceInfo);
 			}
 		}
+
+		LogCapabilityDebug("Parsed local source scripts: kept {0} component candidates. Sample=[{1}]",
+			scripts.Count,
+			string.Join(", ", scripts.Take(12).Select(sourceInfo => sourceInfo.fullName).ToArray()));
 
 		return scripts;
 	}
@@ -2033,6 +2048,18 @@ public partial class ModuleExporter
 			.OrderBy(sourceInfo => sourceInfo.fullName)
 			.ToList();
 
+		List<SourceScriptInfo> excluded = sourceScripts
+			.Where(sourceInfo => sourceInfo != null && sourceInfo.isComponent)
+			.Except(filtered)
+			.OrderBy(sourceInfo => sourceInfo.fullName)
+			.Take(20)
+			.ToList();
+
+		LogCapabilityDebug("Filtering source components by namespace roots kept={0}, excluded={1}. Excluded sample=[{2}]",
+			filtered.Count,
+			sourceScripts.Count(sourceInfo => sourceInfo != null && sourceInfo.isComponent) - filtered.Count,
+			string.Join(", ", excluded.Select(sourceInfo => sourceInfo.fullName).ToArray()));
+
 		return filtered.Count > 0 ? filtered : sourceScripts.Where(sourceInfo => sourceInfo != null && sourceInfo.isComponent).OrderBy(sourceInfo => sourceInfo.fullName).ToList();
 	}
 
@@ -2073,7 +2100,20 @@ public partial class ModuleExporter
 			}
 		}
 
+		LogCapabilityDebug("Computed namespace roots from controller/prefabs: [{0}]",
+			string.Join(", ", roots.OrderBy(value => value).ToArray()));
+
 		return roots;
+	}
+
+	private void LogCapabilityDebug(string format, params object[] args)
+	{
+		if (!capabilityDebugLogging)
+		{
+			return;
+		}
+
+		Debug.Log("[ModuleCapabilities] " + string.Format(format, args));
 	}
 
 	private List<string> BuildAllowedFeatures(SourceScriptInfo sourceInfo)
