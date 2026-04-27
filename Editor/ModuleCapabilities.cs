@@ -308,7 +308,7 @@ public partial class ModuleExporter
 		}
 
 		HashSet<string> featureSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-		HashSet<string> components = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		HashSet<string> unityComponents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		HashSet<string> systems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		HashSet<string> roles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		HashSet<string> shapes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -323,8 +323,15 @@ public partial class ModuleExporter
 				continue;
 			}
 
-			components.Add(componentType.Name);
-			featureSet.Add("component:" + componentType.Name);
+			if (IsAssetBackedComponent(componentType, component))
+			{
+				featureSet.Add("component:" + componentType.Name);
+			}
+			else
+			{
+				unityComponents.Add(componentType.Name);
+			}
+
 			MapBuiltInCapabilities(componentType, systems, roles, shapes, featureSet);
 
 			if (!IsUserDefinedType(componentType))
@@ -361,7 +368,7 @@ public partial class ModuleExporter
 		}
 
 		result.supportedFeatures = featureSet.OrderBy(value => value).ToList();
-		result.unity.components = components.OrderBy(value => value).ToList();
+		result.unity.components = unityComponents.OrderBy(value => value).ToList();
 		result.unity.systems = systems.OrderBy(value => value).ToList();
 		result.unity.gameObjectRoles = roles.OrderBy(value => value).ToList();
 		result.unity.behaviorShapes = shapes.OrderBy(value => value).ToList();
@@ -606,6 +613,43 @@ public partial class ModuleExporter
 			!ns.StartsWith("UnityEditor", StringComparison.Ordinal) &&
 			!ns.StartsWith("TMPro", StringComparison.Ordinal) &&
 			!type.Assembly.GetName().Name.StartsWith("Unity", StringComparison.Ordinal);
+	}
+
+	private static bool IsAssetBackedComponent(Type type, Component instance)
+	{
+		if (type == null)
+		{
+			return false;
+		}
+
+		if (instance is MonoBehaviour monoBehaviour)
+		{
+			MonoScript script = MonoScript.FromMonoBehaviour(monoBehaviour);
+			string scriptPath = script != null ? AssetDatabase.GetAssetPath(script) : string.Empty;
+			return IsAssetsPath(scriptPath);
+		}
+
+		MonoScript[] scripts = Resources.FindObjectsOfTypeAll<MonoScript>();
+		foreach (MonoScript script in scripts)
+		{
+			if (script == null || script.GetClass() != type)
+			{
+				continue;
+			}
+
+			if (IsAssetsPath(AssetDatabase.GetAssetPath(script)))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static bool IsAssetsPath(string assetPath)
+	{
+		return !string.IsNullOrWhiteSpace(assetPath) &&
+			assetPath.Replace("\\", "/").StartsWith("Assets/", StringComparison.OrdinalIgnoreCase);
 	}
 
 	private static void UnionInto(HashSet<string> target, IEnumerable<string> values)
