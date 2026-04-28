@@ -807,20 +807,18 @@ public partial class ModuleExporter
 		DrawSelectedItemProperties();
 
 		EditorGUILayout.Space();
-		GUILayout.Label("CAPABILITIES", EditorStyles.boldLabel);
+		GUILayout.Label("COMPONENTS", EditorStyles.boldLabel);
 		EditorGUILayout.BeginVertical("helpbox");
 		selectedItem.capabilities ??= selectedItem.prefab != null ? InferItemCapabilities(selectedItem) : new ItemCapabilitySet();
-		EditorGUILayout.LabelField("Supported Features", selectedItem.capabilities.supportedFeatures != null ? selectedItem.capabilities.supportedFeatures.Count.ToString() : "0");
 		EditorGUILayout.LabelField("Component Records", selectedItem.capabilities.unity != null && selectedItem.capabilities.unity.components != null ? selectedItem.capabilities.unity.components.Count.ToString() : "0");
-		EditorGUILayout.LabelField("Constraints", selectedItem.capabilities.constraints != null ? selectedItem.capabilities.constraints.Count.ToString() : "0");
 		EditorGUILayout.BeginHorizontal();
 		GUI.enabled = selectedItem.prefab != null;
-		if (GUILayout.Button("Infer Item Capabilities"))
+		if (GUILayout.Button("Infer Item Components"))
 		{
 			selectedItem.capabilities = InferItemCapabilities(selectedItem);
 		}
 		GUI.enabled = true;
-		if (GUILayout.Button("Open Capability Editor"))
+		if (GUILayout.Button("Open Component Editor"))
 		{
 			FocusCapabilityEditorForSelectedItem();
 		}
@@ -1075,7 +1073,7 @@ public partial class ModuleExporter
 			RebuildModuleCapabilitiesFromSelectedScripts();
 		}
 
-		if (GUILayout.Button("Infer All Item Capabilities", GUILayout.Width(180f)))
+		if (GUILayout.Button("Infer All Item Components", GUILayout.Width(180f)))
 		{
 			foreach (ItemGroup group in itemGroups)
 			{
@@ -1195,36 +1193,6 @@ public partial class ModuleExporter
 		if (BeginCapabilitySection("manifest-tags", "Tags"))
 		{
 			DrawStringListEditor("Tags", moduleCapabilities.module.tags);
-			EndCapabilitySection();
-		}
-
-		if (BeginCapabilitySection("manifest-features", "Supported Features"))
-		{
-			DrawFeatureTileEditor("Supported Features", moduleCapabilities.supportedFeatures, ref selectedModuleFeatureIndex);
-			EndCapabilitySection();
-		}
-
-		if (BeginCapabilitySection("manifest-constraints", "Constraints"))
-		{
-			DrawConstraintListEditor("Constraints", moduleCapabilities.constraints);
-			EndCapabilitySection();
-		}
-
-		if (BeginCapabilitySection("manifest-events", "Events"))
-		{
-			DrawEventListEditor(moduleCapabilities.events);
-			EndCapabilitySection();
-		}
-
-		if (BeginCapabilitySection("manifest-methods", "Methods"))
-		{
-			DrawMethodListEditor(moduleCapabilities.methods);
-			EndCapabilitySection();
-		}
-
-		if (BeginCapabilitySection("manifest-parameters", "Parameters"))
-		{
-			DrawParameterListEditor(moduleCapabilities.parameters);
 			EndCapabilitySection();
 		}
 
@@ -1722,10 +1690,10 @@ public partial class ModuleExporter
 
 	private void DrawItemCapabilityEditor()
 	{
-		GUILayout.Label("ITEM / PREFAB CAPABILITIES", EditorStyles.boldLabel);
+		GUILayout.Label("ITEM / PREFAB COMPONENTS", EditorStyles.boldLabel);
 		if (itemGroups.Count == 0)
 		{
-			EditorGUILayout.HelpBox("Add item groups and prefabs in the Items tab to author item-level capabilities.", MessageType.Info);
+			EditorGUILayout.HelpBox("Add item groups and prefabs in the Items tab to author item-level component records.", MessageType.Info);
 			return;
 		}
 
@@ -1748,6 +1716,7 @@ public partial class ModuleExporter
 		selectedItem = itemToEdit;
 		itemToEdit.capabilities ??= itemToEdit.prefab != null ? InferItemCapabilities(itemToEdit) : new ItemCapabilitySet();
 		NormalizeItemCapabilities(itemToEdit.capabilities);
+		itemToEdit.capabilities.unity ??= new CapabilityUnityInfo();
 
 		EditorGUILayout.BeginVertical("box");
 		EditorGUILayout.LabelField("Prefab", EditorStyles.miniBoldLabel);
@@ -1759,24 +1728,20 @@ public partial class ModuleExporter
 			itemToEdit.capabilities = InferItemCapabilities(itemToEdit);
 			NormalizeItemCapabilities(itemToEdit.capabilities);
 			selectedItemFeatureIndex = 0;
+			selectedComponentIndex = -1;
+			selectedComponentArtifactIndex = -1;
 		}
 		GUI.enabled = true;
-		if (GUILayout.Button("Clear Item Capabilities", GUILayout.Width(150f)))
+		if (GUILayout.Button("Clear Item Components", GUILayout.Width(150f)))
 		{
 			itemToEdit.capabilities = new ItemCapabilitySet();
-			selectedItemFeatureIndex = 0;
+			NormalizeItemCapabilities(itemToEdit.capabilities);
+			selectedComponentIndex = -1;
+			selectedComponentArtifactIndex = -1;
 		}
 		EditorGUILayout.EndHorizontal();
-		if (BeginCapabilitySection("item-features", "Supported Features"))
-		{
-			DrawFeatureTileEditor("Supported Features", itemToEdit.capabilities.supportedFeatures, ref selectedItemFeatureIndex);
-			EndCapabilitySection();
-		}
-		if (BeginCapabilitySection("item-constraints", "Constraints"))
-		{
-			DrawConstraintListEditor("Constraints", itemToEdit.capabilities.constraints);
-			EndCapabilitySection();
-		}
+		EditorGUILayout.Space(4f);
+		DrawComponentBrowser(itemToEdit.capabilities.unity.components);
 		EditorGUILayout.EndVertical();
 	}
 

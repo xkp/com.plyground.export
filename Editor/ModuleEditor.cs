@@ -271,7 +271,9 @@ public partial class ModuleExporter : EditorWindow
 
 		if (!HasMeaningfulModuleCapabilities(moduleCapabilities))
 		{
-			moduleCapabilities = InferModuleCapabilities();
+			moduleCapabilities = new CapabilityManifest();
+			PopulateCapabilityModuleMetadata(moduleCapabilities);
+			NormalizeModuleCapabilities(moduleCapabilities);
 		}
 
 

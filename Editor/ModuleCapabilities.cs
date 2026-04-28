@@ -293,10 +293,6 @@ public partial class ModuleExporter
 	private void PrepareCapabilitiesForPersistence()
 	{
 		moduleCapabilities ??= new CapabilityManifest();
-		if (!HasMeaningfulModuleCapabilities(moduleCapabilities))
-		{
-			moduleCapabilities = InferModuleCapabilities();
-		}
 
 		PopulateCapabilityModuleMetadata(moduleCapabilities);
 		moduleCapabilities.manifestVersion = string.IsNullOrWhiteSpace(moduleCapabilities.manifestVersion)
@@ -578,12 +574,7 @@ public partial class ModuleExporter
 			return result;
 		}
 
-		Dictionary<string, CapabilityFeatureInfo> featureMap = new Dictionary<string, CapabilityFeatureInfo>(StringComparer.OrdinalIgnoreCase);
-		Dictionary<string, CapabilityConstraintInfo> constraintMap = new Dictionary<string, CapabilityConstraintInfo>(StringComparer.OrdinalIgnoreCase);
 		Dictionary<string, UnityCapabilityComponentInfo> componentMap = new Dictionary<string, UnityCapabilityComponentInfo>(StringComparer.OrdinalIgnoreCase);
-		Dictionary<string, UnityCapabilitySystemInfo> systemMap = new Dictionary<string, UnityCapabilitySystemInfo>(StringComparer.OrdinalIgnoreCase);
-		Dictionary<string, UnityCapabilityGameObjectRoleInfo> roleMap = new Dictionary<string, UnityCapabilityGameObjectRoleInfo>(StringComparer.OrdinalIgnoreCase);
-		Dictionary<string, UnityCapabilityBehaviorShapeInfo> shapeMap = new Dictionary<string, UnityCapabilityBehaviorShapeInfo>(StringComparer.OrdinalIgnoreCase);
 
 		foreach (Component component in prefab.GetComponentsInChildren<Component>(true))
 		{
@@ -596,30 +587,8 @@ public partial class ModuleExporter
 			SourceScriptInfo sourceInfo = GetSourceScriptInfoForType(componentType);
 			UnityCapabilityComponentInfo componentInfo = BuildUnityComponentInfo(componentType, component, sourceInfo);
 			AddComponent(componentMap, componentInfo);
-
-			foreach (string featureId in componentInfo.allowedFeatures)
-			{
-				AddFeature(featureMap, new CapabilityFeatureInfo
-				{
-					featureId = featureId,
-					description = "Inferred from " + componentType.Name
-				});
-			}
-
-			foreach (CapabilityConstraintInfo constraint in BuildConstraintInfos(componentType))
-			{
-				AddConstraint(constraintMap, constraint);
-			}
 		}
-
-		InferPrefabRolesAndShapes(prefab, componentMap.Values.ToList(), featureMap, systemMap, roleMap, shapeMap);
-
-		result.supportedFeatures = featureMap.Values.OrderBy(info => info.featureId).ToList();
-		result.constraints = constraintMap.Values.OrderBy(info => info.code).ThenBy(info => info.description).ToList();
 		result.unity.components = componentMap.Values.OrderBy(info => info.componentId).ToList();
-		result.unity.systems = systemMap.Values.OrderBy(info => info.systemId).ToList();
-		result.unity.gameObjectRoles = roleMap.Values.OrderBy(info => info.roleId).ToList();
-		result.unity.behaviorShapes = shapeMap.Values.OrderBy(info => info.shapeId).ToList();
 		return result;
 	}
 
@@ -2436,12 +2405,12 @@ public partial class ModuleExporter
 		}
 
 		capabilities.unity ??= new CapabilityUnityInfo();
-		capabilities.supportedFeatures = NormalizeFeatures(capabilities.supportedFeatures);
-		capabilities.constraints = NormalizeConstraints(capabilities.constraints);
+		capabilities.supportedFeatures = new List<CapabilityFeatureInfo>();
+		capabilities.constraints = new List<CapabilityConstraintInfo>();
 		capabilities.unity.components = NormalizeComponents(capabilities.unity.components);
-		capabilities.unity.systems = NormalizeSystems(capabilities.unity.systems);
-		capabilities.unity.gameObjectRoles = NormalizeRoles(capabilities.unity.gameObjectRoles);
-		capabilities.unity.behaviorShapes = NormalizeShapes(capabilities.unity.behaviorShapes);
+		capabilities.unity.systems = new List<UnityCapabilitySystemInfo>();
+		capabilities.unity.gameObjectRoles = new List<UnityCapabilityGameObjectRoleInfo>();
+		capabilities.unity.behaviorShapes = new List<UnityCapabilityBehaviorShapeInfo>();
 	}
 
 	private static void NormalizeModuleCapabilities(CapabilityManifest capabilities)
@@ -2685,13 +2654,8 @@ public partial class ModuleExporter
 	private static bool HasMeaningfulItemCapabilities(ItemCapabilitySet capabilities)
 	{
 		return capabilities != null &&
-			((capabilities.supportedFeatures != null && capabilities.supportedFeatures.Count > 0) ||
-			(capabilities.constraints != null && capabilities.constraints.Count > 0) ||
 			(capabilities.unity != null &&
-				((capabilities.unity.components != null && capabilities.unity.components.Count > 0) ||
-				(capabilities.unity.systems != null && capabilities.unity.systems.Count > 0) ||
-				(capabilities.unity.gameObjectRoles != null && capabilities.unity.gameObjectRoles.Count > 0) ||
-				(capabilities.unity.behaviorShapes != null && capabilities.unity.behaviorShapes.Count > 0))));
+				(capabilities.unity.components != null && capabilities.unity.components.Count > 0));
 	}
 
 	private static bool HasMeaningfulModuleCapabilities(CapabilityManifest capabilities)
