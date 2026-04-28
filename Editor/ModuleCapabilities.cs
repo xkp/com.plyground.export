@@ -494,7 +494,10 @@ public partial class ModuleExporter
 			string.Join(", ", relevantSourceComponents.Take(12).Select(sourceInfo => sourceInfo.fullName).ToArray()));
 		foreach (SourceScriptInfo sourceInfo in relevantSourceComponents)
 		{
-			UnityCapabilityComponentInfo componentInfo = BuildUnityComponentInfo(sourceInfo);
+			Type resolvedType = ResolveTypeByName(sourceInfo.fullName);
+			UnityCapabilityComponentInfo componentInfo = resolvedType != null
+				? BuildUnityComponentInfo(resolvedType, null, sourceInfo)
+				: BuildUnityComponentInfo(sourceInfo);
 			AddComponent(componentMap, componentInfo);
 			AddFeature(featureMap, new CapabilityFeatureInfo
 			{
@@ -502,28 +505,41 @@ public partial class ModuleExporter
 				description = string.IsNullOrWhiteSpace(sourceInfo.summary) ? "Declared in source" : sourceInfo.summary
 			});
 
-			foreach (CapabilityMethodInfo method in componentInfo.methods)
-			{
-				AddMethod(methodMap, method);
-			}
-
-			foreach (CapabilityEventInfo eventInfo in componentInfo.events)
-			{
-				AddEvent(eventMap, eventInfo);
-			}
-
-			foreach (CapabilityParameterInfo parameter in componentInfo.parameters)
-			{
-				AddParameter(parameterMap, parameter);
-			}
-
-			Type resolvedType = ResolveTypeByName(sourceInfo.fullName);
 			if (resolvedType != null)
 			{
 				AddTypeMetadata(resolvedType, typeMap, assemblyNames, namespaceRoots);
+				foreach (CapabilityMethodInfo method in BuildMethodInfos(resolvedType, sourceInfo))
+				{
+					AddMethod(methodMap, method);
+				}
+
+				foreach (CapabilityEventInfo eventInfo in BuildEventInfos(resolvedType, sourceInfo))
+				{
+					AddEvent(eventMap, eventInfo);
+				}
+
+				foreach (CapabilityParameterInfo parameter in BuildParameterInfos(resolvedType, null, sourceInfo))
+				{
+					AddParameter(parameterMap, parameter);
+				}
 			}
 			else
 			{
+				foreach (CapabilityMethodInfo method in componentInfo.methods)
+				{
+					AddMethod(methodMap, method);
+				}
+
+				foreach (CapabilityEventInfo eventInfo in componentInfo.events)
+				{
+					AddEvent(eventMap, eventInfo);
+				}
+
+				foreach (CapabilityParameterInfo parameter in componentInfo.parameters)
+				{
+					AddParameter(parameterMap, parameter);
+				}
+
 				typeMap[sourceInfo.fullName] = BuildTypeInfo(sourceInfo);
 				if (!string.IsNullOrWhiteSpace(sourceInfo.namespaceName))
 				{

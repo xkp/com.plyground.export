@@ -1195,7 +1195,7 @@ public partial class ModuleExporter
 	{
 		components ??= new List<UnityCapabilityComponentInfo>();
 
-		EditorGUILayout.BeginHorizontal(GUILayout.MinHeight(280f), GUILayout.MaxHeight(Mathf.Max(280f, position.height * 0.42f)));
+		EditorGUILayout.BeginHorizontal();
 		GUILayout.Label("Components", EditorStyles.miniBoldLabel);
 		GUILayout.FlexibleSpace();
 		if (GUILayout.Button("Add Component", GUILayout.Width(120f)))
