@@ -34,6 +34,9 @@ public partial class ModuleExporter
 	private int selectedTypeFieldIndex = -1;
 	private int selectedComponentIndex = -1;
 	private int selectedComponentArtifactIndex = -1;
+	private Vector2 componentListScroll;
+	private Vector2 componentArtifactScroll;
+	private Vector2 componentEditorScroll;
 	private Dictionary<string, bool> capabilitySectionFoldouts = new Dictionary<string, bool>();
 	private Dictionary<string, bool> componentNamespaceFoldouts = new Dictionary<string, bool>();
 	private const string PackageLogoAssetPath = "Packages/com.plyground.export/Editor/Branding/plyground-logo.png";
@@ -1233,7 +1236,9 @@ public partial class ModuleExporter
 
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(220f, position.width * 0.22f)));
 		GUILayout.Label("Component List", EditorStyles.boldLabel);
+		componentListScroll = EditorGUILayout.BeginScrollView(componentListScroll, GUILayout.ExpandHeight(true));
 		DrawComponentNamespaceTree(components);
+		EditorGUILayout.EndScrollView();
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(220f, position.width * 0.22f)));
@@ -1271,6 +1276,7 @@ public partial class ModuleExporter
 		}
 		else
 		{
+			componentArtifactScroll = EditorGUILayout.BeginScrollView(componentArtifactScroll, GUILayout.ExpandHeight(true));
 			for (int i = 0; i < artifacts.Count; i++)
 			{
 				ComponentArtifactEntry artifact = artifacts[i];
@@ -1280,10 +1286,12 @@ public partial class ModuleExporter
 					selectedComponentArtifactIndex = i;
 				}
 			}
+			EditorGUILayout.EndScrollView();
 		}
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true));
+		componentEditorScroll = EditorGUILayout.BeginScrollView(componentEditorScroll, GUILayout.ExpandHeight(true));
 		if (selectedComponentArtifactIndex >= 0 && selectedComponentArtifactIndex < artifacts.Count)
 		{
 			DrawSelectedComponentArtifactEditor(selectedComponent, artifacts[selectedComponentArtifactIndex]);
@@ -1292,6 +1300,7 @@ public partial class ModuleExporter
 		{
 			DrawSelectedComponentEditor(components, selectedComponent);
 		}
+		EditorGUILayout.EndScrollView();
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.EndHorizontal();
