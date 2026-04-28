@@ -2040,11 +2040,8 @@ public partial class ModuleExporter
 		List<SourceScriptInfo> filtered = sourceScripts
 			.Where(sourceInfo => sourceInfo != null && sourceInfo.isComponent)
 			.Where(sourceInfo =>
-				relevantNamespaceRoots.Count == 0 ||
-				relevantNamespaceRoots.Any(root =>
-					!string.IsNullOrWhiteSpace(sourceInfo.namespaceName) &&
-					(sourceInfo.namespaceName.Equals(root, StringComparison.Ordinal) ||
-					sourceInfo.namespaceName.StartsWith(root + ".", StringComparison.Ordinal))))
+				string.IsNullOrWhiteSpace(sourceInfo.namespaceName) ||
+				!IsUnityRelatedNamespace(sourceInfo.namespaceName))
 			.OrderBy(sourceInfo => sourceInfo.fullName)
 			.ToList();
 
@@ -2066,37 +2063,11 @@ public partial class ModuleExporter
 	private HashSet<string> GetRelevantNamespaceRoots(List<SourceScriptInfo> sourceScripts)
 	{
 		HashSet<string> roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-		Type controllerType = ResolveTypeByName(controllerClass);
-		if (controllerType != null && !string.IsNullOrWhiteSpace(controllerType.Namespace))
+		foreach (SourceScriptInfo sourceInfo in sourceScripts)
 		{
-			roots.Add(GetNamespaceRoot(controllerType.Namespace));
-		}
-
-		foreach (Item item in itemGroups.SelectMany(group => group.items))
-		{
-			if (item?.prefab == null)
+			if (!string.IsNullOrWhiteSpace(sourceInfo.namespaceName) && !IsUnityRelatedNamespace(sourceInfo.namespaceName))
 			{
-				continue;
-			}
-
-			foreach (Component component in item.prefab.GetComponentsInChildren<Component>(true))
-			{
-				Type componentType = component != null ? component.GetType() : null;
-				if (componentType != null && IsAssetsType(componentType) && !string.IsNullOrWhiteSpace(componentType.Namespace))
-				{
-					roots.Add(GetNamespaceRoot(componentType.Namespace));
-				}
-			}
-		}
-
-		if (roots.Count == 0)
-		{
-			foreach (SourceScriptInfo sourceInfo in sourceScripts)
-			{
-				if (!string.IsNullOrWhiteSpace(sourceInfo.namespaceName))
-				{
-					roots.Add(GetNamespaceRoot(sourceInfo.namespaceName));
-				}
+				roots.Add(GetNamespaceRoot(sourceInfo.namespaceName));
 			}
 		}
 
@@ -2104,6 +2075,21 @@ public partial class ModuleExporter
 			string.Join(", ", roots.OrderBy(value => value).ToArray()));
 
 		return roots;
+	}
+
+	private bool IsUnityRelatedNamespace(string namespaceName)
+	{
+		if (string.IsNullOrWhiteSpace(namespaceName))
+		{
+			return false;
+		}
+
+		return namespaceName.StartsWith("Unity", StringComparison.Ordinal) ||
+			namespaceName.StartsWith("UnityEngine", StringComparison.Ordinal) ||
+			namespaceName.StartsWith("UnityEditor", StringComparison.Ordinal) ||
+			namespaceName.StartsWith("TMPro", StringComparison.Ordinal) ||
+			namespaceName.StartsWith("System", StringComparison.Ordinal) ||
+			namespaceName.StartsWith("Microsoft", StringComparison.Ordinal);
 	}
 
 	private void LogCapabilityDebug(string format, params object[] args)
