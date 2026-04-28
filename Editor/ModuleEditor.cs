@@ -76,7 +76,7 @@ public partial class ModuleExporter : EditorWindow
 		// For component properties, the key is typically "ComponentName.FieldName" and its Property.component is set.
 		// For manual properties, we generate a unique key.
 		public List<Property> properties = new List<Property>();
-		public ItemCapabilitySet capabilities = new ItemCapabilitySet();
+		public List<string> components = new List<string>();
 
 		public Vector3 pivotOffset = Vector3.zero;
 		public Vector3 exportTranslation = Vector3.zero;
@@ -257,12 +257,11 @@ public partial class ModuleExporter : EditorWindow
 						}
 					}
 
-					item.capabilities = CloneItemCapabilities(exportedItem.capabilities);
-					if (!HasMeaningfulItemCapabilities(item.capabilities) && item.prefab != null)
+					item.components = NormalizeItemComponentNames(exportedItem.components);
+					if ((item.components == null || item.components.Count == 0) && item.prefab != null)
 					{
-						item.capabilities = InferItemCapabilities(item);
+						item.components = InferItemComponents(item);
 					}
-					NormalizeItemCapabilities(item.capabilities);
 					group.items.Add(item);
 				}
 				itemGroups.Add(group);
@@ -435,7 +434,7 @@ public partial class ModuleExporter : EditorWindow
 					ei.properties.Add(CopyProperty(kvp));
 				}
 
-				ei.capabilities = CloneItemCapabilities(item.capabilities);
+				ei.components = NormalizeItemComponentNames(item.components);
 				eg.items.Add(ei);
 			}
 			mod.itemGroups.Add(eg);
@@ -730,7 +729,7 @@ public partial class ModuleExporter : EditorWindow
 		public string icon;
 		public string icon3d;
 		public List<ExportedProperty> properties;
-		public ItemCapabilitySet capabilities;
+		public List<string> components;
 		public Vector3 pivotOffset = Vector3.zero;
 		public Vector3 exportTranslation = Vector3.zero;
 		public Vector3 exportRotation = Vector3.zero;
@@ -755,7 +754,7 @@ public partial class ModuleExporter : EditorWindow
 		newItem.icon = "";
 		newItem.modelPath = "";
 		newItem.properties = new List<Property>();
-		newItem.capabilities = new ItemCapabilitySet();
+		newItem.components = new List<string>();
 		newItem.pivotOffset = Vector3.zero;
 		newItem.exportTranslation = Vector3.zero;
 		newItem.exportRotation = Vector3.zero;
@@ -812,7 +811,7 @@ public partial class ModuleExporter : EditorWindow
 			prefab = prefab,
 			prefabPath = assetPath,
 			properties = new List<Property>(),
-			capabilities = InferItemCapabilities(prefab),
+			components = InferItemComponents(prefab),
 			pivotOffset = Vector3.zero,
 			exportTranslation = Vector3.zero,
 			exportRotation = Vector3.zero,

@@ -314,16 +314,12 @@ public partial class ModuleExporter
 
 			foreach (Item item in group.items)
 			{
-				if (!HasMeaningfulItemCapabilities(item.capabilities) && item.prefab != null)
+				if ((item.components == null || item.components.Count == 0) && item.prefab != null)
 				{
-					item.capabilities = InferItemCapabilities(item);
-				}
-				else
-				{
-					item.capabilities ??= new ItemCapabilitySet();
+					item.components = InferItemComponents(item);
 				}
 
-				NormalizeItemCapabilities(item.capabilities);
+				item.components = NormalizeItemComponentNames(item.components);
 			}
 		}
 
@@ -413,77 +409,6 @@ public partial class ModuleExporter
 			}
 		}
 
-		foreach (Item item in itemGroups.SelectMany(group => group.items))
-		{
-			if (item == null)
-			{
-				continue;
-			}
-
-			ItemCapabilitySet itemCapabilities = item.capabilities;
-			if (!HasMeaningfulItemCapabilities(itemCapabilities) && item.prefab != null)
-			{
-				itemCapabilities = InferItemCapabilities(item);
-				item.capabilities = itemCapabilities;
-			}
-
-			if (itemCapabilities == null)
-			{
-				continue;
-			}
-
-			foreach (CapabilityFeatureInfo feature in itemCapabilities.supportedFeatures)
-			{
-				AddFeature(featureMap, feature);
-			}
-
-			foreach (CapabilityConstraintInfo constraint in itemCapabilities.constraints)
-			{
-				AddConstraint(constraintMap, constraint);
-			}
-
-			foreach (UnityCapabilityComponentInfo componentInfo in itemCapabilities.unity.components)
-			{
-				AddComponent(componentMap, componentInfo);
-
-				Type componentType = ResolveTypeByName(componentInfo.typeName);
-				if (componentType != null)
-				{
-					AddTypeMetadata(componentType, typeMap, assemblyNames, namespaceRoots);
-				}
-
-				foreach (CapabilityMethodInfo method in componentInfo.methods)
-				{
-					AddMethod(methodMap, method);
-				}
-
-				foreach (CapabilityEventInfo eventInfo in componentInfo.events)
-				{
-					AddEvent(eventMap, eventInfo);
-				}
-
-				foreach (CapabilityParameterInfo parameter in componentInfo.parameters)
-				{
-					AddParameter(parameterMap, parameter);
-				}
-			}
-
-			foreach (UnityCapabilitySystemInfo systemInfo in itemCapabilities.unity.systems)
-			{
-				AddSystem(systemMap, systemInfo);
-			}
-
-			foreach (UnityCapabilityGameObjectRoleInfo roleInfo in itemCapabilities.unity.gameObjectRoles)
-			{
-				AddRole(roleMap, roleInfo);
-			}
-
-			foreach (UnityCapabilityBehaviorShapeInfo shapeInfo in itemCapabilities.unity.behaviorShapes)
-			{
-				AddBehaviorShape(shapeMap, shapeInfo);
-			}
-		}
-
 		List<SourceScriptInfo> relevantSourceComponents = GetRelevantSourceComponents(sourceScripts, relevantNamespaceRoots);
 		LogCapabilityDebug("Relevant source components kept={0}. Sample=[{1}]",
 			relevantSourceComponents.Count,
@@ -561,35 +486,25 @@ public partial class ModuleExporter
 		return manifest;
 	}
 
-	private ItemCapabilitySet InferItemCapabilities(Item item)
+	private List<string> InferItemComponents(Item item)
 	{
-		return item?.prefab == null ? new ItemCapabilitySet() : InferItemCapabilities(item.prefab);
+		return item?.prefab == null ? new List<string>() : InferItemComponents(item.prefab);
 	}
 
-	private ItemCapabilitySet InferItemCapabilities(GameObject prefab)
+	private List<string> InferItemComponents(GameObject prefab)
 	{
-		ItemCapabilitySet result = new ItemCapabilitySet();
 		if (prefab == null)
 		{
-			return result;
+			return new List<string>();
 		}
-
-		Dictionary<string, UnityCapabilityComponentInfo> componentMap = new Dictionary<string, UnityCapabilityComponentInfo>(StringComparer.OrdinalIgnoreCase);
 
 		foreach (Component component in prefab.GetComponentsInChildren<Component>(true))
-		{
-			Type componentType = component != null ? component.GetType() : null;
-			if (componentType == null || !IsAssetBackedComponent(componentType, component))
-			{
-				continue;
-			}
+			where component != null && !(component is Transform)
+			let componentType = component.GetType()
+			where componentType != null
+			select componentType.FullName ?? componentType.Name);
 
-			SourceScriptInfo sourceInfo = GetSourceScriptInfoForType(componentType);
-			UnityCapabilityComponentInfo componentInfo = BuildUnityComponentInfo(componentType, component, sourceInfo);
-			AddComponent(componentMap, componentInfo);
-		}
-		result.unity.components = componentMap.Values.OrderBy(info => info.componentId).ToList();
-		return result;
+		return NormalizeItemComponentNames(componentNames.ToList());
 	}
 
 	private UnityCapabilityComponentInfo BuildUnityComponentInfo(Type componentType, Component instance)
@@ -2394,6 +2309,20 @@ public partial class ModuleExporter
 				.Select(value => value.Trim())
 				.Distinct(StringComparer.OrdinalIgnoreCase)
 				.OrderBy(value => value)
+				.ToList();
+	}
+
+	private static List<string> NormalizeItemComponentNames(IEnumerable<string> values)
+	{
+		return values == null
+			? new List<string>()
+			: values.Where(value => !string.IsNullOrWhiteSpace(value))
+				.Select(value => value.Trim())
+				.Where(value =>
+					!string.Equals(value, "Transform", StringComparison.OrdinalIgnoreCase) &&
+					!string.Equals(value, typeof(Transform).FullName, StringComparison.OrdinalIgnoreCase))
+				.Distinct(StringComparer.OrdinalIgnoreCase)
+				.OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
 				.ToList();
 	}
 

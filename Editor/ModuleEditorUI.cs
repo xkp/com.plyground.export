@@ -26,10 +26,7 @@ public partial class ModuleExporter
 	private GUIStyle brandSubtitleStyle;
 	private Texture2D brandLogoTexture;
 	private int activeItemGroupIndex;
-	private int capabilityItemGroupIndex;
-	private int capabilityItemIndex;
 	private int selectedModuleFeatureIndex;
-	private int selectedItemFeatureIndex;
 	private int selectedTypeIndex = -1;
 	private int selectedTypeFieldIndex = -1;
 	private int selectedComponentIndex = -1;
@@ -807,25 +804,6 @@ public partial class ModuleExporter
 		DrawSelectedItemProperties();
 
 		EditorGUILayout.Space();
-		GUILayout.Label("COMPONENTS", EditorStyles.boldLabel);
-		EditorGUILayout.BeginVertical("helpbox");
-		selectedItem.capabilities ??= selectedItem.prefab != null ? InferItemCapabilities(selectedItem) : new ItemCapabilitySet();
-		EditorGUILayout.LabelField("Component Records", selectedItem.capabilities.unity != null && selectedItem.capabilities.unity.components != null ? selectedItem.capabilities.unity.components.Count.ToString() : "0");
-		EditorGUILayout.BeginHorizontal();
-		GUI.enabled = selectedItem.prefab != null;
-		if (GUILayout.Button("Infer Item Components"))
-		{
-			selectedItem.capabilities = InferItemCapabilities(selectedItem);
-		}
-		GUI.enabled = true;
-		if (GUILayout.Button("Open Component Editor"))
-		{
-			FocusCapabilityEditorForSelectedItem();
-		}
-		EditorGUILayout.EndHorizontal();
-		EditorGUILayout.EndVertical();
-
-		EditorGUILayout.Space();
 		EditorGUILayout.BeginHorizontal();
 		if (GUILayout.Button("Add Property"))
 		{
@@ -845,34 +823,6 @@ public partial class ModuleExporter
 		}
 		EditorGUILayout.EndHorizontal();
 		EditorGUILayout.EndVertical();
-	}
-
-	private void FocusCapabilityEditorForSelectedItem()
-	{
-		if (selectedItem == null)
-		{
-			return;
-		}
-
-		for (int groupIndex = 0; groupIndex < itemGroups.Count; groupIndex++)
-		{
-			ItemGroup group = itemGroups[groupIndex];
-			if (group?.items == null)
-			{
-				continue;
-			}
-
-			int itemIndex = group.items.IndexOf(selectedItem);
-			if (itemIndex >= 0)
-			{
-				capabilityItemGroupIndex = groupIndex;
-				capabilityItemIndex = itemIndex;
-				activeTab = ModuleEditorTab.Capabilities;
-				GUI.FocusControl(null);
-				Repaint();
-				return;
-			}
-		}
 	}
 
 	private void DrawSelectedItemProperties()
@@ -1073,19 +1023,6 @@ public partial class ModuleExporter
 			RebuildModuleCapabilitiesFromSelectedScripts();
 		}
 
-		if (GUILayout.Button("Infer All Item Components", GUILayout.Width(180f)))
-		{
-			foreach (ItemGroup group in itemGroups)
-			{
-				foreach (Item item in group.items)
-				{
-					item.capabilities = item.prefab != null ? InferItemCapabilities(item) : new ItemCapabilitySet();
-					NormalizeItemCapabilities(item.capabilities);
-				}
-			}
-			selectedItemFeatureIndex = 0;
-		}
-
 		if (GUILayout.Button("Sync Metadata", GUILayout.Width(120f)))
 		{
 			PopulateCapabilityModuleMetadata(moduleCapabilities);
@@ -1095,8 +1032,6 @@ public partial class ModuleExporter
 
 		EditorGUILayout.Space(6f);
 		DrawModuleCapabilityManifestEditor();
-		EditorGUILayout.Space(10f);
-		DrawItemCapabilityEditor();
 	}
 
 	private void RebuildModuleCapabilitiesFromSelectedScripts()
@@ -1686,63 +1621,6 @@ public partial class ModuleExporter
 		public string fullPath;
 		public List<ComponentNamespaceNode> children = new List<ComponentNamespaceNode>();
 		public List<int> componentIndexes = new List<int>();
-	}
-
-	private void DrawItemCapabilityEditor()
-	{
-		GUILayout.Label("ITEM / PREFAB COMPONENTS", EditorStyles.boldLabel);
-		if (itemGroups.Count == 0)
-		{
-			EditorGUILayout.HelpBox("Add item groups and prefabs in the Items tab to author item-level component records.", MessageType.Info);
-			return;
-		}
-
-		capabilityItemGroupIndex = Mathf.Clamp(capabilityItemGroupIndex, 0, itemGroups.Count - 1);
-		ItemGroup group = itemGroups[capabilityItemGroupIndex];
-		string[] groupNames = itemGroups.Select(itemGroup => string.IsNullOrWhiteSpace(itemGroup.name) ? "New Group" : itemGroup.name).ToArray();
-		capabilityItemGroupIndex = EditorGUILayout.Popup("Group", capabilityItemGroupIndex, groupNames);
-		group = itemGroups[capabilityItemGroupIndex];
-
-		if (group.items == null || group.items.Count == 0)
-		{
-			EditorGUILayout.HelpBox("The selected group has no items yet.", MessageType.Info);
-			return;
-		}
-
-		capabilityItemIndex = Mathf.Clamp(capabilityItemIndex, 0, group.items.Count - 1);
-		string[] itemNames = group.items.Select(item => string.IsNullOrWhiteSpace(item.name) ? "Unnamed Item" : item.name).ToArray();
-		capabilityItemIndex = EditorGUILayout.Popup("Item", capabilityItemIndex, itemNames);
-		Item itemToEdit = group.items[capabilityItemIndex];
-		selectedItem = itemToEdit;
-		itemToEdit.capabilities ??= itemToEdit.prefab != null ? InferItemCapabilities(itemToEdit) : new ItemCapabilitySet();
-		NormalizeItemCapabilities(itemToEdit.capabilities);
-		itemToEdit.capabilities.unity ??= new CapabilityUnityInfo();
-
-		EditorGUILayout.BeginVertical("box");
-		EditorGUILayout.LabelField("Prefab", EditorStyles.miniBoldLabel);
-		EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(itemToEdit.prefabPath) ? "Custom / none" : itemToEdit.prefabPath, EditorStyles.wordWrappedLabel);
-		EditorGUILayout.BeginHorizontal();
-		GUI.enabled = itemToEdit.prefab != null;
-		if (GUILayout.Button("Infer Selected Item", GUILayout.Width(150f)))
-		{
-			itemToEdit.capabilities = InferItemCapabilities(itemToEdit);
-			NormalizeItemCapabilities(itemToEdit.capabilities);
-			selectedItemFeatureIndex = 0;
-			selectedComponentIndex = -1;
-			selectedComponentArtifactIndex = -1;
-		}
-		GUI.enabled = true;
-		if (GUILayout.Button("Clear Item Components", GUILayout.Width(150f)))
-		{
-			itemToEdit.capabilities = new ItemCapabilitySet();
-			NormalizeItemCapabilities(itemToEdit.capabilities);
-			selectedComponentIndex = -1;
-			selectedComponentArtifactIndex = -1;
-		}
-		EditorGUILayout.EndHorizontal();
-		EditorGUILayout.Space(4f);
-		DrawComponentBrowser(itemToEdit.capabilities.unity.components);
-		EditorGUILayout.EndVertical();
 	}
 
 	private bool BeginCapabilitySection(string key, string label)
