@@ -498,11 +498,12 @@ public partial class ModuleExporter
 			return new List<string>();
 		}
 
-		foreach (Component component in prefab.GetComponentsInChildren<Component>(true))
-			where component != null && !(component is Transform)
-			let componentType = component.GetType()
-			where componentType != null
-			select componentType.FullName ?? componentType.Name);
+		IEnumerable<string> componentNames = prefab
+			.GetComponentsInChildren<Component>(true)
+			.Where(component => component != null && !(component is Transform))
+			.Select(component => component.GetType())
+			.Where(componentType => componentType != null)
+			.Select(componentType => componentType.FullName ?? componentType.Name);
 
 		return NormalizeItemComponentNames(componentNames.ToList());
 	}
