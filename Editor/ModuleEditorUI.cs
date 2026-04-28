@@ -110,7 +110,7 @@ public partial class ModuleExporter
 	private void DrawBrandHeader()
 	{
 		EditorGUILayout.BeginVertical(brandCardStyle);
-		EditorGUILayout.BeginHorizontal();
+		EditorGUILayout.BeginHorizontal(GUILayout.MinHeight(420f), GUILayout.ExpandHeight(true));
 
 		if (brandLogoTexture != null)
 		{
@@ -1234,14 +1234,17 @@ public partial class ModuleExporter
 
 		EditorGUILayout.BeginHorizontal();
 
-		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(220f, position.width * 0.22f)));
+		float componentListWidth = Mathf.Max(280f, position.width * 0.28f);
+		float artifactListWidth = Mathf.Max(260f, position.width * 0.24f);
+
+		EditorGUILayout.BeginVertical("box", GUILayout.Width(componentListWidth));
 		GUILayout.Label("Component List", EditorStyles.boldLabel);
 		componentListScroll = EditorGUILayout.BeginScrollView(componentListScroll, GUILayout.ExpandHeight(true));
 		DrawComponentNamespaceTree(components);
 		EditorGUILayout.EndScrollView();
 		EditorGUILayout.EndVertical();
 
-		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(220f, position.width * 0.22f)));
+		EditorGUILayout.BeginVertical("box", GUILayout.Width(artifactListWidth));
 		GUILayout.Label("Artifacts", EditorStyles.boldLabel);
 		EditorGUILayout.BeginHorizontal();
 		if (GUILayout.Button("Add Method", GUILayout.Width(90f)))
