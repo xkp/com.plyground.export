@@ -644,6 +644,11 @@ public partial class ModuleExporter
 
 		foreach (FieldInfo field in GetSerializedFields(componentType))
 		{
+			if (IsEventFieldType(field.FieldType))
+			{
+				continue;
+			}
+
 			allowedFeatures.Add("serialized-field:" + componentType.Name + "." + field.Name);
 		}
 
@@ -831,24 +836,25 @@ public partial class ModuleExporter
 			});
 		}
 
-		foreach (MethodInfo method in type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+		foreach (FieldInfo field in GetSerializedFields(type))
 		{
-			if (Array.IndexOf(UnityCallbackNames, method.Name) < 0)
+			if (!IsEventFieldType(field.FieldType))
 			{
 				continue;
 			}
 
+			sourceEventMap.TryGetValue(field.Name, out SourceEventInfo sourceEvent);
 			events.Add(new CapabilityEventInfo
 			{
-				name = method.Name,
+				name = field.Name,
 				direction = "publishes",
-				payloadType = "",
+				payloadType = GetFriendlyTypeName(field.FieldType),
 				declaringType = type.FullName ?? type.Name,
-				description = "Unity callback",
+				description = sourceEvent != null && !string.IsNullOrWhiteSpace(sourceEvent.summary) ? sourceEvent.summary : "Event field",
 				allowedForCodegen = true,
-				scope = "unity-callback",
+				scope = "",
 				authority = "",
-				tags = new List<string> { "callback" }
+				tags = new List<string> { "field-event", "reflection" }
 			});
 		}
 
@@ -857,7 +863,8 @@ public partial class ModuleExporter
 
 	private List<CapabilityEventInfo> BuildEventInfos(SourceScriptInfo sourceInfo)
 	{
-		return sourceInfo.events
+		List<CapabilityEventInfo> events = sourceInfo.events
+			.Where(eventInfo => !IsUnityLifecycleEventName(eventInfo.name))
 			.Select(eventInfo => new CapabilityEventInfo
 			{
 				name = eventInfo.name,
@@ -871,6 +878,24 @@ public partial class ModuleExporter
 				tags = new List<string> { "source" }
 			})
 			.ToList();
+
+		foreach (SourceFieldInfo field in sourceInfo.fields.Where(IsSourceEventField))
+		{
+			events.Add(new CapabilityEventInfo
+			{
+				name = field.name,
+				direction = "publishes",
+				payloadType = field.type,
+				declaringType = sourceInfo.fullName,
+				description = field.summary,
+				allowedForCodegen = true,
+				scope = "",
+				authority = "",
+				tags = new List<string> { "field-event", "source" }
+			});
+		}
+
+		return events;
 	}
 
 	private List<CapabilityParameterInfo> BuildParameterInfos(Type type, Component instance)
@@ -886,6 +911,11 @@ public partial class ModuleExporter
 			field => field.name);
 		foreach (FieldInfo field in GetSerializedFields(type))
 		{
+			if (IsEventFieldType(field.FieldType))
+			{
+				continue;
+			}
+
 			sourceFieldMap.TryGetValue(field.Name, out SourceFieldInfo sourceField);
 			parameters.Add(new CapabilityParameterInfo
 			{
@@ -907,7 +937,7 @@ public partial class ModuleExporter
 	private List<CapabilityParameterInfo> BuildParameterInfos(SourceScriptInfo sourceInfo)
 	{
 		return sourceInfo.fields
-			.Where(field => field.serialized)
+			.Where(field => field.serialized && !IsSourceEventField(field))
 			.Select(field => new CapabilityParameterInfo
 			{
 				name = field.name,
@@ -2023,6 +2053,56 @@ public partial class ModuleExporter
 		return line.Contains("public ") || line.Contains("[SerializeField]") || line.Contains("private ") || line.Contains("protected ");
 	}
 
+	private bool IsUnityLifecycleEventName(string name)
+	{
+		return !string.IsNullOrWhiteSpace(name) && Array.IndexOf(UnityCallbackNames, name) >= 0;
+	}
+
+	private bool IsEventFieldType(Type fieldType)
+	{
+		if (fieldType == null)
+		{
+			return false;
+		}
+
+		if (typeof(Delegate).IsAssignableFrom(fieldType))
+		{
+			return true;
+		}
+
+		Type current = fieldType;
+		while (current != null)
+		{
+			string fullName = current.FullName ?? current.Name;
+			if (string.Equals(fullName, "UnityEngine.Events.UnityEventBase", StringComparison.Ordinal) ||
+				string.Equals(fullName, "UnityEngine.Events.UnityEvent", StringComparison.Ordinal) ||
+				string.Equals(fullName, "UnityEngine.Events.UnityAction", StringComparison.Ordinal))
+			{
+				return true;
+			}
+
+			current = current.BaseType;
+		}
+
+		return false;
+	}
+
+	private bool IsSourceEventField(SourceFieldInfo field)
+	{
+		if (field == null || string.IsNullOrWhiteSpace(field.type))
+		{
+			return false;
+		}
+
+		string typeName = field.type.Trim();
+		return typeName.IndexOf("UnityAction", StringComparison.Ordinal) >= 0 ||
+			typeName.IndexOf("UnityEvent", StringComparison.Ordinal) >= 0 ||
+			typeName.IndexOf("System.Action", StringComparison.Ordinal) >= 0 ||
+			string.Equals(typeName, "Action", StringComparison.Ordinal) ||
+			typeName.IndexOf("Action<", StringComparison.Ordinal) >= 0 ||
+			typeName.IndexOf("Func<", StringComparison.Ordinal) >= 0;
+	}
+
 	private string JoinCommentBuffer(List<string> commentBuffer)
 	{
 		if (commentBuffer == null || commentBuffer.Count == 0)
@@ -2117,7 +2197,7 @@ public partial class ModuleExporter
 			}
 		}
 
-		foreach (SourceFieldInfo field in sourceInfo.fields.Where(field => field.serialized))
+		foreach (SourceFieldInfo field in sourceInfo.fields.Where(field => field.serialized && !IsSourceEventField(field)))
 		{
 			features.Add("serialized-field:" + sourceInfo.className + "." + field.name);
 		}
