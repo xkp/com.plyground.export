@@ -49,6 +49,7 @@ public partial class ModuleExporter : EditorWindow
 
 	private List<Property> moduleProperties = new List<Property>();
 	private CapabilityManifest moduleCapabilities = new CapabilityManifest();
+	private List<string> capabilitySourceScriptPaths = new List<string>();
 
 	[System.Serializable]
 	public class PackageDefinition

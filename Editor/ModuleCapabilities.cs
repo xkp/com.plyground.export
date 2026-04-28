@@ -1394,16 +1394,23 @@ public partial class ModuleExporter
 	private List<SourceScriptInfo> GetAllLocalSourceScripts()
 	{
 		List<SourceScriptInfo> scripts = new List<SourceScriptInfo>();
-		string[] guids = AssetDatabase.FindAssets("t:MonoScript", new[] { "Assets" });
-		LogCapabilityDebug("AssetDatabase.FindAssets returned {0} MonoScript assets.", guids.Length);
-		foreach (string guid in guids)
-		{
-			string assetPath = AssetDatabase.GUIDToAssetPath(guid);
-			if (!assetPath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
-			{
-				continue;
-			}
+		List<string> assetPaths = capabilitySourceScriptPaths == null
+			? new List<string>()
+			: capabilitySourceScriptPaths
+				.Where(path => !string.IsNullOrWhiteSpace(path) && path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+				.Distinct(StringComparer.OrdinalIgnoreCase)
+				.ToList();
 
+		if (assetPaths.Count == 0)
+		{
+			LogCapabilityDebug("No explicit script selection. Source-driven component discovery skipped.");
+			return scripts;
+		}
+
+		LogCapabilityDebug("Using explicit script selection. Selected scripts={0}.", assetPaths.Count);
+
+		foreach (string assetPath in assetPaths)
+		{
 			MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(assetPath);
 			Type scriptType = script != null ? script.GetClass() : null;
 			SourceScriptInfo sourceInfo = ParseSourceScript(assetPath, scriptType);

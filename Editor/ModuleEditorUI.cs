@@ -1067,15 +1067,12 @@ public partial class ModuleExporter
 
 		GUILayout.Label("CAPABILITIES", EditorStyles.boldLabel);
 		EditorGUILayout.BeginVertical("box");
-		EditorGUILayout.HelpBox("Capability data is persisted inside this module's existing module.bgm document. Use inference to populate from controller types, prefab components, Unity callbacks, and serialized fields, then adjust anything manually before save/export.", MessageType.Info);
+		EditorGUILayout.HelpBox("Capability data is persisted inside this module's existing module.bgm document. Choose the C# scripts that should drive component discovery, reflect those compiled types, and then adjust the resulting capabilities manually before save/export.", MessageType.Info);
 
 		EditorGUILayout.BeginHorizontal();
 		if (GUILayout.Button("Infer Module Capabilities", GUILayout.Width(180f)))
 		{
-			moduleCapabilities = InferModuleCapabilities();
-			PopulateCapabilityModuleMetadata(moduleCapabilities);
-			NormalizeModuleCapabilities(moduleCapabilities);
-			selectedModuleFeatureIndex = 0;
+			RebuildModuleCapabilitiesFromSelectedScripts();
 		}
 
 		if (GUILayout.Button("Infer All Item Capabilities", GUILayout.Width(180f)))
@@ -1102,6 +1099,52 @@ public partial class ModuleExporter
 		DrawModuleCapabilityManifestEditor();
 		EditorGUILayout.Space(10f);
 		DrawItemCapabilityEditor();
+	}
+
+	private void RebuildModuleCapabilitiesFromSelectedScripts()
+	{
+		moduleCapabilities = InferModuleCapabilities();
+		PopulateCapabilityModuleMetadata(moduleCapabilities);
+		NormalizeModuleCapabilities(moduleCapabilities);
+		selectedModuleFeatureIndex = 0;
+		selectedTypeIndex = -1;
+		selectedTypeFieldIndex = -1;
+		selectedComponentIndex = -1;
+		selectedComponentArtifactIndex = -1;
+		componentNamespaceFoldouts.Clear();
+		Repaint();
+	}
+
+	private void OpenCapabilityScriptSelector()
+	{
+		capabilitySourceScriptPaths ??= new List<string>();
+		CSharpScriptSelectorWindow.OpenWindow(capabilitySourceScriptPaths);
+		capabilitySourceScriptPaths = capabilitySourceScriptPaths
+			.Where(path => !string.IsNullOrWhiteSpace(path))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		RebuildModuleCapabilitiesFromSelectedScripts();
+	}
+
+	private string GetCapabilityScriptSelectionSummary()
+	{
+		capabilitySourceScriptPaths ??= new List<string>();
+		int count = capabilitySourceScriptPaths.Count(path => !string.IsNullOrWhiteSpace(path));
+		if (count == 0)
+		{
+			return "No C# scripts selected. Choose scripts to drive component discovery.";
+		}
+
+		string[] sample = capabilitySourceScriptPaths
+			.Where(path => !string.IsNullOrWhiteSpace(path))
+			.OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+			.Take(3)
+			.Select(Path.GetFileName)
+			.ToArray();
+
+		string suffix = count > sample.Length ? $" +{count - sample.Length} more" : string.Empty;
+		return $"Selected Scripts: {count} ({string.Join(", ", sample)}{suffix})";
 	}
 
 	private void DrawModuleCapabilityManifestEditor()
@@ -1197,7 +1240,26 @@ public partial class ModuleExporter
 
 		EditorGUILayout.BeginHorizontal();
 		GUILayout.Label("Components", EditorStyles.miniBoldLabel);
+		GUILayout.Space(10f);
+		GUILayout.Label(GetCapabilityScriptSelectionSummary(), EditorStyles.miniLabel);
 		GUILayout.FlexibleSpace();
+		if (GUILayout.Button("Select Scripts", GUILayout.Width(110f)))
+		{
+			OpenCapabilityScriptSelector();
+		}
+		if (GUILayout.Button("Reflect Selected", GUILayout.Width(120f)))
+		{
+			RebuildModuleCapabilitiesFromSelectedScripts();
+			components = moduleCapabilities != null && moduleCapabilities.unity != null
+				? moduleCapabilities.unity.components
+				: new List<UnityCapabilityComponentInfo>();
+		}
+		GUI.enabled = capabilitySourceScriptPaths != null && capabilitySourceScriptPaths.Count > 0;
+		if (GUILayout.Button("Clear Scripts", GUILayout.Width(110f)))
+		{
+			capabilitySourceScriptPaths.Clear();
+		}
+		GUI.enabled = true;
 		if (GUILayout.Button("Add Component", GUILayout.Width(120f)))
 		{
 			components.Add(new UnityCapabilityComponentInfo());
@@ -1205,6 +1267,11 @@ public partial class ModuleExporter
 			selectedComponentArtifactIndex = -1;
 		}
 		EditorGUILayout.EndHorizontal();
+
+		if (capabilitySourceScriptPaths == null || capabilitySourceScriptPaths.Count == 0)
+		{
+			EditorGUILayout.HelpBox("No C# source files selected. Use Select Scripts, then Reflect Selected to populate reflected components.", MessageType.Info);
+		}
 
 		if (components.Count == 0)
 		{
@@ -1363,7 +1430,7 @@ public partial class ModuleExporter
 			GUILayout.Space(depth * 14f);
 			componentNamespaceFoldouts[node.fullPath] = EditorGUILayout.Foldout(componentNamespaceFoldouts[node.fullPath], node.label, true);
 			GUILayout.FlexibleSpace();
-			if (GUILayout.Button("Remove", GUILayout.Width(70f), GUILayout.Height(22f)))
+			if (GUILayout.Button("X", GUILayout.Width(28f), GUILayout.Height(22f)))
 			{
 				RemoveNamespaceComponents(node.fullPath, components);
 				EditorGUILayout.EndHorizontal();
