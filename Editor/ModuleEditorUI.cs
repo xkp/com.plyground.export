@@ -1362,7 +1362,7 @@ public partial class ModuleExporter
 			EditorGUILayout.BeginHorizontal();
 			GUILayout.Space(depth * 14f);
 			componentNamespaceFoldouts[node.fullPath] = EditorGUILayout.Foldout(componentNamespaceFoldouts[node.fullPath], node.label, true);
-			GUILayout.Space(0f, 34f);
+			GUILayoutUtility.GetRect(0f, 34f, GUILayout.ExpandWidth(false));
 			EditorGUILayout.EndHorizontal();
 
 			if (!componentNamespaceFoldouts[node.fullPath])
