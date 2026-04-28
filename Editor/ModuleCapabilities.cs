@@ -31,10 +31,15 @@ public partial class ModuleExporter
 	{
 		public string manifestVersion = CapabilityManifestVersion;
 		public CapabilityModuleInfo module = new CapabilityModuleInfo();
+		[NonSerialized]
 		public List<CapabilityTypeInfo> types = new List<CapabilityTypeInfo>();
+		[NonSerialized]
 		public List<CapabilityEventInfo> events = new List<CapabilityEventInfo>();
+		[NonSerialized]
 		public List<CapabilityMethodInfo> methods = new List<CapabilityMethodInfo>();
+		[NonSerialized]
 		public List<CapabilityParameterInfo> parameters = new List<CapabilityParameterInfo>();
+		[NonSerialized]
 		public List<CapabilityFeatureInfo> supportedFeatures = new List<CapabilityFeatureInfo>();
 		public CapabilityUnityInfo unity = new CapabilityUnityInfo();
 		public List<CapabilityConstraintInfo> constraints = new List<CapabilityConstraintInfo>();
@@ -295,6 +300,7 @@ public partial class ModuleExporter
 		moduleCapabilities ??= new CapabilityManifest();
 
 		PopulateCapabilityModuleMetadata(moduleCapabilities);
+		StripNonPersistedModuleCapabilityData(moduleCapabilities);
 		moduleCapabilities.manifestVersion = string.IsNullOrWhiteSpace(moduleCapabilities.manifestVersion)
 			? CapabilityManifestVersion
 			: moduleCapabilities.manifestVersion;
@@ -358,6 +364,20 @@ public partial class ModuleExporter
 
 			manifest.module.tags = DistinctStrings(tags);
 		}
+	}
+
+	private static void StripNonPersistedModuleCapabilityData(CapabilityManifest manifest)
+	{
+		if (manifest == null)
+		{
+			return;
+		}
+
+		manifest.types = new List<CapabilityTypeInfo>();
+		manifest.events = new List<CapabilityEventInfo>();
+		manifest.methods = new List<CapabilityMethodInfo>();
+		manifest.parameters = new List<CapabilityParameterInfo>();
+		manifest.supportedFeatures = new List<CapabilityFeatureInfo>();
 	}
 
 	private CapabilityManifest InferModuleCapabilities()
