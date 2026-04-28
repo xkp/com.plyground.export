@@ -109,7 +109,7 @@ public partial class ModuleExporter
 
 	private void DrawBrandHeader()
 	{
-		EditorGUILayout.BeginVertical(brandCardStyle);
+		EditorGUILayout.BeginVertical(brandCardStyle, GUILayout.ExpandHeight(false));
 		EditorGUILayout.BeginHorizontal();
 
 		if (brandLogoTexture != null)
@@ -1195,7 +1195,7 @@ public partial class ModuleExporter
 	{
 		components ??= new List<UnityCapabilityComponentInfo>();
 
-		EditorGUILayout.BeginHorizontal();
+		EditorGUILayout.BeginHorizontal(GUILayout.MinHeight(280f), GUILayout.MaxHeight(Mathf.Max(280f, position.height * 0.42f)));
 		GUILayout.Label("Components", EditorStyles.miniBoldLabel);
 		GUILayout.FlexibleSpace();
 		if (GUILayout.Button("Add Component", GUILayout.Width(120f)))
