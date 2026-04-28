@@ -59,6 +59,17 @@ public class CSharpScriptSelectorWindow : EditorWindow
 	{
 		GUILayout.Label("Select C# Scripts", EditorStyles.boldLabel);
 		EditorGUILayout.HelpBox("Choose the source .cs files that should drive capability component discovery and reflection.", MessageType.Info);
+		EditorGUILayout.BeginHorizontal();
+		if (GUILayout.Button("Select All", GUILayout.Width(100f)))
+		{
+			treeView?.SetAllChecked(true);
+		}
+		if (GUILayout.Button("Clear All", GUILayout.Width(100f)))
+		{
+			treeView?.SetAllChecked(false);
+		}
+		GUILayout.FlexibleSpace();
+		EditorGUILayout.EndHorizontal();
 		Rect treeRect = GUILayoutUtility.GetRect(0, position.width, 0, position.height - 70f);
 		treeView.OnGUI(treeRect);
 
@@ -213,6 +224,17 @@ public class CSharpScriptSelectorWindow : EditorWindow
 			{
 				SetCheckedRecursive(child, isChecked);
 			}
+		}
+
+		public void SetAllChecked(bool isChecked)
+		{
+			CheckedIds.Clear();
+			if (isChecked && Root != null)
+			{
+				SetCheckedRecursive(Root, true);
+			}
+
+			Repaint();
 		}
 	}
 }

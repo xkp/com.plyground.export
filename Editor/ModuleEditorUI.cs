@@ -1247,17 +1247,14 @@ public partial class ModuleExporter
 		{
 			OpenCapabilityScriptSelector();
 		}
-		if (GUILayout.Button("Reflect Selected", GUILayout.Width(120f)))
-		{
-			RebuildModuleCapabilitiesFromSelectedScripts();
-			components = moduleCapabilities != null && moduleCapabilities.unity != null
-				? moduleCapabilities.unity.components
-				: new List<UnityCapabilityComponentInfo>();
-		}
 		GUI.enabled = capabilitySourceScriptPaths != null && capabilitySourceScriptPaths.Count > 0;
 		if (GUILayout.Button("Clear Scripts", GUILayout.Width(110f)))
 		{
 			capabilitySourceScriptPaths.Clear();
+			RebuildModuleCapabilitiesFromSelectedScripts();
+			components = moduleCapabilities != null && moduleCapabilities.unity != null
+				? moduleCapabilities.unity.components
+				: new List<UnityCapabilityComponentInfo>();
 		}
 		GUI.enabled = true;
 		if (GUILayout.Button("Add Component", GUILayout.Width(120f)))
@@ -1270,7 +1267,7 @@ public partial class ModuleExporter
 
 		if (capabilitySourceScriptPaths == null || capabilitySourceScriptPaths.Count == 0)
 		{
-			EditorGUILayout.HelpBox("No C# source files selected. Use Select Scripts, then Reflect Selected to populate reflected components.", MessageType.Info);
+			EditorGUILayout.HelpBox("No C# source files selected. Use Select Scripts to populate reflected components.", MessageType.Info);
 		}
 
 		if (components.Count == 0)
