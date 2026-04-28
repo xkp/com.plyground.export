@@ -1237,7 +1237,7 @@ public partial class ModuleExporter
 		float componentListWidth = Mathf.Max(280f, position.width * 0.28f);
 		float artifactListWidth = Mathf.Max(260f, position.width * 0.24f);
 
-		EditorGUILayout.BeginVertical("box", GUILayout.Width(componentListWidth));
+		EditorGUILayout.BeginVertical("box", GUILayout.Width(componentListWidth), GUILayout.Height(520f));
 		GUILayout.Label("Component List", EditorStyles.boldLabel);
 		componentListScroll = EditorGUILayout.BeginScrollView(componentListScroll, GUILayout.ExpandHeight(true));
 		DrawComponentNamespaceTree(components);
@@ -1362,7 +1362,7 @@ public partial class ModuleExporter
 			EditorGUILayout.BeginHorizontal();
 			GUILayout.Space(depth * 14f);
 			componentNamespaceFoldouts[node.fullPath] = EditorGUILayout.Foldout(componentNamespaceFoldouts[node.fullPath], node.label, true);
-			GUILayoutUtility.GetRect(0f, 34f, GUILayout.ExpandWidth(false));
+			GUILayoutUtility.GetRect(0f, 14f, GUILayout.ExpandWidth(false));
 			EditorGUILayout.EndHorizontal();
 
 			if (!componentNamespaceFoldouts[node.fullPath])
