@@ -1362,6 +1362,13 @@ public partial class ModuleExporter
 			EditorGUILayout.BeginHorizontal();
 			GUILayout.Space(depth * 14f);
 			componentNamespaceFoldouts[node.fullPath] = EditorGUILayout.Foldout(componentNamespaceFoldouts[node.fullPath], node.label, true);
+			GUILayout.FlexibleSpace();
+			if (GUILayout.Button("Remove", GUILayout.Width(70f), GUILayout.Height(22f)))
+			{
+				RemoveNamespaceComponents(node.fullPath, components);
+				EditorGUILayout.EndHorizontal();
+				return;
+			}
 			GUILayoutUtility.GetRect(0f, 14f, GUILayout.ExpandWidth(false));
 			EditorGUILayout.EndHorizontal();
 
@@ -1394,8 +1401,40 @@ public partial class ModuleExporter
 				selectedComponentIndex = componentIndex;
 				selectedComponentArtifactIndex = -1;
 			}
+			if (GUILayout.Button("X", GUILayout.Width(28f), GUILayout.Height(34f)))
+			{
+				components.RemoveAt(componentIndex);
+				selectedComponentIndex = Mathf.Clamp(selectedComponentIndex - (selectedComponentIndex >= componentIndex ? 1 : 0), 0, Mathf.Max(0, components.Count - 1));
+				selectedComponentArtifactIndex = -1;
+				EditorGUILayout.EndHorizontal();
+				return;
+			}
 			EditorGUILayout.EndHorizontal();
 		}
+	}
+
+	private void RemoveNamespaceComponents(string namespacePath, List<UnityCapabilityComponentInfo> components)
+	{
+		if (string.IsNullOrWhiteSpace(namespacePath) || components == null || components.Count == 0)
+		{
+			return;
+		}
+
+		components.RemoveAll(component =>
+		{
+			string typeName = !string.IsNullOrWhiteSpace(component.typeName) ? component.typeName : component.componentId;
+			if (string.IsNullOrWhiteSpace(typeName))
+			{
+				return false;
+			}
+
+			string componentNamespace = GetNamespaceOnly(typeName);
+			return string.Equals(componentNamespace, namespacePath, StringComparison.Ordinal) ||
+				componentNamespace.StartsWith(namespacePath + ".", StringComparison.Ordinal);
+		});
+
+		selectedComponentIndex = Mathf.Clamp(selectedComponentIndex, 0, Mathf.Max(0, components.Count - 1));
+		selectedComponentArtifactIndex = -1;
 	}
 
 	private List<ComponentNamespaceNode> BuildComponentNamespaceTreeNodes(List<UnityCapabilityComponentInfo> components)
@@ -1464,6 +1503,17 @@ public partial class ModuleExporter
 		return lastDot >= 0 && lastDot < typeName.Length - 1
 			? typeName.Substring(lastDot + 1)
 			: typeName;
+	}
+
+	private string GetNamespaceOnly(string typeName)
+	{
+		if (string.IsNullOrWhiteSpace(typeName))
+		{
+			return "";
+		}
+
+		int lastDot = typeName.LastIndexOf('.');
+		return lastDot > 0 ? typeName.Substring(0, lastDot) : "";
 	}
 
 	private void DrawSelectedComponentArtifactEditor(UnityCapabilityComponentInfo component, ComponentArtifactEntry artifact)
