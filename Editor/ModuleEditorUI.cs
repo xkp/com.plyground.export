@@ -110,7 +110,7 @@ public partial class ModuleExporter
 	private void DrawBrandHeader()
 	{
 		EditorGUILayout.BeginVertical(brandCardStyle);
-		EditorGUILayout.BeginHorizontal(GUILayout.MinHeight(420f), GUILayout.ExpandHeight(true));
+		EditorGUILayout.BeginHorizontal();
 
 		if (brandLogoTexture != null)
 		{
@@ -1362,6 +1362,7 @@ public partial class ModuleExporter
 			EditorGUILayout.BeginHorizontal();
 			GUILayout.Space(depth * 14f);
 			componentNamespaceFoldouts[node.fullPath] = EditorGUILayout.Foldout(componentNamespaceFoldouts[node.fullPath], node.label, true);
+			GUILayout.Space(0f, 34f);
 			EditorGUILayout.EndHorizontal();
 
 			if (!componentNamespaceFoldouts[node.fullPath])
@@ -1388,7 +1389,7 @@ public partial class ModuleExporter
 				: GetLeafTypeName(entry.typeName);
 			EditorGUILayout.BeginHorizontal();
 			GUILayout.Space((depth + (string.IsNullOrWhiteSpace(node.fullPath) ? 0 : 1)) * 14f);
-			if (GUILayout.Button(label, selectedComponentIndex == componentIndex ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(26f)))
+			if (GUILayout.Button(label, selectedComponentIndex == componentIndex ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(34f)))
 			{
 				selectedComponentIndex = componentIndex;
 				selectedComponentArtifactIndex = -1;
