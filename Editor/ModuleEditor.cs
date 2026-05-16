@@ -404,7 +404,6 @@ public partial class ModuleExporter : EditorWindow
 		mod.moduleProperties = new List<Property>(moduleProperties);
 		PrepareCapabilitiesForPersistence();
 		mod.capabilities = CloneModuleCapabilities(moduleCapabilities);
-		mod.features = null;
 		mod.featuresJson = PlyFeatureJson.Export(PrepareFeatureManifestForPersistence());
 
 		mod.itemGroups = new List<ExportedGroup>();
