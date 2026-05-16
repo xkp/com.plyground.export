@@ -41,6 +41,7 @@ public partial class ModuleExporter
     {
         public string componentType;
         public string memberName;
+        public string displayName;
         public string signature;
         public PlyFeatureMemberKind memberKind;
         public PlyFeatureParameterAccess access;
@@ -75,6 +76,11 @@ public partial class ModuleExporter
     private List<PlyFeatureValidationIssue> featureValidationIssues = new List<PlyFeatureValidationIssue>();
     private bool includeLifecycleMethods;
     private string componentSearchTerm = "";
+    private bool featureValidationDirty = true;
+    private string cachedComponentSearchTerm = "";
+    private bool cachedIncludeLifecycleMethods;
+    private string cachedSnapshotVersion = "";
+    private readonly Dictionary<string, List<CompatibleMemberOption>> compatibleOptionsCache = new Dictionary<string, List<CompatibleMemberOption>>(StringComparer.Ordinal);
 
     private void InitializeFeatureManifest()
     {
@@ -92,14 +98,16 @@ public partial class ModuleExporter
     private void DrawFeaturesTab()
     {
         InitializeFeatureManifest();
-        featureValidationIssues = ValidateFeatureManifest(FeatureManifestState);
+        EnsureFeatureEditorCacheState();
 
         EditorGUILayout.HelpBox("Map existing Plyground features to existing project components. Choose a feature from the catalog, then bind its Inputs, Outputs, and Parameters to compatible project members.", MessageType.Info);
 
+        EditorGUI.BeginChangeCheck();
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Refresh Registry", GUILayout.Width(130f)))
         {
             PlyFeatureTypeCache.Refresh();
+            InvalidateFeatureEditorCaches();
         }
 
         if (GUILayout.Button("Import JSON", GUILayout.Width(100f)))
@@ -117,6 +125,17 @@ public partial class ModuleExporter
 
         EditorGUILayout.Space(6f);
         DrawFeatureWorkspace();
+        if (EditorGUI.EndChangeCheck())
+        {
+            featureValidationDirty = true;
+        }
+
+        if (featureValidationDirty)
+        {
+            featureValidationIssues = ValidateFeatureManifest(FeatureManifestState);
+            featureValidationDirty = false;
+        }
+
         EditorGUILayout.Space(6f);
         DrawFeatureValidationSection();
     }
@@ -236,6 +255,7 @@ public partial class ModuleExporter
         if (GUILayout.Button("Remove Mapping Profile", GUILayout.Width(170f)))
         {
             FeatureManifestState.features.Remove(profile);
+            featureValidationDirty = true;
         }
     }
 
@@ -271,13 +291,12 @@ public partial class ModuleExporter
         port.binding ??= new PlyFeatureBinding();
         List<CompatibleMemberOption> allOptions = GetCompatibleOptionsForPort(port, section);
         List<string> componentOptions = allOptions.Select(option => option.componentType).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value).ToList();
-        EnsureSelectedComponentIsValid(port.binding, componentOptions);
 
         EditorGUILayout.BeginVertical("helpbox");
         EditorGUILayout.BeginHorizontal();
         GUILayout.Label(port.name, GUILayout.Width(160f));
         GUILayout.Label(port.dataType.ToString(), GUILayout.Width(90f));
-        DrawCompatibleComponentPopup("Component", port.binding, componentOptions, 200f);
+        DrawCompatibleComponentPopup(port.binding, componentOptions, 200f);
         List<CompatibleMemberOption> filteredOptions = allOptions.Where(option => string.Equals(option.componentType, port.binding.componentType, StringComparison.OrdinalIgnoreCase)).ToList();
         DrawCompatibleMemberPopup(port.binding, filteredOptions, 220f);
         GUILayout.Label(string.IsNullOrWhiteSpace(port.binding.memberSignature) ? "-" : port.binding.memberSignature, EditorStyles.miniLabel, GUILayout.Width(220f));
@@ -291,13 +310,12 @@ public partial class ModuleExporter
         parameter.binding ??= new PlyFeatureBinding();
         List<CompatibleMemberOption> allOptions = GetCompatibleOptionsForParameter(parameter);
         List<string> componentOptions = allOptions.Select(option => option.componentType).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(value => value).ToList();
-        EnsureSelectedComponentIsValid(parameter.binding, componentOptions);
 
         EditorGUILayout.BeginVertical("helpbox");
         EditorGUILayout.BeginHorizontal();
         GUILayout.Label(parameter.name, GUILayout.Width(160f));
         GUILayout.Label(parameter.type.ToString(), GUILayout.Width(90f));
-        DrawCompatibleComponentPopup("Component", parameter.binding, componentOptions, 200f);
+        DrawCompatibleComponentPopup(parameter.binding, componentOptions, 200f);
         List<CompatibleMemberOption> filteredOptions = allOptions.Where(option => string.Equals(option.componentType, parameter.binding.componentType, StringComparison.OrdinalIgnoreCase)).ToList();
         DrawCompatibleMemberPopup(parameter.binding, filteredOptions, 220f);
         string defaultLabel = string.IsNullOrWhiteSpace(parameter.defaultValue) ? "-" : parameter.defaultValue;
@@ -308,35 +326,47 @@ public partial class ModuleExporter
         EditorGUILayout.EndVertical();
     }
 
-    private void DrawCompatibleComponentPopup(string label, PlyFeatureBinding binding, List<string> componentOptions, float width)
+    private void DrawCompatibleComponentPopup(PlyFeatureBinding binding, List<string> componentOptions, float width)
     {
-        string[] options = componentOptions.Count == 0 ? new[] { "<none>" } : componentOptions.ToArray();
-        int selectedIndex = Mathf.Max(0, componentOptions.FindIndex(option => string.Equals(option, binding.componentType, StringComparison.OrdinalIgnoreCase)));
-        int newIndex = EditorGUILayout.Popup(selectedIndex < 0 ? 0 : selectedIndex, options, GUILayout.Width(width));
-        if (componentOptions.Count == 0)
+        List<string> labels = new List<string> { "<select>" };
+        labels.AddRange(componentOptions);
+
+        int selectedIndex = 0;
+        if (!string.IsNullOrWhiteSpace(binding.componentType))
         {
-            binding.componentType = "";
-            return;
+            int foundIndex = componentOptions.FindIndex(option => string.Equals(option, binding.componentType, StringComparison.OrdinalIgnoreCase));
+            selectedIndex = foundIndex >= 0 ? foundIndex + 1 : 0;
         }
 
-        string newComponent = componentOptions[newIndex];
+        int newIndex = EditorGUILayout.Popup(selectedIndex, labels.ToArray(), GUILayout.Width(width));
+        string newComponent = newIndex <= 0 ? "" : componentOptions[newIndex - 1];
         if (!string.Equals(binding.componentType, newComponent, StringComparison.OrdinalIgnoreCase))
         {
             binding.componentType = newComponent;
             binding.memberName = "";
             binding.memberSignature = "";
             binding.conversion = "";
+            binding.memberKind = PlyFeatureMemberKind.Method;
         }
     }
 
     private void DrawCompatibleMemberPopup(PlyFeatureBinding binding, List<CompatibleMemberOption> options, float width)
     {
-        string[] labels = options.Count == 0 ? new[] { "<none>" } : options.Select(option => option.memberName).ToArray();
-        int selectedIndex = Mathf.Max(0, options.FindIndex(option =>
-            option.memberKind == binding.memberKind &&
-            string.Equals(option.memberName, binding.memberName, StringComparison.Ordinal)));
-        int newIndex = EditorGUILayout.Popup(selectedIndex < 0 ? 0 : selectedIndex, labels, GUILayout.Width(width));
-        if (options.Count == 0)
+        List<string> labels = new List<string> { "<select>" };
+        labels.AddRange(options.Select(option => option.displayName));
+
+        int selectedIndex = 0;
+        if (!string.IsNullOrWhiteSpace(binding.memberName))
+        {
+            int foundIndex = options.FindIndex(option =>
+                option.memberKind == binding.memberKind &&
+                string.Equals(option.memberName, binding.memberName, StringComparison.Ordinal) &&
+                string.Equals(option.signature, binding.memberSignature, StringComparison.Ordinal));
+            selectedIndex = foundIndex >= 0 ? foundIndex + 1 : 0;
+        }
+
+        int newIndex = EditorGUILayout.Popup(selectedIndex, labels.ToArray(), GUILayout.Width(width));
+        if (newIndex <= 0)
         {
             binding.memberName = "";
             binding.memberSignature = "";
@@ -344,7 +374,7 @@ public partial class ModuleExporter
             return;
         }
 
-        CompatibleMemberOption selected = options[newIndex];
+        CompatibleMemberOption selected = options[newIndex - 1];
         binding.memberKind = selected.memberKind;
         binding.memberName = selected.memberName;
         binding.memberSignature = selected.signature;
@@ -353,28 +383,13 @@ public partial class ModuleExporter
         binding.access = selected.access;
     }
 
-    private void EnsureSelectedComponentIsValid(PlyFeatureBinding binding, List<string> validComponents)
-    {
-        if (validComponents.Count == 0)
-        {
-            binding.componentType = "";
-            binding.memberName = "";
-            binding.memberSignature = "";
-            binding.conversion = "";
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(binding.componentType) || !validComponents.Any(option => string.Equals(option, binding.componentType, StringComparison.OrdinalIgnoreCase)))
-        {
-            binding.componentType = validComponents[0];
-            binding.memberName = "";
-            binding.memberSignature = "";
-            binding.conversion = "";
-        }
-    }
-
     private string GetValidationStatusText(PlyFeaturePortMapping port, FeatureMappingSection section)
     {
+        if (port.binding == null || string.IsNullOrWhiteSpace(port.binding.componentType) || string.IsNullOrWhiteSpace(port.binding.memberName))
+        {
+            return "Pending";
+        }
+
         List<PlyFeatureValidationIssue> issues = new List<PlyFeatureValidationIssue>();
         ValidatePortBinding(port, section, issues);
         if (issues.Count == 0)
@@ -387,6 +402,11 @@ public partial class ModuleExporter
 
     private string GetValidationStatusText(PlyFeatureParameterMapping parameter)
     {
+        if (parameter.binding == null || string.IsNullOrWhiteSpace(parameter.binding.componentType) || string.IsNullOrWhiteSpace(parameter.binding.memberName))
+        {
+            return "Pending";
+        }
+
         List<PlyFeatureValidationIssue> issues = new List<PlyFeatureValidationIssue>();
         ValidateParameterBinding(parameter, issues);
         if (issues.Count == 0)
@@ -399,44 +419,185 @@ public partial class ModuleExporter
 
     private List<CompatibleMemberOption> GetCompatibleOptionsForPort(PlyFeaturePortMapping port, FeatureMappingSection section)
     {
+        string cacheKey = "port|" + section + "|" + port.name + "|" + port.kind + "|" + port.dataType;
+        if (compatibleOptionsCache.TryGetValue(cacheKey, out List<CompatibleMemberOption> cached))
+        {
+            return cached;
+        }
+
         List<CompatibleMemberOption> results = new List<CompatibleMemberOption>();
         foreach (PlyFeatureComponentDescriptor component in GetProjectFeatureComponents(componentSearchTerm))
         {
-            Type type = ResolveComponentType(component);
-            if (type == null)
+            foreach (PlyFeatureMemberDescriptor member in component.members ?? new List<PlyFeatureMemberDescriptor>())
             {
-                continue;
-            }
-
-            switch (section)
-            {
-                case FeatureMappingSection.Input:
-                    results.AddRange(GetCompatibleInputMembers(type, component.typeName, port));
-                    break;
-                case FeatureMappingSection.Output:
-                    results.AddRange(GetCompatibleOutputMembers(type, component.typeName, port));
-                    break;
+                if (TryCreateCompatiblePortOption(component, member, port, section, out CompatibleMemberOption option))
+                {
+                    results.Add(option);
+                }
             }
         }
 
+        compatibleOptionsCache[cacheKey] = results;
         return results;
     }
 
     private List<CompatibleMemberOption> GetCompatibleOptionsForParameter(PlyFeatureParameterMapping parameter)
     {
+        string cacheKey = "parameter|" + parameter.name + "|" + parameter.type + "|" + parameter.accessMode;
+        if (compatibleOptionsCache.TryGetValue(cacheKey, out List<CompatibleMemberOption> cached))
+        {
+            return cached;
+        }
+
         List<CompatibleMemberOption> results = new List<CompatibleMemberOption>();
         foreach (PlyFeatureComponentDescriptor component in GetProjectFeatureComponents(componentSearchTerm))
         {
-            Type type = ResolveComponentType(component);
-            if (type == null)
+            foreach (PlyFeatureMemberDescriptor member in component.members ?? new List<PlyFeatureMemberDescriptor>())
             {
-                continue;
+                if (TryCreateCompatibleParameterOption(component, member, parameter, out CompatibleMemberOption option))
+                {
+                    results.Add(option);
+                }
             }
-
-            results.AddRange(GetCompatibleParameterMembers(type, component.typeName, parameter));
         }
 
+        compatibleOptionsCache[cacheKey] = results;
         return results;
+    }
+
+    private bool TryCreateCompatiblePortOption(PlyFeatureComponentDescriptor component, PlyFeatureMemberDescriptor member, PlyFeaturePortMapping port, FeatureMappingSection section, out CompatibleMemberOption option)
+    {
+        option = null;
+        if (component == null || member == null || port == null)
+        {
+            return false;
+        }
+
+        string conversion;
+        switch (section)
+        {
+            case FeatureMappingSection.Input:
+                if (member.memberKind == PlyFeatureMemberKind.Method)
+                {
+                    if ((!includeLifecycleMethods && member.isLifecycleMethod) || !TryMatchInputMethod(member, port, out conversion))
+                    {
+                        return false;
+                    }
+                }
+                else if (port.kind == PlyFeaturePortKind.Value && member.memberKind == PlyFeatureMemberKind.Property)
+                {
+                    if (member.access == PlyFeatureParameterAccess.ReadOnly || !TryMatchFeatureToTarget(port.dataType, member.dataType, out conversion))
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    return false;
+                }
+                break;
+            case FeatureMappingSection.Output:
+                if (member.memberKind != PlyFeatureMemberKind.UnityEvent && member.memberKind != PlyFeatureMemberKind.CSharpEvent)
+                {
+                    return false;
+                }
+
+                if (!TryMatchSourceToExpected(member.dataType, port.dataType, out conversion))
+                {
+                    return false;
+                }
+                break;
+            default:
+                return false;
+        }
+
+        option = CreateCompatibleOption(component, member, conversion);
+        return true;
+    }
+
+    private bool TryCreateCompatibleParameterOption(PlyFeatureComponentDescriptor component, PlyFeatureMemberDescriptor member, PlyFeatureParameterMapping parameter, out CompatibleMemberOption option)
+    {
+        option = null;
+        if (component == null || member == null || parameter == null)
+        {
+            return false;
+        }
+
+        if (member.memberKind != PlyFeatureMemberKind.Field && member.memberKind != PlyFeatureMemberKind.Property)
+        {
+            return false;
+        }
+
+        if (TryMatchParameterDataType(member.dataType, parameter, member.access, out string conversion))
+        {
+            option = CreateCompatibleOption(component, member, conversion);
+            return true;
+        }
+
+        return false;
+    }
+
+    private CompatibleMemberOption CreateCompatibleOption(PlyFeatureComponentDescriptor component, PlyFeatureMemberDescriptor member, string conversion)
+    {
+        return new CompatibleMemberOption
+        {
+            componentType = component.typeName,
+            memberName = member.memberName,
+            displayName = member.displayName,
+            signature = member.displayName,
+            memberKind = member.memberKind,
+            access = member.access,
+            isStatic = member.isStatic,
+            conversion = conversion ?? "",
+            memberDataType = member.dataType
+        };
+    }
+
+    private bool TryMatchInputMethod(PlyFeatureMemberDescriptor member, PlyFeaturePortMapping port, out string conversion)
+    {
+        conversion = "";
+        if (member == null || member.memberKind != PlyFeatureMemberKind.Method)
+        {
+            return false;
+        }
+
+        if (port.dataType == PlyFeatureDataType.Void)
+        {
+            return member.parameterCount == 0 && member.dataType == PlyFeatureDataType.Void;
+        }
+
+        return member.parameterCount == 1 && TryMatchFeatureToTarget(port.dataType, member.dataType, out conversion);
+    }
+
+    private bool TryMatchParameterDataType(PlyFeatureDataType memberDataType, PlyFeatureParameterMapping parameter, PlyFeatureParameterAccess memberAccess, out string conversion)
+    {
+        conversion = "";
+        switch (parameter.accessMode)
+        {
+            case PlyFeatureParameterAccess.ReadOnly:
+                if (memberAccess == PlyFeatureParameterAccess.WriteOnly)
+                {
+                    return false;
+                }
+
+                return TryMatchSourceToExpected(memberDataType, parameter.type, out conversion);
+            case PlyFeatureParameterAccess.WriteOnly:
+                if (memberAccess == PlyFeatureParameterAccess.ReadOnly)
+                {
+                    return false;
+                }
+
+                return TryMatchFeatureToTarget(parameter.type, memberDataType, out conversion);
+            default:
+                if (memberAccess != PlyFeatureParameterAccess.ReadWrite)
+                {
+                    return false;
+                }
+
+                return TryMatchSourceToExpected(memberDataType, parameter.type, out string readConversion)
+                    && TryMatchFeatureToTarget(parameter.type, memberDataType, out string writeConversion)
+                    && MergeConversions(readConversion, writeConversion, out conversion);
+        }
     }
 
     private IEnumerable<CompatibleMemberOption> GetCompatibleInputMembers(Type type, string componentTypeName, PlyFeaturePortMapping port)
@@ -890,6 +1051,11 @@ public partial class ModuleExporter
             return;
         }
 
+        if (string.IsNullOrWhiteSpace(port.binding.componentType) || string.IsNullOrWhiteSpace(port.binding.memberName))
+        {
+            return;
+        }
+
         List<CompatibleMemberOption> options = GetCompatibleOptionsForPort(port, section);
         ValidateBindingSelection(port.binding, options, issues, port.name);
     }
@@ -899,6 +1065,11 @@ public partial class ModuleExporter
         if (parameter.binding == null)
         {
             issues.Add(CreateIssue("error", parameter.name, "Binding is required."));
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(parameter.binding.componentType) || string.IsNullOrWhiteSpace(parameter.binding.memberName))
+        {
             return;
         }
 
@@ -914,8 +1085,8 @@ public partial class ModuleExporter
             return;
         }
 
-        bool componentExists = GetProjectFeatureComponents("").Any(component => string.Equals(component.typeName, binding.componentType, StringComparison.OrdinalIgnoreCase));
-        if (!componentExists)
+        PlyFeatureComponentDescriptor component = PlyFeatureTypeCache.FindComponent(binding.componentType);
+        if (component == null)
         {
             issues.Add(CreateIssue("error", path, "Selected component type does not exist."));
             return;
@@ -973,6 +1144,7 @@ public partial class ModuleExporter
         {
             FeatureManifestState = PlyFeatureJson.ImportFromFile(filePath);
             FeatureManifestState.moduleId = moduleId ?? "";
+            InvalidateFeatureEditorCaches();
         }
         catch (Exception exception)
         {
@@ -1009,6 +1181,26 @@ public partial class ModuleExporter
         string featureFolder = Path.Combine(moduleFolder, "Plyground");
         Directory.CreateDirectory(featureFolder);
         PlyFeatureJson.ExportToFile(PrepareFeatureManifestForPersistence(), Path.Combine(featureFolder, "features.json"));
+    }
+
+    private void EnsureFeatureEditorCacheState()
+    {
+        string snapshotVersion = PlyFeatureTypeCache.Snapshot.generatedAtUtc ?? "";
+        if (!string.Equals(cachedComponentSearchTerm, componentSearchTerm ?? "", StringComparison.Ordinal) ||
+            cachedIncludeLifecycleMethods != includeLifecycleMethods ||
+            !string.Equals(cachedSnapshotVersion, snapshotVersion, StringComparison.Ordinal))
+        {
+            InvalidateFeatureEditorCaches();
+            cachedComponentSearchTerm = componentSearchTerm ?? "";
+            cachedIncludeLifecycleMethods = includeLifecycleMethods;
+            cachedSnapshotVersion = snapshotVersion;
+        }
+    }
+
+    private void InvalidateFeatureEditorCaches()
+    {
+        compatibleOptionsCache.Clear();
+        featureValidationDirty = true;
     }
 
     private List<PlyFeatureComponentDescriptor> GetProjectFeatureComponents(string searchTerm)
@@ -1152,6 +1344,7 @@ public partial class ModuleExporter
             parameters = CloneParameters(definition.parameters)
         };
         FeatureManifestState.features.Add(profile);
+        featureValidationDirty = true;
     }
 
     private List<PlyFeaturePortMapping> ClonePorts(List<PlyFeaturePortMapping> source)

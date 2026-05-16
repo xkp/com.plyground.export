@@ -128,6 +128,8 @@ public class PlyFeatureMemberDescriptor
     public PlyFeatureDataType dataType = PlyFeatureDataType.Any;
     public PlyFeatureParameterAccess access = PlyFeatureParameterAccess.ReadWrite;
     public bool isStatic;
+    public int parameterCount;
+    public bool isLifecycleMethod;
 }
 
 [Serializable]

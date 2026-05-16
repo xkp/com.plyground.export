@@ -85,7 +85,9 @@ public static class PlyFeatureReflectionScanner
                 memberKind = PlyFeatureMemberKind.Method,
                 dataType = GetMethodPayloadType(method),
                 access = PlyFeatureParameterAccess.ReadWrite,
-                isStatic = method.IsStatic
+                isStatic = method.IsStatic,
+                parameterCount = method.GetParameters().Length,
+                isLifecycleMethod = IsLifecycleMethod(method.Name)
             });
         }
 
@@ -108,7 +110,8 @@ public static class PlyFeatureReflectionScanner
                     memberKind = PlyFeatureMemberKind.UnityEvent,
                     dataType = GetUnityEventPayloadType(field.FieldType),
                     access = PlyFeatureParameterAccess.ReadWrite,
-                    isStatic = field.IsStatic
+                    isStatic = field.IsStatic,
+                    parameterCount = GetUnityEventParameterCount(field.FieldType)
                 });
                 continue;
             }
@@ -159,7 +162,8 @@ public static class PlyFeatureReflectionScanner
                 memberKind = PlyFeatureMemberKind.CSharpEvent,
                 dataType = GetCSharpEventPayloadType(eventInfo.EventHandlerType),
                 access = PlyFeatureParameterAccess.ReadOnly,
-                isStatic = (eventInfo.AddMethod != null && eventInfo.AddMethod.IsStatic) || (eventInfo.RemoveMethod != null && eventInfo.RemoveMethod.IsStatic)
+                isStatic = (eventInfo.AddMethod != null && eventInfo.AddMethod.IsStatic) || (eventInfo.RemoveMethod != null && eventInfo.RemoveMethod.IsStatic),
+                parameterCount = GetCSharpEventParameterCount(eventInfo.EventHandlerType)
             });
         }
 
@@ -242,6 +246,50 @@ public static class PlyFeatureReflectionScanner
         }
 
         return MapType(parameters[parameters.Length - 1].ParameterType);
+    }
+
+    private static int GetUnityEventParameterCount(Type eventType)
+    {
+        Type current = eventType;
+        while (current != null)
+        {
+            if (current == typeof(UnityEvent))
+            {
+                return 0;
+            }
+
+            if (current.IsGenericType && current.GetGenericTypeDefinition() == typeof(UnityEvent<>))
+            {
+                return 1;
+            }
+
+            current = current.BaseType;
+        }
+
+        return 0;
+    }
+
+    private static int GetCSharpEventParameterCount(Type eventHandlerType)
+    {
+        MethodInfo invokeMethod = eventHandlerType?.GetMethod("Invoke");
+        return invokeMethod?.GetParameters().Length ?? 0;
+    }
+
+    private static bool IsLifecycleMethod(string methodName)
+    {
+        switch (methodName)
+        {
+            case "Awake":
+            case "Start":
+            case "Update":
+            case "LateUpdate":
+            case "FixedUpdate":
+            case "OnEnable":
+            case "OnDisable":
+                return true;
+            default:
+                return false;
+        }
     }
 
     public static PlyFeatureDataType MapType(Type type)
