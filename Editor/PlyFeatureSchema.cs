@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 [Serializable]
 public enum PlyFeaturePortDirection
@@ -72,6 +73,9 @@ public class PlyFeatureProfile
     public bool useAdapterComponent;
     public string adapterComponentType = "";
     public List<PlyFeatureComponentRequirement> componentRequirements = new List<PlyFeatureComponentRequirement>();
+    public List<PlyFeaturePortMapping> inputs = new List<PlyFeaturePortMapping>();
+    public List<PlyFeaturePortMapping> outputs = new List<PlyFeaturePortMapping>();
+    [NonSerialized]
     public List<PlyFeaturePortMapping> ports = new List<PlyFeaturePortMapping>();
     public List<PlyFeatureParameterMapping> parameters = new List<PlyFeatureParameterMapping>();
 }
@@ -193,7 +197,31 @@ public static class PlyFeatureSchemaUtility
         feature.targetRoles = NormalizeStrings(feature.targetRoles);
         feature.adapterComponentType = feature.adapterComponentType ?? "";
         feature.componentRequirements = feature.componentRequirements ?? new List<PlyFeatureComponentRequirement>();
-        feature.ports = feature.ports ?? new List<PlyFeaturePortMapping>();
+        feature.inputs = NormalizePortList(feature.inputs, PlyFeaturePortDirection.Input);
+        feature.outputs = NormalizePortList(feature.outputs, PlyFeaturePortDirection.Output);
+        if (feature.ports != null && feature.ports.Count > 0)
+        {
+            foreach (PlyFeaturePortMapping port in feature.ports)
+            {
+                if (port == null)
+                {
+                    continue;
+                }
+
+                if (port.direction == PlyFeaturePortDirection.Output)
+                {
+                    feature.outputs.Add(NormalizePort(port, PlyFeaturePortDirection.Output));
+                }
+                else
+                {
+                    feature.inputs.Add(NormalizePort(port, PlyFeaturePortDirection.Input));
+                }
+            }
+        }
+
+        feature.inputs = DeduplicatePorts(feature.inputs, PlyFeaturePortDirection.Input);
+        feature.outputs = DeduplicatePorts(feature.outputs, PlyFeaturePortDirection.Output);
+        feature.ports = feature.inputs.Concat(feature.outputs).ToList();
         feature.parameters = feature.parameters ?? new List<PlyFeatureParameterMapping>();
 
         foreach (PlyFeatureComponentRequirement requirement in feature.componentRequirements)
@@ -205,17 +233,6 @@ public static class PlyFeatureSchemaUtility
 
             requirement.typeName = requirement.typeName ?? "";
             requirement.assemblyQualifiedName = requirement.assemblyQualifiedName ?? "";
-        }
-
-        foreach (PlyFeaturePortMapping port in feature.ports)
-        {
-            if (port == null)
-            {
-                continue;
-            }
-
-            port.name = port.name ?? "";
-            port.binding = NormalizeBinding(port.binding);
         }
 
         foreach (PlyFeatureParameterMapping parameter in feature.parameters)
@@ -232,6 +249,41 @@ public static class PlyFeatureSchemaUtility
         }
 
         return feature;
+    }
+
+    private static List<PlyFeaturePortMapping> NormalizePortList(List<PlyFeaturePortMapping> ports, PlyFeaturePortDirection direction)
+    {
+        List<PlyFeaturePortMapping> normalized = new List<PlyFeaturePortMapping>();
+        foreach (PlyFeaturePortMapping port in ports ?? new List<PlyFeaturePortMapping>())
+        {
+            if (port == null)
+            {
+                continue;
+            }
+
+            normalized.Add(NormalizePort(port, direction));
+        }
+
+        return normalized;
+    }
+
+    private static PlyFeaturePortMapping NormalizePort(PlyFeaturePortMapping port, PlyFeaturePortDirection direction)
+    {
+        port = port ?? new PlyFeaturePortMapping();
+        port.name = port.name ?? "";
+        port.direction = direction;
+        port.binding = NormalizeBinding(port.binding);
+        return port;
+    }
+
+    private static List<PlyFeaturePortMapping> DeduplicatePorts(List<PlyFeaturePortMapping> ports, PlyFeaturePortDirection direction)
+    {
+        return (ports ?? new List<PlyFeaturePortMapping>())
+            .Where(port => port != null && !string.IsNullOrWhiteSpace(port.name))
+            .GroupBy(port => port.name.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(group => NormalizePort(group.First(), direction))
+            .OrderBy(port => port.name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     public static PlyFeatureBinding NormalizeBinding(PlyFeatureBinding binding)

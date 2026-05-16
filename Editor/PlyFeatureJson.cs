@@ -45,7 +45,8 @@ public static class PlyFeatureJson
             feature.useAdapterComponent = ReadBool(featureObject, "useAdapterComponent", false);
             feature.adapterComponentType = ReadString(featureObject, "adapterComponentType", "");
             feature.componentRequirements = new List<PlyFeatureComponentRequirement>();
-            feature.ports = new List<PlyFeaturePortMapping>();
+            feature.inputs = new List<PlyFeaturePortMapping>();
+            feature.outputs = new List<PlyFeaturePortMapping>();
             feature.parameters = new List<PlyFeatureParameterMapping>();
 
             foreach (Dictionary<string, object> requirementObject in ReadObjectList(featureObject, "componentRequirements"))
@@ -60,7 +61,7 @@ public static class PlyFeatureJson
 
             foreach (Dictionary<string, object> portObject in ReadObjectList(featureObject, "inputs"))
             {
-                feature.ports.Add(new PlyFeaturePortMapping
+                feature.inputs.Add(new PlyFeaturePortMapping
                 {
                     name = ReadString(portObject, "name", ""),
                     direction = PlyFeaturePortDirection.Input,
@@ -72,7 +73,7 @@ public static class PlyFeatureJson
 
             foreach (Dictionary<string, object> portObject in ReadObjectList(featureObject, "outputs"))
             {
-                feature.ports.Add(new PlyFeaturePortMapping
+                feature.outputs.Add(new PlyFeaturePortMapping
                 {
                     name = ReadString(portObject, "name", ""),
                     direction = PlyFeaturePortDirection.Output,
@@ -84,14 +85,22 @@ public static class PlyFeatureJson
 
             foreach (Dictionary<string, object> portObject in ReadObjectList(featureObject, "ports"))
             {
-                feature.ports.Add(new PlyFeaturePortMapping
+                PlyFeaturePortMapping port = new PlyFeaturePortMapping
                 {
                     name = ReadString(portObject, "name", ""),
                     direction = ReadEnum(ReadString(portObject, "direction", "input"), PlyFeaturePortDirection.Input),
                     kind = ReadEnum(ReadString(portObject, "kind", "action"), PlyFeaturePortKind.Action),
                     dataType = ReadEnum(ReadString(portObject, "dataType", "any"), PlyFeatureDataType.Any),
                     binding = ReadBinding(portObject)
-                });
+                };
+                if (port.direction == PlyFeaturePortDirection.Output)
+                {
+                    feature.outputs.Add(port);
+                }
+                else
+                {
+                    feature.inputs.Add(port);
+                }
             }
 
             foreach (Dictionary<string, object> parameterObject in ReadObjectList(featureObject, "parameters"))
@@ -323,8 +332,8 @@ public static class PlyFeatureJson
         WriteBoolProperty(builder, indent, "useAdapterComponent", feature.useAdapterComponent, true);
         WriteProperty(builder, indent, "adapterComponentType", feature.adapterComponentType, true);
         WriteComponentRequirements(builder, indent, feature.componentRequirements, true);
-        WritePorts(builder, indent, "inputs", feature.ports.Where(port => port != null && port.direction == PlyFeaturePortDirection.Input).ToList(), true);
-        WritePorts(builder, indent, "outputs", feature.ports.Where(port => port != null && port.direction == PlyFeaturePortDirection.Output).ToList(), true);
+        WritePorts(builder, indent, "inputs", feature.inputs, true);
+        WritePorts(builder, indent, "outputs", feature.outputs, true);
         WriteParameters(builder, indent, feature.parameters, false);
         Indent(builder, indent - 1);
         builder.Append("}");
