@@ -7,6 +7,25 @@ using UnityEngine;
 
 public partial class ModuleExporter
 {
+    private PlyFeatureManifest FeatureManifestState
+    {
+        get
+        {
+            if (featureManifest is PlyFeatureManifest manifest)
+            {
+                return manifest;
+            }
+
+            PlyFeatureManifest created = new PlyFeatureManifest();
+            featureManifest = created;
+            return created;
+        }
+        set
+        {
+            featureManifest = value;
+        }
+    }
+
     private int selectedFeatureProfileIndex = -1;
     private string featureComponentSearch = "";
     private Vector2 featureListScroll;
@@ -16,21 +35,21 @@ public partial class ModuleExporter
 
     private void InitializeFeatureManifest()
     {
-        featureManifest = PlyFeatureSchemaUtility.NormalizeManifest(featureManifest);
-        featureManifest.moduleId = moduleId ?? "";
+        FeatureManifestState = PlyFeatureSchemaUtility.NormalizeManifest(FeatureManifestState);
+        FeatureManifestState.moduleId = moduleId ?? "";
     }
 
     private PlyFeatureManifest PrepareFeatureManifestForPersistence()
     {
         InitializeFeatureManifest();
-        featureManifest.moduleId = moduleId ?? "";
-        return PlyFeatureSchemaUtility.NormalizeManifest(featureManifest);
+        FeatureManifestState.moduleId = moduleId ?? "";
+        return PlyFeatureSchemaUtility.NormalizeManifest(FeatureManifestState);
     }
 
     private void DrawFeaturesTab()
     {
         InitializeFeatureManifest();
-        featureValidationIssues = ValidateFeatureManifest(featureManifest);
+        featureValidationIssues = ValidateFeatureManifest(FeatureManifestState);
 
         EditorGUILayout.HelpBox("Create semantic gameplay features from the curated capability components in this module. Feature bindings are limited to components and members defined in the Components subtab.", MessageType.Info);
 
@@ -79,21 +98,21 @@ public partial class ModuleExporter
     private void DrawFeatureWorkspace()
     {
         InitializeFeatureManifest();
-        featureManifest.features ??= new List<PlyFeatureProfile>();
+        FeatureManifestState.features ??= new List<PlyFeatureProfile>();
 
         EditorGUILayout.BeginHorizontal();
 
         EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(250f, position.width * 0.24f)), GUILayout.Height(620f));
         GUILayout.Label("Feature Profiles", EditorStyles.boldLabel);
         featureListScroll = EditorGUILayout.BeginScrollView(featureListScroll);
-        if (featureManifest.features.Count == 0)
+        if (FeatureManifestState.features.Count == 0)
         {
             EditorGUILayout.HelpBox("No feature profiles yet.", MessageType.Info);
         }
 
-        for (int i = 0; i < featureManifest.features.Count; i++)
+        for (int i = 0; i < FeatureManifestState.features.Count; i++)
         {
-            PlyFeatureProfile profile = featureManifest.features[i];
+            PlyFeatureProfile profile = FeatureManifestState.features[i];
             string label = string.IsNullOrWhiteSpace(profile.name) ? (string.IsNullOrWhiteSpace(profile.id) ? "New Feature" : profile.id) : profile.name;
             if (GUILayout.Button(label, selectedFeatureProfileIndex == i ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(30f)))
             {
@@ -104,15 +123,15 @@ public partial class ModuleExporter
         EditorGUILayout.EndVertical();
 
         EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true), GUILayout.Height(620f));
-        if (featureManifest.features.Count == 0)
+        if (FeatureManifestState.features.Count == 0)
         {
             EditorGUILayout.HelpBox("Create or import a feature profile to begin mapping components, members, and semantic capabilities.", MessageType.Info);
         }
         else
         {
-            selectedFeatureProfileIndex = Mathf.Clamp(selectedFeatureProfileIndex < 0 ? 0 : selectedFeatureProfileIndex, 0, featureManifest.features.Count - 1);
+            selectedFeatureProfileIndex = Mathf.Clamp(selectedFeatureProfileIndex < 0 ? 0 : selectedFeatureProfileIndex, 0, FeatureManifestState.features.Count - 1);
             featureEditorScroll = EditorGUILayout.BeginScrollView(featureEditorScroll);
-            DrawFeatureProfileEditor(featureManifest.features[selectedFeatureProfileIndex]);
+            DrawFeatureProfileEditor(FeatureManifestState.features[selectedFeatureProfileIndex]);
             EditorGUILayout.EndScrollView();
         }
         EditorGUILayout.EndVertical();
@@ -166,8 +185,8 @@ public partial class ModuleExporter
         EditorGUILayout.Space(8f);
         if (GUILayout.Button("Remove Feature Profile", GUILayout.Width(170f)))
         {
-            featureManifest.features.Remove(profile);
-            selectedFeatureProfileIndex = Mathf.Clamp(selectedFeatureProfileIndex - 1, -1, featureManifest.features.Count - 1);
+            FeatureManifestState.features.Remove(profile);
+            selectedFeatureProfileIndex = Mathf.Clamp(selectedFeatureProfileIndex - 1, -1, FeatureManifestState.features.Count - 1);
         }
     }
 
@@ -364,12 +383,12 @@ public partial class ModuleExporter
     private void AddFeatureProfile()
     {
         InitializeFeatureManifest();
-        featureManifest.features.Add(new PlyFeatureProfile
+        FeatureManifestState.features.Add(new PlyFeatureProfile
         {
             id = "feature." + Guid.NewGuid().ToString("N").Substring(0, 8),
             name = "New Feature"
         });
-        selectedFeatureProfileIndex = featureManifest.features.Count - 1;
+        selectedFeatureProfileIndex = FeatureManifestState.features.Count - 1;
     }
 
     private void AddGuardAiExampleProfile()
@@ -417,8 +436,8 @@ public partial class ModuleExporter
 }").features.FirstOrDefault();
         if (example != null)
         {
-            featureManifest.features.Add(example);
-            selectedFeatureProfileIndex = featureManifest.features.Count - 1;
+            FeatureManifestState.features.Add(example);
+            selectedFeatureProfileIndex = FeatureManifestState.features.Count - 1;
         }
     }
 
@@ -432,9 +451,9 @@ public partial class ModuleExporter
 
         try
         {
-            featureManifest = PlyFeatureJson.ImportFromFile(filePath);
-            featureManifest.moduleId = moduleId ?? "";
-            selectedFeatureProfileIndex = featureManifest.features.Count > 0 ? 0 : -1;
+            FeatureManifestState = PlyFeatureJson.ImportFromFile(filePath);
+            FeatureManifestState.moduleId = moduleId ?? "";
+            selectedFeatureProfileIndex = FeatureManifestState.features.Count > 0 ? 0 : -1;
         }
         catch (Exception exception)
         {

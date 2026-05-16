@@ -49,7 +49,7 @@ public partial class ModuleExporter : EditorWindow
 
 	private List<Property> moduleProperties = new List<Property>();
 	private CapabilityManifest moduleCapabilities = new CapabilityManifest();
-	private PlyFeatureManifest featureManifest = new PlyFeatureManifest();
+	private object featureManifest;
 	private List<string> capabilitySourceScriptPaths = new List<string>();
 
 	[System.Serializable]
@@ -203,7 +203,7 @@ public partial class ModuleExporter : EditorWindow
 		PopulateCapabilityModuleMetadata(moduleCapabilities);
 		NormalizeModuleCapabilities(moduleCapabilities);
 		featureManifest = LoadFeatureManifestFromModule(mod);
-		featureManifest.moduleId = moduleId ?? "";
+		PrepareFeatureManifestForPersistence().moduleId = moduleId ?? "";
 
 		dependencies.Clear();
 		if (mod.dependencies != null)
@@ -713,11 +713,11 @@ public partial class ModuleExporter : EditorWindow
 		public string featuresJson;
 	}
 
-	private PlyFeatureManifest LoadFeatureManifestFromModule(ExportedModule mod)
+	private object LoadFeatureManifestFromModule(ExportedModule mod)
 	{
 		if (mod == null || string.IsNullOrWhiteSpace(mod.featuresJson))
 		{
-			return new PlyFeatureManifest();
+			return null;
 		}
 
 		return PlyFeatureJson.Import(mod.featuresJson);
