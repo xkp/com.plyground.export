@@ -1023,7 +1023,7 @@ public partial class ModuleExporter
 
 		GUILayout.Label("CAPABILITIES", EditorStyles.boldLabel);
 		EditorGUILayout.BeginVertical("box");
-		EditorGUILayout.HelpBox("Capability data is persisted inside this module's existing module.bgm document. Choose the C# scripts that should drive component discovery, reflect those compiled types, and then adjust the resulting capabilities manually before save/export.", MessageType.Info);
+		EditorGUILayout.HelpBox("Capabilities are now scoped to curated components and feature mappings. Use Components to choose the module-facing components and public properties, then use Features to map those properties into semantic gameplay concepts.", MessageType.Info);
 
 		EditorGUILayout.BeginHorizontal();
 		if (GUILayout.Button("Infer Module Capabilities", GUILayout.Width(180f)))
@@ -1041,7 +1041,16 @@ public partial class ModuleExporter
 		EditorGUILayout.Space(6f);
 		activeCapabilityTab = (CapabilityWorkspaceTab)GUILayout.Toolbar((int)activeCapabilityTab, capabilityTabs);
 		EditorGUILayout.Space(6f);
-		DrawModuleCapabilityManifestEditor();
+
+		switch (activeCapabilityTab)
+		{
+			case CapabilityWorkspaceTab.Components:
+				DrawCapabilitiesComponentsWorkspace();
+				break;
+			case CapabilityWorkspaceTab.Features:
+				DrawCapabilitiesFeaturesWorkspace();
+				break;
+		}
 	}
 
 	private void RebuildModuleCapabilitiesFromSelectedScripts()
@@ -1090,66 +1099,18 @@ public partial class ModuleExporter
 		return $"Selected Scripts: {count} ({string.Join(", ", sample)}{suffix})";
 	}
 
-	private void DrawModuleCapabilityManifestEditor()
+	private void DrawCapabilitiesComponentsWorkspace()
 	{
-		moduleCapabilities.module ??= new CapabilityModuleInfo();
 		moduleCapabilities.unity ??= new CapabilityUnityInfo();
-		moduleCapabilities.exportInfo ??= new CapabilityExportInfo();
-
-		GUILayout.Label("MODULE-WIDE MANIFEST", EditorStyles.boldLabel);
 		EditorGUILayout.BeginVertical("box");
-		if (BeginCapabilitySection("manifest-header", "Header"))
-		{
-			moduleCapabilities.manifestVersion = EditorGUILayout.TextField("Manifest Version", moduleCapabilities.manifestVersion);
-			moduleCapabilities.module.displayName = EditorGUILayout.TextField("Display Name", moduleCapabilities.module.displayName);
-			moduleCapabilities.module.version = EditorGUILayout.TextField("Version", moduleCapabilities.module.version);
-			moduleCapabilities.module.category = EditorGUILayout.TextField("Category", moduleCapabilities.module.category);
-			moduleCapabilities.module.description = EditorGUILayout.TextField("Description", moduleCapabilities.module.description);
-			moduleCapabilities.module.codegenEnabled = EditorGUILayout.Toggle("Codegen Enabled", moduleCapabilities.module.codegenEnabled);
-			moduleCapabilities.module.availability.local = EditorGUILayout.Toggle("Available Local", moduleCapabilities.module.availability.local);
-			moduleCapabilities.module.availability.cloud = EditorGUILayout.Toggle("Available Cloud", moduleCapabilities.module.availability.cloud);
-			EndCapabilitySection();
-		}
+		DrawComponentBrowser(moduleCapabilities.unity.components);
+		EditorGUILayout.EndVertical();
+	}
 
-		if (activeCapabilityTab == CapabilityWorkspaceTab.Components && BeginCapabilitySection("manifest-components", "Components"))
-		{
-			DrawComponentBrowser(moduleCapabilities.unity.components);
-			EndCapabilitySection();
-		}
-
-		if (activeCapabilityTab == CapabilityWorkspaceTab.Features && BeginCapabilitySection("manifest-features", "Features"))
-		{
-			DrawFeaturesTab();
-			EndCapabilitySection();
-		}
-
-		if (BeginCapabilitySection("manifest-assemblies", "Assembly Names"))
-		{
-			DrawStringListEditor("Assembly Names", moduleCapabilities.module.assemblyNames);
-			EndCapabilitySection();
-		}
-
-		if (BeginCapabilitySection("manifest-namespaces", "Namespace Roots"))
-		{
-			DrawStringListEditor("Namespace Roots", moduleCapabilities.module.namespaceRoots);
-			EndCapabilitySection();
-		}
-
-		if (BeginCapabilitySection("manifest-dependencies", "Dependencies"))
-		{
-			DrawStringListEditor("Dependencies", moduleCapabilities.module.dependencies);
-			EndCapabilitySection();
-		}
-
-		if (BeginCapabilitySection("manifest-tags", "Tags"))
-		{
-			DrawStringListEditor("Tags", moduleCapabilities.module.tags);
-			EndCapabilitySection();
-		}
-
-		EditorGUILayout.LabelField("Producer", moduleCapabilities.exportInfo.producerName);
-		EditorGUILayout.LabelField("Producer Version", moduleCapabilities.exportInfo.producerVersion);
-		EditorGUILayout.LabelField("Last Exported At", string.IsNullOrWhiteSpace(moduleCapabilities.exportInfo.exportedAt) ? "Not exported yet" : moduleCapabilities.exportInfo.exportedAt);
+	private void DrawCapabilitiesFeaturesWorkspace()
+	{
+		EditorGUILayout.BeginVertical("box");
+		DrawFeaturesTab();
 		EditorGUILayout.EndVertical();
 	}
 
