@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using UnityEngine;
 
@@ -54,6 +55,30 @@ public static class PlyFeatureJson
                     typeName = ReadString(requirementObject, "typeName", ""),
                     assemblyQualifiedName = ReadString(requirementObject, "assemblyQualifiedName", ""),
                     required = ReadBool(requirementObject, "required", true)
+                });
+            }
+
+            foreach (Dictionary<string, object> portObject in ReadObjectList(featureObject, "inputs"))
+            {
+                feature.ports.Add(new PlyFeaturePortMapping
+                {
+                    name = ReadString(portObject, "name", ""),
+                    direction = PlyFeaturePortDirection.Input,
+                    kind = ReadEnum(ReadString(portObject, "kind", "action"), PlyFeaturePortKind.Action),
+                    dataType = ReadEnum(ReadString(portObject, "dataType", "any"), PlyFeatureDataType.Any),
+                    binding = ReadBinding(portObject)
+                });
+            }
+
+            foreach (Dictionary<string, object> portObject in ReadObjectList(featureObject, "outputs"))
+            {
+                feature.ports.Add(new PlyFeaturePortMapping
+                {
+                    name = ReadString(portObject, "name", ""),
+                    direction = PlyFeaturePortDirection.Output,
+                    kind = ReadEnum(ReadString(portObject, "kind", "event"), PlyFeaturePortKind.Event),
+                    dataType = ReadEnum(ReadString(portObject, "dataType", "any"), PlyFeatureDataType.Any),
+                    binding = ReadBinding(portObject)
                 });
             }
 
@@ -298,7 +323,8 @@ public static class PlyFeatureJson
         WriteBoolProperty(builder, indent, "useAdapterComponent", feature.useAdapterComponent, true);
         WriteProperty(builder, indent, "adapterComponentType", feature.adapterComponentType, true);
         WriteComponentRequirements(builder, indent, feature.componentRequirements, true);
-        WritePorts(builder, indent, feature.ports, true);
+        WritePorts(builder, indent, "inputs", feature.ports.Where(port => port != null && port.direction == PlyFeaturePortDirection.Input).ToList(), true);
+        WritePorts(builder, indent, "outputs", feature.ports.Where(port => port != null && port.direction == PlyFeaturePortDirection.Output).ToList(), true);
         WriteParameters(builder, indent, feature.parameters, false);
         Indent(builder, indent - 1);
         builder.Append("}");
@@ -341,10 +367,10 @@ public static class PlyFeatureJson
         builder.AppendLine();
     }
 
-    private static void WritePorts(StringBuilder builder, int indent, List<PlyFeaturePortMapping> ports, bool trailingComma)
+    private static void WritePorts(StringBuilder builder, int indent, string propertyName, List<PlyFeaturePortMapping> ports, bool trailingComma)
     {
         Indent(builder, indent);
-        builder.Append("\"ports\": [");
+        builder.Append("\"").Append(Escape(propertyName)).Append("\": [");
         if (ports != null && ports.Count > 0)
         {
             builder.AppendLine();
@@ -354,7 +380,6 @@ public static class PlyFeatureJson
                 Indent(builder, indent + 1);
                 builder.AppendLine("{");
                 WriteProperty(builder, indent + 2, "name", port.name, true);
-                WriteProperty(builder, indent + 2, "direction", ToCamelCase(port.direction), true);
                 WriteProperty(builder, indent + 2, "kind", ToCamelCase(port.kind), true);
                 WriteProperty(builder, indent + 2, "dataType", ToCamelCase(port.dataType), true);
                 WriteBinding(builder, indent + 2, port.binding, false);

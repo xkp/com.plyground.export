@@ -195,12 +195,43 @@ public partial class ModuleExporter
 		public List<string> requiredComponents = new List<string>();
 		public List<string> optionalComponents = new List<string>();
 		public List<string> allowedFeatures = new List<string>();
+		public List<CapabilityComponentInputInfo> inputs = new List<CapabilityComponentInputInfo>();
+		public List<CapabilityComponentOutputInfo> outputs = new List<CapabilityComponentOutputInfo>();
+		[NonSerialized]
 		public List<CapabilityEventInfo> events = new List<CapabilityEventInfo>();
+		[NonSerialized]
 		public List<CapabilityMethodInfo> methods = new List<CapabilityMethodInfo>();
 		public List<CapabilityParameterInfo> parameters = new List<CapabilityParameterInfo>();
 		public List<string> tags = new List<string>();
 		public bool codegenAllowed = true;
 		public bool userEditable;
+	}
+
+	[Serializable]
+	public class CapabilityComponentInputInfo
+	{
+		public string name = "";
+		public string kind = "";
+		public string valueType = "";
+		public string declaringType = "";
+		public string description = "";
+		public List<CapabilityMethodParameterInfo> parameters = new List<CapabilityMethodParameterInfo>();
+		public string returnType = "";
+		public bool isStatic;
+		public bool inspectorExposed;
+		public List<string> tags = new List<string>();
+	}
+
+	[Serializable]
+	public class CapabilityComponentOutputInfo
+	{
+		public string name = "";
+		public string kind = "";
+		public string valueType = "";
+		public string declaringType = "";
+		public string description = "";
+		public bool inspectorExposed;
+		public List<string> tags = new List<string>();
 	}
 
 	[Serializable]
@@ -547,6 +578,8 @@ public partial class ModuleExporter
 			attachTarget = "self",
 			description = sourceInfo != null && !string.IsNullOrWhiteSpace(sourceInfo.summary) ? sourceInfo.summary : "Component inferred from Assets/ script",
 			requiredComponents = BuildRequiredComponentNames(componentType),
+			inputs = BuildComponentInputs(componentType, sourceInfo),
+			outputs = BuildComponentOutputs(componentType, sourceInfo),
 			methods = BuildMethodInfos(componentType, sourceInfo),
 			events = BuildEventInfos(componentType, sourceInfo),
 			parameters = BuildParameterInfos(componentType, instance, sourceInfo),
@@ -568,6 +601,8 @@ public partial class ModuleExporter
 			attachTarget = "self",
 			description = sourceInfo.summary,
 			requiredComponents = new List<string>(),
+			inputs = BuildComponentInputs(sourceInfo),
+			outputs = BuildComponentOutputs(sourceInfo),
 			methods = BuildMethodInfos(sourceInfo),
 			events = BuildEventInfos(sourceInfo),
 			parameters = BuildParameterInfos(sourceInfo),
@@ -659,6 +694,165 @@ public partial class ModuleExporter
 	private List<CapabilityMethodInfo> BuildMethodInfos(Type type)
 	{
 		return BuildMethodInfos(type, GetSourceScriptInfoForType(type));
+	}
+
+	private List<CapabilityComponentInputInfo> BuildComponentInputs(Type type, SourceScriptInfo sourceInfo)
+	{
+		List<CapabilityComponentInputInfo> inputs = new List<CapabilityComponentInputInfo>();
+		Dictionary<string, SourceMethodInfo> sourceMethodMap = BuildSourceLookup(
+			sourceInfo != null ? sourceInfo.methods : null,
+			method => method.name);
+		foreach (MethodInfo method in type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+		{
+			if (method.IsSpecialName)
+			{
+				continue;
+			}
+
+			sourceMethodMap.TryGetValue(method.Name, out SourceMethodInfo sourceMethod);
+			inputs.Add(new CapabilityComponentInputInfo
+			{
+				name = method.Name,
+				kind = "method",
+				valueType = method.GetParameters().Length == 1 ? GetFriendlyTypeName(method.GetParameters()[0].ParameterType) : "",
+				declaringType = type.FullName ?? type.Name,
+				description = sourceMethod != null && !string.IsNullOrWhiteSpace(sourceMethod.summary) ? sourceMethod.summary : "Public method",
+				parameters = BuildMethodParameters(method, sourceMethod),
+				returnType = GetFriendlyTypeName(method.ReturnType),
+				isStatic = method.IsStatic,
+				inspectorExposed = false,
+				tags = BuildMethodTags(method)
+			});
+		}
+
+		Dictionary<string, SourceFieldInfo> sourceFieldMap = BuildSourceLookup(
+			sourceInfo != null ? sourceInfo.fields : null,
+			field => field.name);
+		foreach (FieldInfo field in GetInspectorFields(type))
+		{
+			if (IsEventFieldType(field.FieldType) || IsSimpleInspectorValueType(field.FieldType))
+			{
+				continue;
+			}
+
+			sourceFieldMap.TryGetValue(field.Name, out SourceFieldInfo sourceField);
+			inputs.Add(new CapabilityComponentInputInfo
+			{
+				name = field.Name,
+				kind = "field",
+				valueType = GetFriendlyTypeName(field.FieldType),
+				declaringType = type.FullName ?? type.Name,
+				description = sourceField != null && !string.IsNullOrWhiteSpace(sourceField.summary) ? sourceField.summary : "Inspector input field",
+				parameters = new List<CapabilityMethodParameterInfo>(),
+				returnType = "",
+				isStatic = field.IsStatic,
+				inspectorExposed = true,
+				tags = new List<string> { "inspector-field" }
+			});
+		}
+
+		foreach (PropertyInfo property in GetCapabilityProperties(type))
+		{
+			if (IsSimpleInspectorValueType(property.PropertyType))
+			{
+				continue;
+			}
+
+			sourceFieldMap.TryGetValue(property.Name, out SourceFieldInfo sourceField);
+			inputs.Add(new CapabilityComponentInputInfo
+			{
+				name = property.Name,
+				kind = "property",
+				valueType = GetFriendlyTypeName(property.PropertyType),
+				declaringType = type.FullName ?? type.Name,
+				description = sourceField != null && !string.IsNullOrWhiteSpace(sourceField.summary) ? sourceField.summary : "Public property input",
+				parameters = new List<CapabilityMethodParameterInfo>(),
+				returnType = "",
+				isStatic = false,
+				inspectorExposed = false,
+				tags = new List<string> { "public-property" }
+			});
+		}
+
+		return inputs
+			.GroupBy(input => input.kind + "|" + input.declaringType + "|" + input.name + "|" + input.valueType, StringComparer.OrdinalIgnoreCase)
+			.Select(group => group.First())
+			.OrderBy(input => input.name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	private List<CapabilityComponentInputInfo> BuildComponentInputs(SourceScriptInfo sourceInfo)
+	{
+		List<CapabilityComponentInputInfo> inputs = sourceInfo.methods
+			.Select(method => new CapabilityComponentInputInfo
+			{
+				name = method.name,
+				kind = "method",
+				valueType = method.parameters != null && method.parameters.Count == 1 ? method.parameters[0].type : "",
+				declaringType = sourceInfo.fullName,
+				description = method.summary,
+				parameters = method.parameters != null ? CloneMethodParameterList(method.parameters) : new List<CapabilityMethodParameterInfo>(),
+				returnType = string.IsNullOrWhiteSpace(method.returnType) ? "void" : method.returnType,
+				isStatic = method.isStatic,
+				inspectorExposed = false,
+				tags = new List<string> { "source" }
+			})
+			.ToList();
+
+		foreach (SourceFieldInfo field in sourceInfo.fields.Where(field => field.serialized && !IsSourceEventField(field) && !IsSimpleInspectorValueTypeName(field.type)))
+		{
+			inputs.Add(new CapabilityComponentInputInfo
+			{
+				name = field.name,
+				kind = "field",
+				valueType = field.type,
+				declaringType = sourceInfo.fullName,
+				description = field.summary,
+				parameters = new List<CapabilityMethodParameterInfo>(),
+				returnType = "",
+				isStatic = false,
+				inspectorExposed = true,
+				tags = new List<string> { "source", "inspector-field" }
+			});
+		}
+
+		return inputs
+			.GroupBy(input => input.kind + "|" + input.declaringType + "|" + input.name + "|" + input.valueType, StringComparer.OrdinalIgnoreCase)
+			.Select(group => group.First())
+			.OrderBy(input => input.name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	private List<CapabilityComponentOutputInfo> BuildComponentOutputs(Type type, SourceScriptInfo sourceInfo)
+	{
+		return BuildEventInfos(type, sourceInfo)
+			.Select(eventInfo => new CapabilityComponentOutputInfo
+			{
+				name = eventInfo.name,
+				kind = "event",
+				valueType = eventInfo.payloadType,
+				declaringType = eventInfo.declaringType,
+				description = eventInfo.description,
+				inspectorExposed = eventInfo.tags != null && eventInfo.tags.Contains("field-event"),
+				tags = eventInfo.tags != null ? new List<string>(eventInfo.tags) : new List<string>()
+			})
+			.ToList();
+	}
+
+	private List<CapabilityComponentOutputInfo> BuildComponentOutputs(SourceScriptInfo sourceInfo)
+	{
+		return BuildEventInfos(sourceInfo)
+			.Select(eventInfo => new CapabilityComponentOutputInfo
+			{
+				name = eventInfo.name,
+				kind = "event",
+				valueType = eventInfo.payloadType,
+				declaringType = eventInfo.declaringType,
+				description = eventInfo.description,
+				inspectorExposed = eventInfo.tags != null && eventInfo.tags.Contains("field-event"),
+				tags = eventInfo.tags != null ? new List<string>(eventInfo.tags) : new List<string>()
+			})
+			.ToList();
 	}
 
 	private List<CapabilityMethodInfo> BuildMethodInfos(Type type, SourceScriptInfo sourceInfo)
@@ -813,9 +1007,9 @@ public partial class ModuleExporter
 		Dictionary<string, SourceFieldInfo> sourceFieldMap = BuildSourceLookup(
 			sourceInfo != null ? sourceInfo.fields : null,
 			field => field.name);
-		foreach (FieldInfo field in GetSerializedFields(type))
+		foreach (FieldInfo field in GetInspectorFields(type))
 		{
-			if (IsEventFieldType(field.FieldType))
+			if (IsEventFieldType(field.FieldType) || !IsSimpleInspectorValueType(field.FieldType))
 			{
 				continue;
 			}
@@ -852,6 +1046,11 @@ public partial class ModuleExporter
 
 		foreach (PropertyInfo property in GetCapabilityProperties(type))
 		{
+			if (!IsSimpleInspectorValueType(property.PropertyType))
+			{
+				continue;
+			}
+
 			sourceFieldMap.TryGetValue(property.Name, out SourceFieldInfo sourceField);
 			string defaultValue = "";
 			if (instance != null && property.CanRead && property.GetIndexParameters().Length == 0)
@@ -889,7 +1088,7 @@ public partial class ModuleExporter
 	private List<CapabilityParameterInfo> BuildParameterInfos(SourceScriptInfo sourceInfo)
 	{
 		return sourceInfo.fields
-			.Where(field => field.serialized && !IsSourceEventField(field))
+			.Where(field => field.serialized && !IsSourceEventField(field) && IsSimpleInspectorValueTypeName(field.type))
 			.Select(field => new CapabilityParameterInfo
 			{
 				name = field.name,
@@ -917,28 +1116,8 @@ public partial class ModuleExporter
 			.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
 			.Where(property =>
 				property.GetIndexParameters().Length == 0 &&
-				property.GetGetMethod() != null &&
-				IsCapabilityPropertyType(property.PropertyType))
+				property.GetGetMethod() != null)
 			.OrderBy(property => property.Name, StringComparer.OrdinalIgnoreCase);
-	}
-
-	private bool IsCapabilityPropertyType(Type type)
-	{
-		if (type == null)
-		{
-			return false;
-		}
-
-		if (type.IsEnum || type.IsPrimitive || type == typeof(string) || type == typeof(decimal))
-		{
-			return true;
-		}
-
-		return type == typeof(Vector2) ||
-			type == typeof(Vector3) ||
-			type == typeof(Vector4) ||
-			type == typeof(Color) ||
-			type == typeof(GameObject);
 	}
 
 	private List<CapabilityConstraintInfo> BuildConstraintInfos(Type type)
@@ -1114,6 +1293,8 @@ public partial class ModuleExporter
 		existing.optionalComponents = DistinctStrings(existing.optionalComponents.Concat(component.optionalComponents ?? new List<string>()));
 		existing.allowedFeatures = DistinctStrings(existing.allowedFeatures.Concat(component.allowedFeatures ?? new List<string>()));
 		existing.tags = DistinctStrings(existing.tags.Concat(component.tags ?? new List<string>()));
+		MergeComponentInputs(existing.inputs, component.inputs);
+		MergeComponentOutputs(existing.outputs, component.outputs);
 		MergeMethods(existing.methods, component.methods);
 		MergeEvents(existing.events, component.events);
 		MergeParameters(existing.parameters, component.parameters);
@@ -1199,6 +1380,48 @@ public partial class ModuleExporter
 		target.AddRange(map.Values.OrderBy(method => method.declaringType).ThenBy(method => method.name));
 	}
 
+	private void MergeComponentInputs(List<CapabilityComponentInputInfo> target, List<CapabilityComponentInputInfo> source)
+	{
+		if (target == null || source == null)
+		{
+			return;
+		}
+
+		Dictionary<string, CapabilityComponentInputInfo> map = target.ToDictionary(
+			input => input.kind + "|" + input.declaringType + "|" + input.name + "|" + input.valueType,
+			input => input,
+			StringComparer.OrdinalIgnoreCase);
+
+		foreach (CapabilityComponentInputInfo input in source)
+		{
+			map[input.kind + "|" + input.declaringType + "|" + input.name + "|" + input.valueType] = CloneComponentInput(input);
+		}
+
+		target.Clear();
+		target.AddRange(map.Values.OrderBy(input => input.name, StringComparer.OrdinalIgnoreCase));
+	}
+
+	private void MergeComponentOutputs(List<CapabilityComponentOutputInfo> target, List<CapabilityComponentOutputInfo> source)
+	{
+		if (target == null || source == null)
+		{
+			return;
+		}
+
+		Dictionary<string, CapabilityComponentOutputInfo> map = target.ToDictionary(
+			output => output.kind + "|" + output.declaringType + "|" + output.name + "|" + output.valueType,
+			output => output,
+			StringComparer.OrdinalIgnoreCase);
+
+		foreach (CapabilityComponentOutputInfo output in source)
+		{
+			map[output.kind + "|" + output.declaringType + "|" + output.name + "|" + output.valueType] = CloneComponentOutput(output);
+		}
+
+		target.Clear();
+		target.AddRange(map.Values.OrderBy(output => output.name, StringComparer.OrdinalIgnoreCase));
+	}
+
 	private void MergeEvents(List<CapabilityEventInfo> target, List<CapabilityEventInfo> source)
 	{
 		if (target == null || source == null)
@@ -1251,6 +1474,15 @@ public partial class ModuleExporter
 				IsCapabilitySupportedFieldType(field.FieldType));
 	}
 
+	private static IEnumerable<FieldInfo> GetInspectorFields(Type type)
+	{
+		return type
+			.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+			.Where(field =>
+				!field.IsStatic &&
+				(field.IsPublic || field.GetCustomAttributes(typeof(SerializeField), true).Length > 0));
+	}
+
 	private static bool IsCapabilitySupportedFieldType(Type type)
 	{
 		return type.IsPrimitive ||
@@ -1260,6 +1492,63 @@ public partial class ModuleExporter
 			type == typeof(Vector3) ||
 			type == typeof(Vector4) ||
 			type == typeof(Color);
+	}
+
+	private static bool IsSimpleInspectorValueType(Type type)
+	{
+		if (type == null)
+		{
+			return false;
+		}
+
+		return type.IsPrimitive ||
+			type == typeof(string) ||
+			type.IsEnum ||
+			type == typeof(decimal) ||
+			type == typeof(Vector2) ||
+			type == typeof(Vector3) ||
+			type == typeof(Vector4) ||
+			type == typeof(Color);
+	}
+
+	private static bool IsSimpleInspectorValueTypeName(string typeName)
+	{
+		if (string.IsNullOrWhiteSpace(typeName))
+		{
+			return false;
+		}
+
+		string normalized = typeName.Trim();
+		int lastDot = normalized.LastIndexOf('.');
+		if (lastDot >= 0 && lastDot < normalized.Length - 1)
+		{
+			normalized = normalized.Substring(lastDot + 1);
+		}
+
+		switch (normalized)
+		{
+			case "bool":
+			case "byte":
+			case "sbyte":
+			case "short":
+			case "ushort":
+			case "int":
+			case "uint":
+			case "long":
+			case "ulong":
+			case "float":
+			case "double":
+			case "decimal":
+			case "char":
+			case "string":
+			case "Vector2":
+			case "Vector3":
+			case "Vector4":
+			case "Color":
+				return true;
+			default:
+				return false;
+		}
 	}
 
 	private static string GetFriendlyTypeName(Type type)
@@ -2530,6 +2819,27 @@ public partial class ModuleExporter
 			clone.requiredComponents = DistinctStrings(clone.requiredComponents);
 			clone.optionalComponents = DistinctStrings(clone.optionalComponents);
 			clone.allowedFeatures = DistinctStrings(clone.allowedFeatures);
+			clone.inputs = (clone.inputs ?? new List<CapabilityComponentInputInfo>())
+				.Where(input => input != null && !string.IsNullOrWhiteSpace(input.name))
+				.GroupBy(input => input.kind + "|" + input.declaringType + "|" + input.name + "|" + input.valueType, StringComparer.OrdinalIgnoreCase)
+				.Select(group => CloneComponentInput(group.First()))
+				.OrderBy(input => input.name, StringComparer.OrdinalIgnoreCase)
+				.ToList();
+			foreach (CapabilityComponentInputInfo input in clone.inputs)
+			{
+				input.parameters = input.parameters ?? new List<CapabilityMethodParameterInfo>();
+				input.tags = DistinctStrings(input.tags);
+			}
+			clone.outputs = (clone.outputs ?? new List<CapabilityComponentOutputInfo>())
+				.Where(output => output != null && !string.IsNullOrWhiteSpace(output.name))
+				.GroupBy(output => output.kind + "|" + output.declaringType + "|" + output.name + "|" + output.valueType, StringComparer.OrdinalIgnoreCase)
+				.Select(group => CloneComponentOutput(group.First()))
+				.OrderBy(output => output.name, StringComparer.OrdinalIgnoreCase)
+				.ToList();
+			foreach (CapabilityComponentOutputInfo output in clone.outputs)
+			{
+				output.tags = DistinctStrings(output.tags);
+			}
 			clone.methods = (clone.methods ?? new List<CapabilityMethodInfo>())
 				.Where(method => method != null && !string.IsNullOrWhiteSpace(method.name) && !string.IsNullOrWhiteSpace(method.declaringType))
 				.GroupBy(method => method.declaringType + "." + method.name + "(" + string.Join(",", (method.parameters ?? new List<CapabilityMethodParameterInfo>()).Select(parameter => parameter.type + ":" + parameter.name)) + ")", StringComparer.OrdinalIgnoreCase)
@@ -2678,6 +2988,16 @@ public partial class ModuleExporter
 	private static CapabilityParameterInfo CloneParameter(CapabilityParameterInfo source)
 	{
 		return source == null ? new CapabilityParameterInfo() : JsonUtility.FromJson<CapabilityParameterInfo>(JsonUtility.ToJson(source)) ?? new CapabilityParameterInfo();
+	}
+
+	private static CapabilityComponentInputInfo CloneComponentInput(CapabilityComponentInputInfo source)
+	{
+		return source == null ? new CapabilityComponentInputInfo() : JsonUtility.FromJson<CapabilityComponentInputInfo>(JsonUtility.ToJson(source)) ?? new CapabilityComponentInputInfo();
+	}
+
+	private static CapabilityComponentOutputInfo CloneComponentOutput(CapabilityComponentOutputInfo source)
+	{
+		return source == null ? new CapabilityComponentOutputInfo() : JsonUtility.FromJson<CapabilityComponentOutputInfo>(JsonUtility.ToJson(source)) ?? new CapabilityComponentOutputInfo();
 	}
 
 	private static UnityCapabilityComponentInfo CloneUnityComponent(UnityCapabilityComponentInfo source)
