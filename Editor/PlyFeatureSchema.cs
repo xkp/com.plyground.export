@@ -98,8 +98,10 @@ public class PlyFeaturePortMapping
 public class PlyFeatureParameterMapping
 {
     public string name = "";
+    public string direction = "parameter";
     public PlyFeatureDataType type = PlyFeatureDataType.Any;
     public string defaultValue = "";
+    public PlyFeatureParameterAccess accessMode = PlyFeatureParameterAccess.ReadWrite;
     public PlyFeatureBinding binding = new PlyFeatureBinding();
 }
 
@@ -109,6 +111,8 @@ public class PlyFeatureBinding
     public string componentType = "";
     public PlyFeatureMemberKind memberKind = PlyFeatureMemberKind.Method;
     public string memberName = "";
+    public string memberSignature = "";
+    public string conversion = "";
     public bool isStatic;
     public PlyFeatureParameterAccess access = PlyFeatureParameterAccess.ReadWrite;
 }
@@ -220,6 +224,7 @@ public static class PlyFeatureSchemaUtility
             }
 
             parameter.name = parameter.name ?? "";
+            parameter.direction = string.IsNullOrWhiteSpace(parameter.direction) ? "parameter" : parameter.direction;
             parameter.defaultValue = parameter.defaultValue ?? "";
             parameter.binding = NormalizeBinding(parameter.binding);
         }
@@ -232,6 +237,8 @@ public static class PlyFeatureSchemaUtility
         binding = binding ?? new PlyFeatureBinding();
         binding.componentType = binding.componentType ?? "";
         binding.memberName = binding.memberName ?? "";
+        binding.memberSignature = binding.memberSignature ?? "";
+        binding.conversion = binding.conversion ?? "";
         return binding;
     }
 

@@ -74,8 +74,10 @@ public static class PlyFeatureJson
                 PlyFeatureParameterMapping parameter = new PlyFeatureParameterMapping
                 {
                     name = ReadString(parameterObject, "name", ""),
+                    direction = ReadString(parameterObject, "direction", "parameter"),
                     type = ReadEnum(ReadString(parameterObject, "type", "any"), PlyFeatureDataType.Any),
                     defaultValue = ReadScalarAsString(parameterObject, "defaultValue"),
+                    accessMode = ReadEnum(ReadString(parameterObject, "accessMode", "readWrite"), PlyFeatureParameterAccess.ReadWrite),
                     binding = ReadBinding(parameterObject)
                 };
                 feature.parameters.Add(parameter);
@@ -118,6 +120,8 @@ public static class PlyFeatureJson
             componentType = ReadString(bindingObject, "componentType", ""),
             memberKind = ReadEnum(ReadString(bindingObject, "memberKind", "method"), PlyFeatureMemberKind.Method),
             memberName = ReadString(bindingObject, "memberName", ""),
+            memberSignature = ReadString(bindingObject, "memberSignature", ""),
+            conversion = ReadString(bindingObject, "conversion", ""),
             isStatic = ReadBool(bindingObject, "isStatic", false),
             access = ReadEnum(ReadString(bindingObject, "access", "readWrite"), PlyFeatureParameterAccess.ReadWrite)
         };
@@ -389,8 +393,10 @@ public static class PlyFeatureJson
                 Indent(builder, indent + 1);
                 builder.AppendLine("{");
                 WriteProperty(builder, indent + 2, "name", parameter.name, true);
+                WriteProperty(builder, indent + 2, "direction", parameter.direction, true);
                 WriteProperty(builder, indent + 2, "type", ToCamelCase(parameter.type), true);
                 WriteScalarProperty(builder, indent + 2, "defaultValue", parameter.defaultValue, true);
+                WriteProperty(builder, indent + 2, "accessMode", ToCamelCase(parameter.accessMode), true);
                 WriteBinding(builder, indent + 2, parameter.binding, false);
                 Indent(builder, indent + 1);
                 builder.Append("}");
@@ -422,6 +428,8 @@ public static class PlyFeatureJson
         WriteProperty(builder, indent + 1, "componentType", binding.componentType, true);
         WriteProperty(builder, indent + 1, "memberKind", ToCamelCase(binding.memberKind), true);
         WriteProperty(builder, indent + 1, "memberName", binding.memberName, true);
+        WriteProperty(builder, indent + 1, "memberSignature", binding.memberSignature, true);
+        WriteProperty(builder, indent + 1, "conversion", binding.conversion, true);
         WriteBoolProperty(builder, indent + 1, "isStatic", binding.isStatic, true);
         WriteProperty(builder, indent + 1, "access", ToCamelCase(binding.access), false);
         Indent(builder, indent);
