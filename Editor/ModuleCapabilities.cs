@@ -31,6 +31,7 @@ public partial class ModuleExporter
 	{
 		public string manifestVersion = CapabilityManifestVersion;
 		public CapabilityModuleInfo module = new CapabilityModuleInfo();
+		public PlyFeatureManifest features = new PlyFeatureManifest();
 		[NonSerialized]
 		public List<CapabilityTypeInfo> types = new List<CapabilityTypeInfo>();
 		[NonSerialized]
@@ -300,6 +301,7 @@ public partial class ModuleExporter
 	private void PrepareCapabilitiesForPersistence()
 	{
 		moduleCapabilities ??= new CapabilityManifest();
+		moduleCapabilities.features = PrepareFeatureManifestForPersistence();
 
 		PopulateCapabilityModuleMetadata(moduleCapabilities);
 		StripNonPersistedModuleCapabilityData(moduleCapabilities);
@@ -2397,6 +2399,7 @@ public partial class ModuleExporter
 		}
 
 		capabilities.module ??= new CapabilityModuleInfo();
+		capabilities.features = PlyFeatureSchemaUtility.NormalizeManifest(capabilities.features);
 		capabilities.unity ??= new CapabilityUnityInfo();
 		capabilities.exportInfo ??= new CapabilityExportInfo();
 		capabilities.types = NormalizeTypes(capabilities.types);

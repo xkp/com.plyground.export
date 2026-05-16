@@ -49,7 +49,7 @@ public partial class ModuleExporter : EditorWindow
 
 	private List<Property> moduleProperties = new List<Property>();
 	private CapabilityManifest moduleCapabilities = new CapabilityManifest();
-	private object featureManifest;
+	private PlyFeatureManifest featureManifest = new PlyFeatureManifest();
 	private List<string> capabilitySourceScriptPaths = new List<string>();
 
 	[System.Serializable]
@@ -202,7 +202,7 @@ public partial class ModuleExporter : EditorWindow
 		moduleCapabilities = CloneModuleCapabilities(mod.capabilities);
 		PopulateCapabilityModuleMetadata(moduleCapabilities);
 		NormalizeModuleCapabilities(moduleCapabilities);
-		featureManifest = LoadFeatureManifestFromModule(mod);
+		featureManifest = LoadFeatureManifestFromCapabilities(moduleCapabilities);
 		PrepareFeatureManifestForPersistence().moduleId = moduleId ?? "";
 
 		dependencies.Clear();
@@ -277,6 +277,7 @@ public partial class ModuleExporter : EditorWindow
 			PopulateCapabilityModuleMetadata(moduleCapabilities);
 			NormalizeModuleCapabilities(moduleCapabilities);
 		}
+		featureManifest = LoadFeatureManifestFromCapabilities(moduleCapabilities);
 
 
 		UpdateAssets();
@@ -404,7 +405,6 @@ public partial class ModuleExporter : EditorWindow
 		mod.moduleProperties = new List<Property>(moduleProperties);
 		PrepareCapabilitiesForPersistence();
 		mod.capabilities = CloneModuleCapabilities(moduleCapabilities);
-		mod.featuresJson = PlyFeatureJson.Export(PrepareFeatureManifestForPersistence());
 
 		mod.itemGroups = new List<ExportedGroup>();
 		foreach (var group in itemGroups)
@@ -709,17 +709,21 @@ public partial class ModuleExporter : EditorWindow
 		public List<ExportedGroup> itemGroups;
 		public List<Property> moduleProperties;
 		public CapabilityManifest capabilities;
-		public string featuresJson;
 	}
 
-	private object LoadFeatureManifestFromModule(ExportedModule mod)
+	private PlyFeatureManifest LoadFeatureManifestFromCapabilities(CapabilityManifest capabilities)
 	{
-		if (mod == null || string.IsNullOrWhiteSpace(mod.featuresJson))
+		if (capabilities == null || capabilities.features == null)
 		{
-			return null;
+			return new PlyFeatureManifest
+			{
+				moduleId = moduleId ?? ""
+			};
 		}
 
-		return PlyFeatureJson.Import(mod.featuresJson);
+		PlyFeatureManifest manifest = PlyFeatureSchemaUtility.NormalizeManifest(capabilities.features);
+		manifest.moduleId = string.IsNullOrWhiteSpace(manifest.moduleId) ? moduleId ?? "" : manifest.moduleId;
+		return manifest;
 	}
 
 	[System.Serializable]

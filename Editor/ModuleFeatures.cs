@@ -54,9 +54,9 @@ public partial class ModuleExporter
     {
         get
         {
-            if (featureManifest is PlyFeatureManifest manifest)
+            if (featureManifest != null)
             {
-                return manifest;
+                return featureManifest;
             }
 
             PlyFeatureManifest created = new PlyFeatureManifest();
