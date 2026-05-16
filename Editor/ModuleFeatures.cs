@@ -80,6 +80,7 @@ public partial class ModuleExporter
     private string cachedComponentSearchTerm = "";
     private bool cachedIncludeLifecycleMethods;
     private string cachedSnapshotVersion = "";
+    private string cachedCapabilityComponentSignature = "";
     private readonly Dictionary<string, List<CompatibleMemberOption>> compatibleOptionsCache = new Dictionary<string, List<CompatibleMemberOption>>(StringComparer.Ordinal);
 
     private void InitializeFeatureManifest()
@@ -230,6 +231,12 @@ public partial class ModuleExporter
 
     private void DrawFeatureImplementationEditor(AvailableFeatureDefinition definition, PlyFeatureProfile profile)
     {
+        if (GetSelectedCapabilityComponents().Count == 0)
+        {
+            EditorGUILayout.HelpBox("No components are selected in Capabilities > Components. Add module components there before creating feature mappings.", MessageType.Info);
+            return;
+        }
+
         if (profile == null)
         {
             EditorGUILayout.HelpBox("This feature has not been mapped in the current module yet.", MessageType.Info);
@@ -1085,10 +1092,12 @@ public partial class ModuleExporter
             return;
         }
 
-        PlyFeatureComponentDescriptor component = PlyFeatureTypeCache.FindComponent(binding.componentType);
+        PlyFeatureComponentDescriptor component = GetProjectFeatureComponents("")
+            .FirstOrDefault(entry => string.Equals(entry.typeName, binding.componentType, StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(entry.fullName, binding.componentType, StringComparison.OrdinalIgnoreCase));
         if (component == null)
         {
-            issues.Add(CreateIssue("error", path, "Selected component type does not exist."));
+            issues.Add(CreateIssue("error", path, "Selected component type is not available in Capabilities > Components."));
             return;
         }
 
@@ -1186,14 +1195,17 @@ public partial class ModuleExporter
     private void EnsureFeatureEditorCacheState()
     {
         string snapshotVersion = PlyFeatureTypeCache.Snapshot.generatedAtUtc ?? "";
+        string capabilityComponentSignature = GetSelectedCapabilityComponentSignature();
         if (!string.Equals(cachedComponentSearchTerm, componentSearchTerm ?? "", StringComparison.Ordinal) ||
             cachedIncludeLifecycleMethods != includeLifecycleMethods ||
-            !string.Equals(cachedSnapshotVersion, snapshotVersion, StringComparison.Ordinal))
+            !string.Equals(cachedSnapshotVersion, snapshotVersion, StringComparison.Ordinal) ||
+            !string.Equals(cachedCapabilityComponentSignature, capabilityComponentSignature, StringComparison.Ordinal))
         {
             InvalidateFeatureEditorCaches();
             cachedComponentSearchTerm = componentSearchTerm ?? "";
             cachedIncludeLifecycleMethods = includeLifecycleMethods;
             cachedSnapshotVersion = snapshotVersion;
+            cachedCapabilityComponentSignature = capabilityComponentSignature;
         }
     }
 
@@ -1205,7 +1217,33 @@ public partial class ModuleExporter
 
     private List<PlyFeatureComponentDescriptor> GetProjectFeatureComponents(string searchTerm)
     {
-        IEnumerable<PlyFeatureComponentDescriptor> query = PlyFeatureTypeCache.Snapshot.components ?? new List<PlyFeatureComponentDescriptor>();
+        Dictionary<string, PlyFeatureComponentDescriptor> availableByKey = (PlyFeatureTypeCache.Snapshot.components ?? new List<PlyFeatureComponentDescriptor>())
+            .GroupBy(component => component.fullName ?? component.typeName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
+
+        List<PlyFeatureComponentDescriptor> curated = new List<PlyFeatureComponentDescriptor>();
+        foreach (UnityCapabilityComponentInfo selectedComponent in GetSelectedCapabilityComponents())
+        {
+            string preferredKey = !string.IsNullOrWhiteSpace(selectedComponent.typeName)
+                ? selectedComponent.typeName
+                : selectedComponent.componentId;
+            if (!string.IsNullOrWhiteSpace(preferredKey) && availableByKey.TryGetValue(preferredKey, out PlyFeatureComponentDescriptor exactMatch))
+            {
+                curated.Add(exactMatch);
+                continue;
+            }
+
+            PlyFeatureComponentDescriptor fallback = PlyFeatureTypeCache.FindComponent(selectedComponent.typeName)
+                ?? PlyFeatureTypeCache.FindComponent(selectedComponent.componentId);
+            if (fallback != null)
+            {
+                curated.Add(fallback);
+            }
+        }
+
+        IEnumerable<PlyFeatureComponentDescriptor> query = curated
+            .GroupBy(component => component.fullName ?? component.typeName, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First());
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
             string needle = searchTerm.Trim();
@@ -1216,6 +1254,25 @@ public partial class ModuleExporter
         }
 
         return query.OrderBy(component => component.typeName, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private List<UnityCapabilityComponentInfo> GetSelectedCapabilityComponents()
+    {
+        moduleCapabilities ??= new CapabilityManifest();
+        moduleCapabilities.unity ??= new CapabilityUnityInfo();
+        return (moduleCapabilities.unity.components ?? new List<UnityCapabilityComponentInfo>())
+            .Where(component =>
+                component != null &&
+                (!string.IsNullOrWhiteSpace(component.typeName) || !string.IsNullOrWhiteSpace(component.componentId)))
+            .ToList();
+    }
+
+    private string GetSelectedCapabilityComponentSignature()
+    {
+        return string.Join("|", GetSelectedCapabilityComponents()
+            .Select(component => (component.typeName ?? "").Trim() + "::" + (component.componentId ?? "").Trim())
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToArray());
     }
 
     private Type ResolveComponentType(PlyFeatureComponentDescriptor descriptor)
