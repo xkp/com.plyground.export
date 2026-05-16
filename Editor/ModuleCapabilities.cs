@@ -547,8 +547,8 @@ public partial class ModuleExporter
 			attachTarget = "self",
 			description = sourceInfo != null && !string.IsNullOrWhiteSpace(sourceInfo.summary) ? sourceInfo.summary : "Component inferred from Assets/ script",
 			requiredComponents = BuildRequiredComponentNames(componentType),
-			methods = new List<CapabilityMethodInfo>(),
-			events = new List<CapabilityEventInfo>(),
+			methods = BuildMethodInfos(componentType, sourceInfo),
+			events = BuildEventInfos(componentType, sourceInfo),
 			parameters = BuildParameterInfos(componentType, instance, sourceInfo),
 			tags = DistinctStrings(new[] { "component-first", "unity-exporter" }),
 			codegenAllowed = true,
@@ -568,8 +568,8 @@ public partial class ModuleExporter
 			attachTarget = "self",
 			description = sourceInfo.summary,
 			requiredComponents = new List<string>(),
-			methods = new List<CapabilityMethodInfo>(),
-			events = new List<CapabilityEventInfo>(),
+			methods = BuildMethodInfos(sourceInfo),
+			events = BuildEventInfos(sourceInfo),
 			parameters = BuildParameterInfos(sourceInfo),
 			tags = DistinctStrings(new[] { "component-first", "unity-exporter", "source-derived" }),
 			codegenAllowed = true,
@@ -809,9 +809,47 @@ public partial class ModuleExporter
 	private List<CapabilityParameterInfo> BuildParameterInfos(Type type, Component instance, SourceScriptInfo sourceInfo)
 	{
 		List<CapabilityParameterInfo> parameters = new List<CapabilityParameterInfo>();
+		Dictionary<string, CapabilityParameterInfo> parameterMap = new Dictionary<string, CapabilityParameterInfo>(StringComparer.OrdinalIgnoreCase);
 		Dictionary<string, SourceFieldInfo> sourceFieldMap = BuildSourceLookup(
 			sourceInfo != null ? sourceInfo.fields : null,
 			field => field.name);
+		foreach (FieldInfo field in GetSerializedFields(type))
+		{
+			if (IsEventFieldType(field.FieldType))
+			{
+				continue;
+			}
+
+			sourceFieldMap.TryGetValue(field.Name, out SourceFieldInfo sourceField);
+			string defaultValue = "";
+			if (instance != null)
+			{
+				try
+				{
+					object value = field.GetValue(instance);
+					defaultValue = value != null ? value.ToString() : "";
+				}
+				catch
+				{
+					defaultValue = "";
+				}
+			}
+
+			parameterMap["field|" + field.Name] = new CapabilityParameterInfo
+			{
+				name = field.Name,
+				type = GetFriendlyTypeName(field.FieldType),
+				required = !field.IsInitOnly,
+				@default = defaultValue,
+				description = sourceField != null && !string.IsNullOrWhiteSpace(sourceField.summary) ? sourceField.summary : "Serialized field",
+				moduleScoped = false,
+				featureId = "field:" + type.Name + "." + field.Name,
+				enumValues = field.FieldType.IsEnum ? Enum.GetNames(field.FieldType).ToList() : new List<string>(),
+				tags = new List<string> { "serialized-field" },
+				userEditable = !field.IsInitOnly
+			};
+		}
+
 		foreach (PropertyInfo property in GetCapabilityProperties(type))
 		{
 			sourceFieldMap.TryGetValue(property.Name, out SourceFieldInfo sourceField);
@@ -829,7 +867,7 @@ public partial class ModuleExporter
 				}
 			}
 
-			parameters.Add(new CapabilityParameterInfo
+			parameterMap["property|" + property.Name] = new CapabilityParameterInfo
 			{
 				name = property.Name,
 				type = GetFriendlyTypeName(property.PropertyType),
@@ -841,9 +879,10 @@ public partial class ModuleExporter
 				enumValues = property.PropertyType.IsEnum ? Enum.GetNames(property.PropertyType).ToList() : new List<string>(),
 				tags = new List<string> { "public-property" },
 				userEditable = property.CanWrite
-			});
+			};
 		}
 
+		parameters.AddRange(parameterMap.Values.OrderBy(parameter => parameter.name, StringComparer.OrdinalIgnoreCase));
 		return parameters;
 	}
 
@@ -2490,9 +2529,29 @@ public partial class ModuleExporter
 			UnityCapabilityComponentInfo clone = CloneUnityComponent(component);
 			clone.requiredComponents = DistinctStrings(clone.requiredComponents);
 			clone.optionalComponents = DistinctStrings(clone.optionalComponents);
-			clone.allowedFeatures = new List<string>();
-			clone.methods = new List<CapabilityMethodInfo>();
-			clone.events = new List<CapabilityEventInfo>();
+			clone.allowedFeatures = DistinctStrings(clone.allowedFeatures);
+			clone.methods = (clone.methods ?? new List<CapabilityMethodInfo>())
+				.Where(method => method != null && !string.IsNullOrWhiteSpace(method.name) && !string.IsNullOrWhiteSpace(method.declaringType))
+				.GroupBy(method => method.declaringType + "." + method.name + "(" + string.Join(",", (method.parameters ?? new List<CapabilityMethodParameterInfo>()).Select(parameter => parameter.type + ":" + parameter.name)) + ")", StringComparer.OrdinalIgnoreCase)
+				.Select(group => CloneMethod(group.First()))
+				.OrderBy(method => method.name, StringComparer.OrdinalIgnoreCase)
+				.ToList();
+			foreach (CapabilityMethodInfo method in clone.methods)
+			{
+				method.parameters = method.parameters ?? new List<CapabilityMethodParameterInfo>();
+				method.constraints = DistinctStrings(method.constraints);
+				method.tags = DistinctStrings(method.tags);
+			}
+			clone.events = (clone.events ?? new List<CapabilityEventInfo>())
+				.Where(eventInfo => eventInfo != null && !string.IsNullOrWhiteSpace(eventInfo.name) && !string.IsNullOrWhiteSpace(eventInfo.declaringType))
+				.GroupBy(eventInfo => eventInfo.declaringType + "." + eventInfo.name, StringComparer.OrdinalIgnoreCase)
+				.Select(group => CloneEvent(group.First()))
+				.OrderBy(eventInfo => eventInfo.name, StringComparer.OrdinalIgnoreCase)
+				.ToList();
+			foreach (CapabilityEventInfo eventInfo in clone.events)
+			{
+				eventInfo.tags = DistinctStrings(eventInfo.tags);
+			}
 			clone.parameters = (clone.parameters ?? new List<CapabilityParameterInfo>())
 				.Where(parameter => parameter != null && !string.IsNullOrWhiteSpace(parameter.name))
 				.OrderBy(parameter => parameter.name, StringComparer.OrdinalIgnoreCase)
