@@ -159,6 +159,7 @@ public partial class ModuleExporter
 		public bool moduleScoped;
 		public string featureId = "";
 		public List<string> tags = new List<string>();
+		public bool userEditable = true;
 	}
 
 	[Serializable]
@@ -198,6 +199,7 @@ public partial class ModuleExporter
 		public List<CapabilityParameterInfo> parameters = new List<CapabilityParameterInfo>();
 		public List<string> tags = new List<string>();
 		public bool codegenAllowed = true;
+		public bool userEditable;
 	}
 
 	[Serializable]
@@ -543,37 +545,14 @@ public partial class ModuleExporter
 			attachTarget = "self",
 			description = sourceInfo != null && !string.IsNullOrWhiteSpace(sourceInfo.summary) ? sourceInfo.summary : "Component inferred from Assets/ script",
 			requiredComponents = BuildRequiredComponentNames(componentType),
-			methods = BuildMethodInfos(componentType, sourceInfo),
-			events = BuildEventInfos(componentType, sourceInfo),
+			methods = new List<CapabilityMethodInfo>(),
+			events = new List<CapabilityEventInfo>(),
 			parameters = BuildParameterInfos(componentType, instance, sourceInfo),
 			tags = DistinctStrings(new[] { "component-first", "unity-exporter" }),
-			codegenAllowed = true
+			codegenAllowed = true,
+			userEditable = false
 		};
-
-		HashSet<string> allowedFeatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-		{
-			"component:" + componentType.Name
-		};
-
-		foreach (MethodInfo method in componentType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
-		{
-			if (Array.IndexOf(UnityCallbackNames, method.Name) >= 0)
-			{
-				allowedFeatures.Add("callback:" + method.Name);
-			}
-		}
-
-		foreach (FieldInfo field in GetSerializedFields(componentType))
-		{
-			if (IsEventFieldType(field.FieldType))
-			{
-				continue;
-			}
-
-			allowedFeatures.Add("serialized-field:" + componentType.Name + "." + field.Name);
-		}
-
-		componentInfo.allowedFeatures = allowedFeatures.OrderBy(value => value).ToList();
+		componentInfo.allowedFeatures = new List<string>();
 		return componentInfo;
 	}
 
@@ -587,12 +566,13 @@ public partial class ModuleExporter
 			attachTarget = "self",
 			description = sourceInfo.summary,
 			requiredComponents = new List<string>(),
-			methods = BuildMethodInfos(sourceInfo),
-			events = BuildEventInfos(sourceInfo),
+			methods = new List<CapabilityMethodInfo>(),
+			events = new List<CapabilityEventInfo>(),
 			parameters = BuildParameterInfos(sourceInfo),
 			tags = DistinctStrings(new[] { "component-first", "unity-exporter", "source-derived" }),
 			codegenAllowed = true,
-			allowedFeatures = BuildAllowedFeatures(sourceInfo)
+			allowedFeatures = new List<string>(),
+			userEditable = false
 		};
 
 		return componentInfo;
@@ -830,25 +810,35 @@ public partial class ModuleExporter
 		Dictionary<string, SourceFieldInfo> sourceFieldMap = BuildSourceLookup(
 			sourceInfo != null ? sourceInfo.fields : null,
 			field => field.name);
-		foreach (FieldInfo field in GetSerializedFields(type))
+		foreach (PropertyInfo property in GetCapabilityProperties(type))
 		{
-			if (IsEventFieldType(field.FieldType))
+			sourceFieldMap.TryGetValue(property.Name, out SourceFieldInfo sourceField);
+			string defaultValue = "";
+			if (instance != null && property.CanRead && property.GetIndexParameters().Length == 0)
 			{
-				continue;
+				try
+				{
+					object value = property.GetValue(instance, null);
+					defaultValue = value != null ? value.ToString() : "";
+				}
+				catch
+				{
+					defaultValue = "";
+				}
 			}
 
-			sourceFieldMap.TryGetValue(field.Name, out SourceFieldInfo sourceField);
 			parameters.Add(new CapabilityParameterInfo
 			{
-				name = field.Name,
-				type = GetFriendlyTypeName(field.FieldType),
-				required = false,
-				@default = instance != null && field.GetValue(instance) != null ? field.GetValue(instance).ToString() : "",
-				description = sourceField != null && !string.IsNullOrWhiteSpace(sourceField.summary) ? sourceField.summary : "Serialized field",
+				name = property.Name,
+				type = GetFriendlyTypeName(property.PropertyType),
+				required = property.CanWrite,
+				@default = defaultValue,
+				description = sourceField != null && !string.IsNullOrWhiteSpace(sourceField.summary) ? sourceField.summary : "Public property",
 				moduleScoped = false,
-				featureId = "serialized-field:" + type.Name + "." + field.Name,
-				enumValues = field.FieldType.IsEnum ? Enum.GetNames(field.FieldType).ToList() : new List<string>(),
-				tags = new List<string> { "serialized-field" }
+				featureId = "public-property:" + type.Name + "." + property.Name,
+				enumValues = property.PropertyType.IsEnum ? Enum.GetNames(property.PropertyType).ToList() : new List<string>(),
+				tags = new List<string> { "public-property" },
+				userEditable = property.CanWrite
 			});
 		}
 
@@ -867,11 +857,47 @@ public partial class ModuleExporter
 				@default = "",
 				description = field.summary,
 				moduleScoped = false,
-				featureId = "serialized-field:" + sourceInfo.className + "." + field.name,
+				featureId = "public-property:" + sourceInfo.className + "." + field.name,
 				enumValues = new List<string>(),
-				tags = new List<string> { "source" }
+				tags = new List<string> { "source" },
+				userEditable = true
 			})
 			.ToList();
+	}
+
+	private IEnumerable<PropertyInfo> GetCapabilityProperties(Type type)
+	{
+		if (type == null)
+		{
+			return Enumerable.Empty<PropertyInfo>();
+		}
+
+		return type
+			.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
+			.Where(property =>
+				property.GetIndexParameters().Length == 0 &&
+				property.GetGetMethod() != null &&
+				IsCapabilityPropertyType(property.PropertyType))
+			.OrderBy(property => property.Name, StringComparer.OrdinalIgnoreCase);
+	}
+
+	private bool IsCapabilityPropertyType(Type type)
+	{
+		if (type == null)
+		{
+			return false;
+		}
+
+		if (type.IsEnum || type.IsPrimitive || type == typeof(string) || type == typeof(decimal))
+		{
+			return true;
+		}
+
+		return type == typeof(Vector2) ||
+			type == typeof(Vector3) ||
+			type == typeof(Vector4) ||
+			type == typeof(Color) ||
+			type == typeof(GameObject);
 	}
 
 	private List<CapabilityConstraintInfo> BuildConstraintInfos(Type type)
@@ -2461,7 +2487,18 @@ public partial class ModuleExporter
 			UnityCapabilityComponentInfo clone = CloneUnityComponent(component);
 			clone.requiredComponents = DistinctStrings(clone.requiredComponents);
 			clone.optionalComponents = DistinctStrings(clone.optionalComponents);
-			clone.allowedFeatures = DistinctStrings(clone.allowedFeatures);
+			clone.allowedFeatures = new List<string>();
+			clone.methods = new List<CapabilityMethodInfo>();
+			clone.events = new List<CapabilityEventInfo>();
+			clone.parameters = (clone.parameters ?? new List<CapabilityParameterInfo>())
+				.Where(parameter => parameter != null && !string.IsNullOrWhiteSpace(parameter.name))
+				.OrderBy(parameter => parameter.name, StringComparer.OrdinalIgnoreCase)
+				.ToList();
+			foreach (CapabilityParameterInfo parameter in clone.parameters)
+			{
+				parameter.enumValues = DistinctStrings(parameter.enumValues);
+				parameter.tags = DistinctStrings(parameter.tags);
+			}
 			clone.tags = DistinctStrings(clone.tags);
 			map[clone.componentId] = clone;
 		}

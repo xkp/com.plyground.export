@@ -17,6 +17,14 @@ public partial class ModuleExporter
 	}
 
 	private readonly string[] topTabs = { "Overview", "Files", "Items", "Capabilities", "Export" };
+	private enum CapabilityWorkspaceTab
+	{
+		Components,
+		Features
+	}
+
+	private readonly string[] capabilityTabs = { "Components", "Features" };
+	private CapabilityWorkspaceTab activeCapabilityTab;
 
 	private ModuleEditorTab activeTab;
 	private Vector2 _assetScroll;
@@ -1031,6 +1039,8 @@ public partial class ModuleExporter
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.Space(6f);
+		activeCapabilityTab = (CapabilityWorkspaceTab)GUILayout.Toolbar((int)activeCapabilityTab, capabilityTabs);
+		EditorGUILayout.Space(6f);
 		DrawModuleCapabilityManifestEditor();
 	}
 
@@ -1101,9 +1111,15 @@ public partial class ModuleExporter
 			EndCapabilitySection();
 		}
 
-		if (BeginCapabilitySection("manifest-components", "Components"))
+		if (activeCapabilityTab == CapabilityWorkspaceTab.Components && BeginCapabilitySection("manifest-components", "Components"))
 		{
 			DrawComponentBrowser(moduleCapabilities.unity.components);
+			EndCapabilitySection();
+		}
+
+		if (activeCapabilityTab == CapabilityWorkspaceTab.Features && BeginCapabilitySection("manifest-features", "Features"))
+		{
+			DrawFeaturesTab();
 			EndCapabilitySection();
 		}
 
@@ -1181,23 +1197,11 @@ public partial class ModuleExporter
 
 		selectedComponentIndex = Mathf.Clamp(selectedComponentIndex < 0 ? 0 : selectedComponentIndex, 0, components.Count - 1);
 		UnityCapabilityComponentInfo selectedComponent = components[selectedComponentIndex];
-		selectedComponent.methods ??= new List<CapabilityMethodInfo>();
-		selectedComponent.events ??= new List<CapabilityEventInfo>();
 		selectedComponent.parameters ??= new List<CapabilityParameterInfo>();
 		selectedComponent.requiredComponents ??= new List<string>();
 		selectedComponent.optionalComponents ??= new List<string>();
-		selectedComponent.allowedFeatures ??= new List<string>();
 		selectedComponent.tags ??= new List<string>();
-
-		List<ComponentArtifactEntry> artifacts = BuildComponentArtifacts(selectedComponent);
-		if (artifacts.Count == 0)
-		{
-			selectedComponentArtifactIndex = -1;
-		}
-		else
-		{
-			selectedComponentArtifactIndex = Mathf.Clamp(selectedComponentArtifactIndex < 0 ? 0 : selectedComponentArtifactIndex, 0, artifacts.Count - 1);
-		}
+		selectedComponentArtifactIndex = Mathf.Clamp(selectedComponentArtifactIndex, -1, Mathf.Max(-1, selectedComponent.parameters.Count - 1));
 
 		EditorGUILayout.BeginHorizontal();
 
@@ -1212,45 +1216,33 @@ public partial class ModuleExporter
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(artifactListWidth));
-		GUILayout.Label("Artifacts", EditorStyles.boldLabel);
+		GUILayout.Label("Public Properties", EditorStyles.boldLabel);
 		EditorGUILayout.BeginHorizontal();
-		if (GUILayout.Button("Add Method", GUILayout.Width(90f)))
+		if (GUILayout.Button("Add Property", GUILayout.Width(100f)))
 		{
-			selectedComponent.methods.Add(new CapabilityMethodInfo
+			selectedComponent.parameters.Add(new CapabilityParameterInfo
 			{
-				declaringType = selectedComponent.typeName
+				name = "NewProperty",
+				type = "string",
+				description = "User-defined public property",
+				userEditable = true
 			});
-			artifacts = BuildComponentArtifacts(selectedComponent);
-			selectedComponentArtifactIndex = artifacts.FindIndex(artifact => artifact.kind == ComponentArtifactKind.Method && artifact.method == selectedComponent.methods.Last());
-		}
-		if (GUILayout.Button("Add Event", GUILayout.Width(90f)))
-		{
-			selectedComponent.events.Add(new CapabilityEventInfo
-			{
-				declaringType = selectedComponent.typeName
-			});
-			artifacts = BuildComponentArtifacts(selectedComponent);
-			selectedComponentArtifactIndex = artifacts.FindIndex(artifact => artifact.kind == ComponentArtifactKind.Event && artifact.eventInfo == selectedComponent.events.Last());
-		}
-		if (GUILayout.Button("Add Field", GUILayout.Width(90f)))
-		{
-			selectedComponent.parameters.Add(new CapabilityParameterInfo());
-			artifacts = BuildComponentArtifacts(selectedComponent);
-			selectedComponentArtifactIndex = artifacts.FindIndex(artifact => artifact.kind == ComponentArtifactKind.Parameter && artifact.parameter == selectedComponent.parameters.Last());
+			selectedComponentArtifactIndex = selectedComponent.parameters.Count - 1;
 		}
 		EditorGUILayout.EndHorizontal();
 
-		if (artifacts.Count == 0)
+		if (selectedComponent.parameters.Count == 0)
 		{
-			EditorGUILayout.LabelField("No artifacts", EditorStyles.miniLabel);
+			EditorGUILayout.LabelField("No public properties", EditorStyles.miniLabel);
 		}
 		else
 		{
 			componentArtifactScroll = EditorGUILayout.BeginScrollView(componentArtifactScroll, GUILayout.ExpandHeight(true));
-			for (int i = 0; i < artifacts.Count; i++)
+			for (int i = 0; i < selectedComponent.parameters.Count; i++)
 			{
-				ComponentArtifactEntry artifact = artifacts[i];
-				string label = artifact.label;
+				CapabilityParameterInfo parameter = selectedComponent.parameters[i];
+				string editableLabel = parameter.userEditable ? "Editable" : "Locked";
+				string label = (string.IsNullOrWhiteSpace(parameter.name) ? "New Property" : parameter.name) + " [" + editableLabel + "]";
 				if (GUILayout.Button(label, selectedComponentArtifactIndex == i ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(26f)))
 				{
 					selectedComponentArtifactIndex = i;
@@ -1262,9 +1254,9 @@ public partial class ModuleExporter
 
 		EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true));
 		componentEditorScroll = EditorGUILayout.BeginScrollView(componentEditorScroll, GUILayout.ExpandHeight(true));
-		if (selectedComponentArtifactIndex >= 0 && selectedComponentArtifactIndex < artifacts.Count)
+		if (selectedComponentArtifactIndex >= 0 && selectedComponentArtifactIndex < selectedComponent.parameters.Count)
 		{
-			DrawSelectedComponentArtifactEditor(selectedComponent, artifacts[selectedComponentArtifactIndex]);
+			DrawParameterArtifactEditor(selectedComponent, selectedComponent.parameters[selectedComponentArtifactIndex]);
 		}
 		else
 		{
@@ -1284,10 +1276,10 @@ public partial class ModuleExporter
 		component.baseType = EditorGUILayout.TextField("Base Type", component.baseType);
 		component.attachTarget = EditorGUILayout.TextField("Attach Target", component.attachTarget);
 		component.description = EditorGUILayout.TextField("Description", component.description);
+		component.userEditable = EditorGUILayout.Toggle("User Editable", component.userEditable);
 		component.codegenAllowed = EditorGUILayout.Toggle("Codegen Allowed", component.codegenAllowed);
 		DrawStringListEditor("Required Components", component.requiredComponents);
 		DrawStringListEditor("Optional Components", component.optionalComponents);
-		DrawStringListEditor("Allowed Features", component.allowedFeatures);
 		DrawStringListEditor("Tags", component.tags);
 		if (GUILayout.Button("Remove Component", GUILayout.Width(140f)))
 		{
@@ -1539,10 +1531,11 @@ public partial class ModuleExporter
 
 	private void DrawParameterArtifactEditor(UnityCapabilityComponentInfo component, CapabilityParameterInfo parameter)
 	{
-		GUILayout.Label("Field Properties", EditorStyles.boldLabel);
+		GUILayout.Label("Property Properties", EditorStyles.boldLabel);
 		parameter.name = EditorGUILayout.TextField("Name", parameter.name);
 		parameter.type = EditorGUILayout.TextField("Type", parameter.type);
-		parameter.required = EditorGUILayout.Toggle("Required", parameter.required);
+		parameter.required = EditorGUILayout.Toggle("Writable", parameter.required);
+		parameter.userEditable = EditorGUILayout.Toggle("User Editable", parameter.userEditable);
 		parameter.@default = EditorGUILayout.TextField("Default", parameter.@default);
 		parameter.min = EditorGUILayout.FloatField("Min", parameter.min);
 		parameter.max = EditorGUILayout.FloatField("Max", parameter.max);
@@ -1551,7 +1544,7 @@ public partial class ModuleExporter
 		parameter.moduleScoped = EditorGUILayout.Toggle("Module Scoped", parameter.moduleScoped);
 		parameter.featureId = EditorGUILayout.TextField("Feature Id", parameter.featureId);
 		DrawStringListEditor("Tags", parameter.tags);
-		if (GUILayout.Button("Remove Field", GUILayout.Width(120f)))
+		if (GUILayout.Button("Remove Property", GUILayout.Width(120f)))
 		{
 			component.parameters.Remove(parameter);
 			selectedComponentArtifactIndex = -1;

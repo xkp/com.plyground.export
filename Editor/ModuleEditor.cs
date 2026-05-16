@@ -49,6 +49,7 @@ public partial class ModuleExporter : EditorWindow
 
 	private List<Property> moduleProperties = new List<Property>();
 	private CapabilityManifest moduleCapabilities = new CapabilityManifest();
+	private PlyFeatureManifest featureManifest = new PlyFeatureManifest();
 	private List<string> capabilitySourceScriptPaths = new List<string>();
 
 	[System.Serializable]
@@ -201,6 +202,8 @@ public partial class ModuleExporter : EditorWindow
 		moduleCapabilities = CloneModuleCapabilities(mod.capabilities);
 		PopulateCapabilityModuleMetadata(moduleCapabilities);
 		NormalizeModuleCapabilities(moduleCapabilities);
+		featureManifest = LoadFeatureManifestFromModule(mod);
+		featureManifest.moduleId = moduleId ?? "";
 
 		dependencies.Clear();
 		if (mod.dependencies != null)
@@ -401,6 +404,8 @@ public partial class ModuleExporter : EditorWindow
 		mod.moduleProperties = new List<Property>(moduleProperties);
 		PrepareCapabilitiesForPersistence();
 		mod.capabilities = CloneModuleCapabilities(moduleCapabilities);
+		mod.features = null;
+		mod.featuresJson = PlyFeatureJson.Export(PrepareFeatureManifestForPersistence());
 
 		mod.itemGroups = new List<ExportedGroup>();
 		foreach (var group in itemGroups)
@@ -517,6 +522,7 @@ public partial class ModuleExporter : EditorWindow
 
 		string jsonFilePath = SaveModule();
 		File.Copy(jsonFilePath, Path.Combine(moduleFolder, "module.bgm"), true);
+		ExportFeatureManifestToModuleFolder(moduleFolder);
 
 		//export assets
 		var assetsFromGroups = new List<string>();
@@ -704,6 +710,17 @@ public partial class ModuleExporter : EditorWindow
 		public List<ExportedGroup> itemGroups;
 		public List<Property> moduleProperties;
 		public CapabilityManifest capabilities;
+		public string featuresJson;
+	}
+
+	private PlyFeatureManifest LoadFeatureManifestFromModule(ExportedModule mod)
+	{
+		if (mod == null || string.IsNullOrWhiteSpace(mod.featuresJson))
+		{
+			return new PlyFeatureManifest();
+		}
+
+		return PlyFeatureJson.Import(mod.featuresJson);
 	}
 
 	[System.Serializable]
