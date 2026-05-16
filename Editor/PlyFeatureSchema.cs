@@ -59,6 +59,7 @@ public class PlyFeatureManifest
 public class PlyFeatureProfile
 {
     public string id = "";
+    public string featureId = "";
     public string name = "";
     public string description = "";
     public string aiMatchDescription = "";
@@ -68,6 +69,8 @@ public class PlyFeatureProfile
     public List<string> provides = new List<string>();
     public List<string> consumes = new List<string>();
     public List<string> targetRoles = new List<string>();
+    public bool useAdapterComponent;
+    public string adapterComponentType = "";
     public List<PlyFeatureComponentRequirement> componentRequirements = new List<PlyFeatureComponentRequirement>();
     public List<PlyFeaturePortMapping> ports = new List<PlyFeaturePortMapping>();
     public List<PlyFeatureParameterMapping> parameters = new List<PlyFeatureParameterMapping>();
@@ -172,6 +175,7 @@ public static class PlyFeatureSchemaUtility
     {
         feature = feature ?? new PlyFeatureProfile();
         feature.id = feature.id ?? "";
+        feature.featureId = feature.featureId ?? "";
         feature.name = feature.name ?? "";
         feature.description = feature.description ?? "";
         feature.aiMatchDescription = feature.aiMatchDescription ?? "";
@@ -181,6 +185,7 @@ public static class PlyFeatureSchemaUtility
         feature.provides = NormalizeStrings(feature.provides);
         feature.consumes = NormalizeStrings(feature.consumes);
         feature.targetRoles = NormalizeStrings(feature.targetRoles);
+        feature.adapterComponentType = feature.adapterComponentType ?? "";
         feature.componentRequirements = feature.componentRequirements ?? new List<PlyFeatureComponentRequirement>();
         feature.ports = feature.ports ?? new List<PlyFeaturePortMapping>();
         feature.parameters = feature.parameters ?? new List<PlyFeatureParameterMapping>();

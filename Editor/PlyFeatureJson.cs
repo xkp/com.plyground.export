@@ -31,6 +31,7 @@ public static class PlyFeatureJson
         {
             PlyFeatureProfile feature = new PlyFeatureProfile();
             feature.id = ReadString(featureObject, "id", "");
+            feature.featureId = ReadString(featureObject, "featureId", "");
             feature.name = ReadString(featureObject, "name", "");
             feature.description = ReadString(featureObject, "description", "");
             feature.aiMatchDescription = ReadString(featureObject, "aiMatchDescription", "");
@@ -40,6 +41,8 @@ public static class PlyFeatureJson
             feature.provides = ReadStringList(featureObject, "provides");
             feature.consumes = ReadStringList(featureObject, "consumes");
             feature.targetRoles = ReadStringList(featureObject, "targetRoles");
+            feature.useAdapterComponent = ReadBool(featureObject, "useAdapterComponent", false);
+            feature.adapterComponentType = ReadString(featureObject, "adapterComponentType", "");
             feature.componentRequirements = new List<PlyFeatureComponentRequirement>();
             feature.ports = new List<PlyFeaturePortMapping>();
             feature.parameters = new List<PlyFeatureParameterMapping>();
@@ -278,6 +281,7 @@ public static class PlyFeatureJson
     {
         builder.AppendLine("{");
         WriteProperty(builder, indent, "id", feature.id, true);
+        WriteProperty(builder, indent, "featureId", feature.featureId, true);
         WriteProperty(builder, indent, "name", feature.name, true);
         WriteProperty(builder, indent, "description", feature.description, true);
         WriteProperty(builder, indent, "aiMatchDescription", feature.aiMatchDescription, true);
@@ -287,6 +291,8 @@ public static class PlyFeatureJson
         WriteStringArray(builder, indent, "provides", feature.provides, true);
         WriteStringArray(builder, indent, "consumes", feature.consumes, true);
         WriteStringArray(builder, indent, "targetRoles", feature.targetRoles, true);
+        WriteBoolProperty(builder, indent, "useAdapterComponent", feature.useAdapterComponent, true);
+        WriteProperty(builder, indent, "adapterComponentType", feature.adapterComponentType, true);
         WriteComponentRequirements(builder, indent, feature.componentRequirements, true);
         WritePorts(builder, indent, feature.ports, true);
         WriteParameters(builder, indent, feature.parameters, false);

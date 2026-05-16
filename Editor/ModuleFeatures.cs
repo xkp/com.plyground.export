@@ -7,6 +7,19 @@ using UnityEngine;
 
 public partial class ModuleExporter
 {
+    private class AvailableFeatureDefinition
+    {
+        public string id;
+        public string name;
+        public string description;
+        public string aiMatchDescription;
+        public List<string> tags = new List<string>();
+        public List<string> categories = new List<string>();
+        public List<string> provides = new List<string>();
+        public List<string> consumes = new List<string>();
+        public List<string> targetRoles = new List<string>();
+    }
+
     private PlyFeatureManifest FeatureManifestState
     {
         get
@@ -27,6 +40,7 @@ public partial class ModuleExporter
     }
 
     private int selectedFeatureProfileIndex = -1;
+    private int selectedFeatureCatalogIndex = -1;
     private string featureComponentSearch = "";
     private Vector2 featureListScroll;
     private Vector2 featureEditorScroll;
@@ -51,7 +65,7 @@ public partial class ModuleExporter
         InitializeFeatureManifest();
         featureValidationIssues = ValidateFeatureManifest(FeatureManifestState);
 
-        EditorGUILayout.HelpBox("Create semantic gameplay features from the curated capability components in this module. Feature bindings are limited to components and members defined in the Components subtab.", MessageType.Info);
+        EditorGUILayout.HelpBox("Select an available semantic feature and implement it locally using either an adapter component or direct bindings to this module's curated components.", MessageType.Info);
 
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Refresh Reflection Cache", GUILayout.Width(170f)))
@@ -69,12 +83,7 @@ public partial class ModuleExporter
             ExportFeatureManifestToJson();
         }
 
-        if (GUILayout.Button("Add Feature", GUILayout.Width(100f)))
-        {
-            AddFeatureProfile();
-        }
-
-        if (GUILayout.Button("Add Guard AI Example", GUILayout.Width(160f)))
+        if (GUILayout.Button("Add Example Implementation", GUILayout.Width(170f)))
         {
             AddGuardAiExampleProfile();
         }
@@ -99,39 +108,43 @@ public partial class ModuleExporter
     {
         InitializeFeatureManifest();
         FeatureManifestState.features ??= new List<PlyFeatureProfile>();
+        List<AvailableFeatureDefinition> catalog = GetAvailableFeatureCatalog();
+        selectedFeatureCatalogIndex = Mathf.Clamp(selectedFeatureCatalogIndex < 0 ? 0 : selectedFeatureCatalogIndex, 0, Mathf.Max(0, catalog.Count - 1));
+        AvailableFeatureDefinition selectedFeature = catalog.Count > 0 ? catalog[selectedFeatureCatalogIndex] : null;
+        PlyFeatureProfile implementation = selectedFeature != null ? FindFeatureImplementation(selectedFeature.id) : null;
 
         EditorGUILayout.BeginHorizontal();
 
         EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(250f, position.width * 0.24f)), GUILayout.Height(620f));
-        GUILayout.Label("Feature Profiles", EditorStyles.boldLabel);
+        GUILayout.Label("Available Features", EditorStyles.boldLabel);
         featureListScroll = EditorGUILayout.BeginScrollView(featureListScroll);
-        if (FeatureManifestState.features.Count == 0)
+        if (catalog.Count == 0)
         {
-            EditorGUILayout.HelpBox("No feature profiles yet.", MessageType.Info);
+            EditorGUILayout.HelpBox("No available semantic features were found.", MessageType.Info);
         }
 
-        for (int i = 0; i < FeatureManifestState.features.Count; i++)
+        for (int i = 0; i < catalog.Count; i++)
         {
-            PlyFeatureProfile profile = FeatureManifestState.features[i];
-            string label = string.IsNullOrWhiteSpace(profile.name) ? (string.IsNullOrWhiteSpace(profile.id) ? "New Feature" : profile.id) : profile.name;
-            if (GUILayout.Button(label, selectedFeatureProfileIndex == i ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(30f)))
+            AvailableFeatureDefinition feature = catalog[i];
+            bool implemented = FindFeatureImplementation(feature.id) != null;
+            string label = feature.name + (implemented ? " [Implemented]" : "");
+            if (GUILayout.Button(label, selectedFeatureCatalogIndex == i ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(30f)))
             {
-                selectedFeatureProfileIndex = i;
+                selectedFeatureCatalogIndex = i;
             }
         }
         EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
 
         EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true), GUILayout.Height(620f));
-        if (FeatureManifestState.features.Count == 0)
+        if (selectedFeature == null)
         {
-            EditorGUILayout.HelpBox("Create or import a feature profile to begin mapping components, members, and semantic capabilities.", MessageType.Info);
+            EditorGUILayout.HelpBox("Select a semantic feature to implement.", MessageType.Info);
         }
         else
         {
-            selectedFeatureProfileIndex = Mathf.Clamp(selectedFeatureProfileIndex < 0 ? 0 : selectedFeatureProfileIndex, 0, FeatureManifestState.features.Count - 1);
             featureEditorScroll = EditorGUILayout.BeginScrollView(featureEditorScroll);
-            DrawFeatureProfileEditor(FeatureManifestState.features[selectedFeatureProfileIndex]);
+            DrawFeatureImplementationEditor(selectedFeature, implementation);
             EditorGUILayout.EndScrollView();
         }
         EditorGUILayout.EndVertical();
@@ -160,33 +173,48 @@ public partial class ModuleExporter
         EditorGUILayout.EndHorizontal();
     }
 
-    private void DrawFeatureProfileEditor(PlyFeatureProfile profile)
+    private void DrawFeatureImplementationEditor(AvailableFeatureDefinition feature, PlyFeatureProfile profile)
     {
-        profile = PlyFeatureSchemaUtility.NormalizeFeature(profile);
-
-        GUILayout.Label("Feature Profile", EditorStyles.boldLabel);
-        profile.id = EditorGUILayout.TextField("Id", profile.id);
-        profile.name = EditorGUILayout.TextField("Name", profile.name);
+        GUILayout.Label(feature.name, EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Feature Id", feature.id);
         GUILayout.Label("Description", EditorStyles.miniBoldLabel);
-        profile.description = EditorGUILayout.TextArea(profile.description, GUILayout.MinHeight(40f));
-        GUILayout.Label("AI Match Description", EditorStyles.miniBoldLabel);
-        profile.aiMatchDescription = EditorGUILayout.TextArea(profile.aiMatchDescription, GUILayout.MinHeight(40f));
+        EditorGUILayout.HelpBox(feature.description, MessageType.None);
+        EditorGUILayout.LabelField("Categories", string.Join(", ", feature.categories.ToArray()));
+        EditorGUILayout.LabelField("Tags", string.Join(", ", feature.tags.ToArray()));
+        EditorGUILayout.LabelField("Provides", string.Join(", ", feature.provides.ToArray()));
+        EditorGUILayout.LabelField("Consumes", string.Join(", ", feature.consumes.ToArray()));
+        EditorGUILayout.LabelField("Target Roles", string.Join(", ", feature.targetRoles.ToArray()));
+        EditorGUILayout.Space(8f);
 
-        DrawStringListEditor("Tags", profile.tags);
-        DrawStringListEditor("Categories", profile.categories);
-        DrawStringListEditor("Implements", profile.implements);
-        DrawStringListEditor("Provides", profile.provides);
-        DrawStringListEditor("Consumes", profile.consumes);
-        DrawStringListEditor("Target Roles", profile.targetRoles);
-        DrawFeatureComponentRequirements(profile);
-        DrawFeaturePorts(profile);
-        DrawFeatureParameters(profile);
+        if (profile == null)
+        {
+            EditorGUILayout.HelpBox("This feature is not implemented in the current module yet.", MessageType.Info);
+            if (GUILayout.Button("Implement Feature", GUILayout.Width(150f)))
+            {
+                CreateFeatureImplementation(feature);
+            }
+            return;
+        }
+
+        profile = PlyFeatureSchemaUtility.NormalizeFeature(profile);
+        profile.id = EditorGUILayout.TextField("Implementation Id", profile.id);
+        profile.useAdapterComponent = EditorGUILayout.Toggle("Use Adapter Component", profile.useAdapterComponent);
+
+        if (profile.useAdapterComponent)
+        {
+            DrawAdapterComponentPopup(profile);
+        }
+        else
+        {
+            DrawFeatureComponentRequirements(profile);
+            DrawFeaturePorts(profile);
+            DrawFeatureParameters(profile);
+        }
 
         EditorGUILayout.Space(8f);
-        if (GUILayout.Button("Remove Feature Profile", GUILayout.Width(170f)))
+        if (GUILayout.Button("Remove Implementation", GUILayout.Width(170f)))
         {
             FeatureManifestState.features.Remove(profile);
-            selectedFeatureProfileIndex = Mathf.Clamp(selectedFeatureProfileIndex - 1, -1, FeatureManifestState.features.Count - 1);
         }
     }
 
@@ -216,6 +244,18 @@ public partial class ModuleExporter
                 i--;
             }
             EditorGUILayout.EndVertical();
+        }
+    }
+
+    private void DrawAdapterComponentPopup(PlyFeatureProfile profile)
+    {
+        List<UnityCapabilityComponentInfo> components = GetAvailableFeatureComponents();
+        string[] options = components.Count == 0 ? new[] { "<none>" } : components.Select(component => component.typeName).ToArray();
+        int selectedIndex = Mathf.Max(0, components.FindIndex(component => string.Equals(component.typeName, profile.adapterComponentType, StringComparison.OrdinalIgnoreCase)));
+        int newIndex = EditorGUILayout.Popup("Adapter Component", selectedIndex < 0 ? 0 : selectedIndex, options);
+        if (components.Count > 0 && newIndex >= 0 && newIndex < components.Count)
+        {
+            profile.adapterComponentType = components[newIndex].typeName;
         }
     }
 
@@ -382,13 +422,7 @@ public partial class ModuleExporter
 
     private void AddFeatureProfile()
     {
-        InitializeFeatureManifest();
-        FeatureManifestState.features.Add(new PlyFeatureProfile
-        {
-            id = "feature." + Guid.NewGuid().ToString("N").Substring(0, 8),
-            name = "New Feature"
-        });
-        selectedFeatureProfileIndex = FeatureManifestState.features.Count - 1;
+        CreateFeatureImplementation(GetAvailableFeatureCatalog().FirstOrDefault());
     }
 
     private void AddGuardAiExampleProfile()
@@ -401,6 +435,7 @@ public partial class ModuleExporter
   ""features"": [
     {
       ""id"": ""thirdparty.guard_ai.profile"",
+      ""featureId"": ""enemy_aggression"",
       ""name"": ""Guard AI"",
       ""description"": ""Maps existing guard AI systems into Plyground semantic gameplay features."",
       ""aiMatchDescription"": ""guard ai, enemy aggression, alert enemy, hostile npc, attack player"",
@@ -410,6 +445,8 @@ public partial class ModuleExporter
       ""provides"": [""aggression_control""],
       ""consumes"": [""spotted_state""],
       ""targetRoles"": [""Enemy""],
+      ""useAdapterComponent"": false,
+      ""adapterComponentType"": """",
       ""componentRequirements"": [
         {
           ""typeName"": ""GuardAI"",
@@ -436,8 +473,7 @@ public partial class ModuleExporter
 }").features.FirstOrDefault();
         if (example != null)
         {
-            FeatureManifestState.features.Add(example);
-            selectedFeatureProfileIndex = FeatureManifestState.features.Count - 1;
+            ReplaceFeatureImplementation(example);
         }
     }
 
@@ -502,45 +538,58 @@ public partial class ModuleExporter
         {
             PlyFeatureProfile profile = manifest.features[i];
             string path = "Feature[" + i + "]";
+            if (string.IsNullOrWhiteSpace(profile.featureId))
+            {
+                issues.Add(CreateIssue("error", path, "Feature catalog id is required."));
+            }
             if (string.IsNullOrWhiteSpace(profile.id))
             {
                 issues.Add(CreateIssue("error", path, "Feature id is required."));
             }
-            else if (!ids.Add(profile.id))
+            else if (!ids.Add(profile.featureId))
             {
-                issues.Add(CreateIssue("error", path, "Feature id must be unique."));
+                issues.Add(CreateIssue("error", path, "Only one implementation is allowed per available feature."));
             }
 
-            if (string.IsNullOrWhiteSpace(profile.name))
+            if (profile.useAdapterComponent)
             {
-                issues.Add(CreateIssue("error", path, "Feature name is required."));
-            }
-
-            if (profile.componentRequirements.Count == 0)
-            {
-                issues.Add(CreateIssue("warning", path, "Feature has no component requirements."));
-            }
-
-            foreach (PlyFeatureComponentRequirement requirement in profile.componentRequirements)
-            {
-                if (string.IsNullOrWhiteSpace(requirement.typeName))
+                if (string.IsNullOrWhiteSpace(profile.adapterComponentType))
                 {
-                    issues.Add(CreateIssue("error", path, "Component requirement is missing a type name."));
+                    issues.Add(CreateIssue("error", path, "Adapter component type is required when adapter mode is enabled."));
                 }
-                else if (FindAvailableFeatureComponent(requirement.typeName) == null)
+                else if (FindAvailableFeatureComponent(profile.adapterComponentType) == null)
                 {
-                    issues.Add(CreateIssue("warning", path, "Required component type '" + requirement.typeName + "' was not found in the Components subtab."));
+                    issues.Add(CreateIssue("warning", path, "Adapter component type '" + profile.adapterComponentType + "' was not found in the Components subtab."));
                 }
             }
-
-            for (int portIndex = 0; portIndex < profile.ports.Count; portIndex++)
+            else
             {
-                ValidateBinding(profile, profile.ports[portIndex].binding, path + ".ports[" + portIndex + "]", issues);
-            }
+                if (profile.componentRequirements.Count == 0)
+                {
+                    issues.Add(CreateIssue("warning", path, "Feature has no component requirements."));
+                }
 
-            for (int parameterIndex = 0; parameterIndex < profile.parameters.Count; parameterIndex++)
-            {
-                ValidateBinding(profile, profile.parameters[parameterIndex].binding, path + ".parameters[" + parameterIndex + "]", issues);
+                foreach (PlyFeatureComponentRequirement requirement in profile.componentRequirements)
+                {
+                    if (string.IsNullOrWhiteSpace(requirement.typeName))
+                    {
+                        issues.Add(CreateIssue("error", path, "Component requirement is missing a type name."));
+                    }
+                    else if (FindAvailableFeatureComponent(requirement.typeName) == null)
+                    {
+                        issues.Add(CreateIssue("warning", path, "Required component type '" + requirement.typeName + "' was not found in the Components subtab."));
+                    }
+                }
+
+                for (int portIndex = 0; portIndex < profile.ports.Count; portIndex++)
+                {
+                    ValidateBinding(profile, profile.ports[portIndex].binding, path + ".ports[" + portIndex + "]", issues);
+                }
+
+                for (int parameterIndex = 0; parameterIndex < profile.parameters.Count; parameterIndex++)
+                {
+                    ValidateBinding(profile, profile.parameters[parameterIndex].binding, path + ".parameters[" + parameterIndex + "]", issues);
+                }
             }
         }
 
@@ -707,5 +756,112 @@ public partial class ModuleExporter
             path = path,
             message = message
         };
+    }
+
+    private List<AvailableFeatureDefinition> GetAvailableFeatureCatalog()
+    {
+        return new List<AvailableFeatureDefinition>
+        {
+            new AvailableFeatureDefinition
+            {
+                id = "enemy_aggression",
+                name = "Enemy Aggression",
+                description = "Hostile NPCs can become aggressive, calm down, and expose aggression-related runtime state.",
+                aiMatchDescription = "guard ai, enemy aggression, hostile npc, combat ai",
+                tags = new List<string> { "ai", "combat", "enemy" },
+                categories = new List<string> { "AI" },
+                provides = new List<string> { "aggression_control" },
+                consumes = new List<string> { "spotted_state" },
+                targetRoles = new List<string> { "Enemy" }
+            },
+            new AvailableFeatureDefinition
+            {
+                id = "health_state",
+                name = "Health State",
+                description = "Exposes health-like state that gameplay can read or update locally.",
+                aiMatchDescription = "health, hp, damageable, hit points",
+                tags = new List<string> { "combat", "stats" },
+                categories = new List<string> { "Gameplay" },
+                provides = new List<string> { "health_value" },
+                consumes = new List<string>(),
+                targetRoles = new List<string> { "Enemy", "Player", "NPC" }
+            },
+            new AvailableFeatureDefinition
+            {
+                id = "movement_speed",
+                name = "Movement Speed",
+                description = "Exposes movement speed configuration or runtime locomotion speed values.",
+                aiMatchDescription = "movement speed, locomotion speed, npc speed",
+                tags = new List<string> { "movement" },
+                categories = new List<string> { "Movement" },
+                provides = new List<string> { "speed_control" },
+                consumes = new List<string>(),
+                targetRoles = new List<string> { "Enemy", "Player", "NPC" }
+            },
+            new AvailableFeatureDefinition
+            {
+                id = "interaction_prompt",
+                name = "Interaction Prompt",
+                description = "Supports showing or configuring interaction labels or prompts for an interactable object.",
+                aiMatchDescription = "interact prompt, use prompt, pickup prompt",
+                tags = new List<string> { "interaction", "ui" },
+                categories = new List<string> { "Interaction" },
+                provides = new List<string> { "prompt_text" },
+                consumes = new List<string>(),
+                targetRoles = new List<string> { "Interactable" }
+            }
+        };
+    }
+
+    private PlyFeatureProfile FindFeatureImplementation(string featureId)
+    {
+        return FeatureManifestState.features.FirstOrDefault(feature =>
+            string.Equals(feature.featureId, featureId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void CreateFeatureImplementation(AvailableFeatureDefinition feature)
+    {
+        if (feature == null)
+        {
+            return;
+        }
+
+        PlyFeatureProfile existing = FindFeatureImplementation(feature.id);
+        if (existing != null)
+        {
+            return;
+        }
+
+        PlyFeatureProfile profile = new PlyFeatureProfile
+        {
+            id = "impl." + feature.id,
+            featureId = feature.id,
+            name = feature.name,
+            description = feature.description,
+            aiMatchDescription = feature.aiMatchDescription,
+            tags = new List<string>(feature.tags),
+            categories = new List<string>(feature.categories),
+            implements = new List<string> { feature.id },
+            provides = new List<string>(feature.provides),
+            consumes = new List<string>(feature.consumes),
+            targetRoles = new List<string>(feature.targetRoles)
+        };
+        FeatureManifestState.features.Add(profile);
+    }
+
+    private void ReplaceFeatureImplementation(PlyFeatureProfile profile)
+    {
+        if (profile == null || string.IsNullOrWhiteSpace(profile.featureId))
+        {
+            return;
+        }
+
+        PlyFeatureProfile existing = FindFeatureImplementation(profile.featureId);
+        if (existing != null)
+        {
+            FeatureManifestState.features.Remove(existing);
+        }
+
+        FeatureManifestState.features.Add(profile);
     }
 }
