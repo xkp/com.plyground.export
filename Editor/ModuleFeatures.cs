@@ -18,6 +18,9 @@ public partial class ModuleExporter
         public List<string> provides = new List<string>();
         public List<string> consumes = new List<string>();
         public List<string> targetRoles = new List<string>();
+        public List<PlyFeatureComponentRequirement> componentRequirements = new List<PlyFeatureComponentRequirement>();
+        public List<PlyFeaturePortMapping> ports = new List<PlyFeaturePortMapping>();
+        public List<PlyFeatureParameterMapping> parameters = new List<PlyFeatureParameterMapping>();
     }
 
     private PlyFeatureManifest FeatureManifestState
@@ -43,8 +46,8 @@ public partial class ModuleExporter
     private int selectedFeatureCatalogIndex = -1;
     private string featureComponentSearch = "";
     private Vector2 featureListScroll;
+    private Vector2 featureDetailsScroll;
     private Vector2 featureEditorScroll;
-    private Vector2 featureDiscoveryScroll;
     private List<PlyFeatureValidationIssue> featureValidationIssues = new List<PlyFeatureValidationIssue>();
 
     private void InitializeFeatureManifest()
@@ -136,10 +139,23 @@ public partial class ModuleExporter
         EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
 
+        EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(300f, position.width * 0.32f)), GUILayout.Height(620f));
+        if (selectedFeature == null)
+        {
+            EditorGUILayout.HelpBox("Select a semantic feature to review its definition.", MessageType.Info);
+        }
+        else
+        {
+            featureDetailsScroll = EditorGUILayout.BeginScrollView(featureDetailsScroll);
+            DrawSelectedFeatureDefinition(selectedFeature, implementation != null);
+            EditorGUILayout.EndScrollView();
+        }
+        EditorGUILayout.EndVertical();
+
         EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true), GUILayout.Height(620f));
         if (selectedFeature == null)
         {
-            EditorGUILayout.HelpBox("Select a semantic feature to implement.", MessageType.Info);
+            EditorGUILayout.HelpBox("Select a semantic feature to configure its local implementation.", MessageType.Info);
         }
         else
         {
@@ -149,34 +165,15 @@ public partial class ModuleExporter
         }
         EditorGUILayout.EndVertical();
 
-        EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(280f, position.width * 0.26f)), GUILayout.Height(620f));
-        GUILayout.Label("Available Components", EditorStyles.boldLabel);
-        featureComponentSearch = EditorGUILayout.TextField("Search", featureComponentSearch);
-        featureDiscoveryScroll = EditorGUILayout.BeginScrollView(featureDiscoveryScroll);
-        List<UnityCapabilityComponentInfo> components = GetAvailableFeatureComponents(featureComponentSearch);
-        if (components.Count == 0)
-        {
-            EditorGUILayout.HelpBox("No curated capability components matched the current search. Add or infer components in the Components subtab first.", MessageType.Info);
-        }
-
-        foreach (UnityCapabilityComponentInfo component in components.Take(200))
-        {
-            EditorGUILayout.BeginVertical("helpbox");
-            EditorGUILayout.LabelField(component.typeName, EditorStyles.miniBoldLabel);
-            EditorGUILayout.LabelField(component.componentId, EditorStyles.wordWrappedMiniLabel);
-            EditorGUILayout.LabelField($"Methods: {(component.methods ?? new List<CapabilityMethodInfo>()).Count}  Events: {(component.events ?? new List<CapabilityEventInfo>()).Count}  Fields: {(component.parameters ?? new List<CapabilityParameterInfo>()).Count}", EditorStyles.miniLabel);
-            EditorGUILayout.EndVertical();
-        }
-        EditorGUILayout.EndScrollView();
-        EditorGUILayout.EndVertical();
-
         EditorGUILayout.EndHorizontal();
     }
 
-    private void DrawFeatureImplementationEditor(AvailableFeatureDefinition feature, PlyFeatureProfile profile)
+    private void DrawSelectedFeatureDefinition(AvailableFeatureDefinition feature, bool implemented)
     {
-        GUILayout.Label(feature.name, EditorStyles.boldLabel);
+        GUILayout.Label("Selected Feature", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Name", feature.name);
         EditorGUILayout.LabelField("Feature Id", feature.id);
+        EditorGUILayout.LabelField("Status", implemented ? "Implemented in this module" : "Not implemented");
         GUILayout.Label("Description", EditorStyles.miniBoldLabel);
         EditorGUILayout.HelpBox(feature.description, MessageType.None);
         EditorGUILayout.LabelField("Categories", string.Join(", ", feature.categories.ToArray()));
@@ -184,6 +181,40 @@ public partial class ModuleExporter
         EditorGUILayout.LabelField("Provides", string.Join(", ", feature.provides.ToArray()));
         EditorGUILayout.LabelField("Consumes", string.Join(", ", feature.consumes.ToArray()));
         EditorGUILayout.LabelField("Target Roles", string.Join(", ", feature.targetRoles.ToArray()));
+        EditorGUILayout.Space(8f);
+        GUILayout.Label("Required Bindings", EditorStyles.boldLabel);
+
+        if (feature.componentRequirements.Count > 0)
+        {
+            GUILayout.Label("Components", EditorStyles.miniBoldLabel);
+            foreach (PlyFeatureComponentRequirement requirement in feature.componentRequirements)
+            {
+                EditorGUILayout.LabelField((requirement.required ? "Required" : "Optional") + ": component", requirement.typeName);
+            }
+        }
+
+        if (feature.ports.Count > 0)
+        {
+            GUILayout.Label("Inputs / Outputs", EditorStyles.miniBoldLabel);
+            foreach (PlyFeaturePortMapping port in feature.ports)
+            {
+                EditorGUILayout.LabelField(port.name, $"{port.direction} {port.kind} {port.dataType}");
+            }
+        }
+
+        if (feature.parameters.Count > 0)
+        {
+            GUILayout.Label("Parameters", EditorStyles.miniBoldLabel);
+            foreach (PlyFeatureParameterMapping parameter in feature.parameters)
+            {
+                EditorGUILayout.LabelField(parameter.name, $"{parameter.type} default={parameter.defaultValue}");
+            }
+        }
+    }
+
+    private void DrawFeatureImplementationEditor(AvailableFeatureDefinition feature, PlyFeatureProfile profile)
+    {
+        GUILayout.Label("Implementation", EditorStyles.boldLabel);
         EditorGUILayout.Space(8f);
 
         if (profile == null)
@@ -206,6 +237,7 @@ public partial class ModuleExporter
         }
         else
         {
+            featureComponentSearch = EditorGUILayout.TextField("Component Search", featureComponentSearch);
             DrawFeatureComponentRequirements(profile);
             DrawFeaturePorts(profile);
             DrawFeatureParameters(profile);
@@ -221,11 +253,6 @@ public partial class ModuleExporter
     private void DrawFeatureComponentRequirements(PlyFeatureProfile profile)
     {
         GUILayout.Label("Component Requirements", EditorStyles.boldLabel);
-        if (GUILayout.Button("Add Component Requirement", GUILayout.Width(180f)))
-        {
-            profile.componentRequirements.Add(new PlyFeatureComponentRequirement());
-        }
-
         if (profile.componentRequirements.Count == 0)
         {
             EditorGUILayout.HelpBox("Choose from the module's curated capability components.", MessageType.Info);
@@ -249,7 +276,7 @@ public partial class ModuleExporter
 
     private void DrawAdapterComponentPopup(PlyFeatureProfile profile)
     {
-        List<UnityCapabilityComponentInfo> components = GetAvailableFeatureComponents();
+        List<UnityCapabilityComponentInfo> components = GetAvailableFeatureComponents(featureComponentSearch);
         string[] options = components.Count == 0 ? new[] { "<none>" } : components.Select(component => component.typeName).ToArray();
         int selectedIndex = Mathf.Max(0, components.FindIndex(component => string.Equals(component.typeName, profile.adapterComponentType, StringComparison.OrdinalIgnoreCase)));
         int newIndex = EditorGUILayout.Popup("Adapter Component", selectedIndex < 0 ? 0 : selectedIndex, options);
@@ -262,29 +289,16 @@ public partial class ModuleExporter
     private void DrawFeaturePorts(PlyFeatureProfile profile)
     {
         GUILayout.Label("Port Mappings", EditorStyles.boldLabel);
-        if (GUILayout.Button("Add Port", GUILayout.Width(90f)))
-        {
-            profile.ports.Add(new PlyFeaturePortMapping
-            {
-                kind = PlyFeaturePortKind.Value
-            });
-        }
-
         for (int i = 0; i < profile.ports.Count; i++)
         {
             PlyFeaturePortMapping port = profile.ports[i];
             port.binding ??= new PlyFeatureBinding();
-            port.kind = PlyFeaturePortKind.Value;
             EditorGUILayout.BeginVertical("helpbox");
             port.name = EditorGUILayout.TextField("Name", port.name);
             port.direction = (PlyFeaturePortDirection)EditorGUILayout.EnumPopup("Direction", port.direction);
+            port.kind = (PlyFeaturePortKind)EditorGUILayout.EnumPopup("Kind", port.kind);
             port.dataType = (PlyFeatureDataType)EditorGUILayout.EnumPopup("Data Type", port.dataType);
             DrawBindingEditor(profile, port.binding, port.kind, port.direction);
-            if (GUILayout.Button("Remove Port", GUILayout.Width(110f)))
-            {
-                profile.ports.RemoveAt(i);
-                i--;
-            }
             EditorGUILayout.EndVertical();
         }
     }
@@ -292,11 +306,6 @@ public partial class ModuleExporter
     private void DrawFeatureParameters(PlyFeatureProfile profile)
     {
         GUILayout.Label("Parameter Mappings", EditorStyles.boldLabel);
-        if (GUILayout.Button("Add Parameter", GUILayout.Width(110f)))
-        {
-            profile.parameters.Add(new PlyFeatureParameterMapping());
-        }
-
         for (int i = 0; i < profile.parameters.Count; i++)
         {
             PlyFeatureParameterMapping parameter = profile.parameters[i];
@@ -307,11 +316,6 @@ public partial class ModuleExporter
             parameter.defaultValue = EditorGUILayout.TextField("Default Value", parameter.defaultValue);
             DrawBindingEditor(profile, parameter.binding, PlyFeaturePortKind.Value, PlyFeaturePortDirection.Input);
             parameter.binding.access = (PlyFeatureParameterAccess)EditorGUILayout.EnumPopup("Access", parameter.binding.access);
-            if (GUILayout.Button("Remove Parameter", GUILayout.Width(130f)))
-            {
-                profile.parameters.RemoveAt(i);
-                i--;
-            }
             EditorGUILayout.EndVertical();
         }
     }
@@ -350,7 +354,7 @@ public partial class ModuleExporter
 
     private void DrawComponentRequirementPicker(PlyFeatureComponentRequirement requirement, string label)
     {
-        List<UnityCapabilityComponentInfo> components = GetAvailableFeatureComponents();
+        List<UnityCapabilityComponentInfo> components = GetAvailableFeatureComponents(featureComponentSearch);
         string[] options = components.Count == 0 ? new[] { "<none>" } : components.Select(component => component.typeName).ToArray();
         int selectedIndex = Mathf.Max(0, components.FindIndex(component =>
             string.Equals(component.typeName, requirement.typeName, StringComparison.OrdinalIgnoreCase)));
@@ -454,7 +458,32 @@ public partial class ModuleExporter
           ""required"": true
         }
       ],
-      ""ports"": [],
+      ""ports"": [
+        {
+          ""name"": ""IsAggressive"",
+          ""direction"": ""input"",
+          ""kind"": ""value"",
+          ""dataType"": ""bool"",
+          ""binding"": {
+            ""componentType"": ""GuardAI"",
+            ""memberKind"": ""property"",
+            ""memberName"": ""IsAggressive"",
+            ""access"": ""readWrite""
+          }
+        },
+        {
+          ""name"": ""HasTargetInSight"",
+          ""direction"": ""output"",
+          ""kind"": ""value"",
+          ""dataType"": ""bool"",
+          ""binding"": {
+            ""componentType"": ""GuardAI"",
+            ""memberKind"": ""property"",
+            ""memberName"": ""HasTargetInSight"",
+            ""access"": ""readOnly""
+          }
+        }
+      ],
       ""parameters"": [
         {
           ""name"": ""AggroRadius"",
@@ -772,7 +801,20 @@ public partial class ModuleExporter
                 categories = new List<string> { "AI" },
                 provides = new List<string> { "aggression_control" },
                 consumes = new List<string> { "spotted_state" },
-                targetRoles = new List<string> { "Enemy" }
+                targetRoles = new List<string> { "Enemy" },
+                componentRequirements = new List<PlyFeatureComponentRequirement>
+                {
+                    new PlyFeatureComponentRequirement { required = true }
+                },
+                ports = new List<PlyFeaturePortMapping>
+                {
+                    new PlyFeaturePortMapping { name = "IsAggressive", direction = PlyFeaturePortDirection.Input, kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Bool },
+                    new PlyFeaturePortMapping { name = "HasTargetInSight", direction = PlyFeaturePortDirection.Output, kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Bool }
+                },
+                parameters = new List<PlyFeatureParameterMapping>
+                {
+                    new PlyFeatureParameterMapping { name = "AggroRadius", type = PlyFeatureDataType.Float, defaultValue = "20" }
+                }
             },
             new AvailableFeatureDefinition
             {
@@ -784,7 +826,16 @@ public partial class ModuleExporter
                 categories = new List<string> { "Gameplay" },
                 provides = new List<string> { "health_value" },
                 consumes = new List<string>(),
-                targetRoles = new List<string> { "Enemy", "Player", "NPC" }
+                targetRoles = new List<string> { "Enemy", "Player", "NPC" },
+                componentRequirements = new List<PlyFeatureComponentRequirement>
+                {
+                    new PlyFeatureComponentRequirement { required = true }
+                },
+                ports = new List<PlyFeaturePortMapping>
+                {
+                    new PlyFeaturePortMapping { name = "CurrentHealth", direction = PlyFeaturePortDirection.Output, kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Float },
+                    new PlyFeaturePortMapping { name = "MaxHealth", direction = PlyFeaturePortDirection.Output, kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Float }
+                }
             },
             new AvailableFeatureDefinition
             {
@@ -796,7 +847,15 @@ public partial class ModuleExporter
                 categories = new List<string> { "Movement" },
                 provides = new List<string> { "speed_control" },
                 consumes = new List<string>(),
-                targetRoles = new List<string> { "Enemy", "Player", "NPC" }
+                targetRoles = new List<string> { "Enemy", "Player", "NPC" },
+                componentRequirements = new List<PlyFeatureComponentRequirement>
+                {
+                    new PlyFeatureComponentRequirement { required = true }
+                },
+                ports = new List<PlyFeaturePortMapping>
+                {
+                    new PlyFeaturePortMapping { name = "MoveSpeed", direction = PlyFeaturePortDirection.Input, kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Float }
+                }
             },
             new AvailableFeatureDefinition
             {
@@ -808,7 +867,16 @@ public partial class ModuleExporter
                 categories = new List<string> { "Interaction" },
                 provides = new List<string> { "prompt_text" },
                 consumes = new List<string>(),
-                targetRoles = new List<string> { "Interactable" }
+                targetRoles = new List<string> { "Interactable" },
+                componentRequirements = new List<PlyFeatureComponentRequirement>
+                {
+                    new PlyFeatureComponentRequirement { required = true }
+                },
+                ports = new List<PlyFeaturePortMapping>
+                {
+                    new PlyFeaturePortMapping { name = "PromptText", direction = PlyFeaturePortDirection.Output, kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.String },
+                    new PlyFeaturePortMapping { name = "CanInteract", direction = PlyFeaturePortDirection.Output, kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Bool }
+                }
             }
         };
     }
@@ -844,7 +912,10 @@ public partial class ModuleExporter
             implements = new List<string> { feature.id },
             provides = new List<string>(feature.provides),
             consumes = new List<string>(feature.consumes),
-            targetRoles = new List<string>(feature.targetRoles)
+            targetRoles = new List<string>(feature.targetRoles),
+            componentRequirements = CloneComponentRequirements(feature.componentRequirements),
+            ports = ClonePortMappings(feature.ports),
+            parameters = CloneParameterMappings(feature.parameters)
         };
         FeatureManifestState.features.Add(profile);
     }
@@ -863,5 +934,44 @@ public partial class ModuleExporter
         }
 
         FeatureManifestState.features.Add(profile);
+    }
+
+    private List<PlyFeatureComponentRequirement> CloneComponentRequirements(List<PlyFeatureComponentRequirement> values)
+    {
+        return (values ?? new List<PlyFeatureComponentRequirement>())
+            .Select(value => new PlyFeatureComponentRequirement
+            {
+                typeName = value != null ? value.typeName : "",
+                assemblyQualifiedName = value != null ? value.assemblyQualifiedName : "",
+                required = value == null || value.required
+            })
+            .ToList();
+    }
+
+    private List<PlyFeaturePortMapping> ClonePortMappings(List<PlyFeaturePortMapping> values)
+    {
+        return (values ?? new List<PlyFeaturePortMapping>())
+            .Select(value => new PlyFeaturePortMapping
+            {
+                name = value != null ? value.name : "",
+                direction = value != null ? value.direction : PlyFeaturePortDirection.Input,
+                kind = value != null ? value.kind : PlyFeaturePortKind.Value,
+                dataType = value != null ? value.dataType : PlyFeatureDataType.Any,
+                binding = new PlyFeatureBinding()
+            })
+            .ToList();
+    }
+
+    private List<PlyFeatureParameterMapping> CloneParameterMappings(List<PlyFeatureParameterMapping> values)
+    {
+        return (values ?? new List<PlyFeatureParameterMapping>())
+            .Select(value => new PlyFeatureParameterMapping
+            {
+                name = value != null ? value.name : "",
+                type = value != null ? value.type : PlyFeatureDataType.Any,
+                defaultValue = value != null ? value.defaultValue : "",
+                binding = new PlyFeatureBinding()
+            })
+            .ToList();
     }
 }
