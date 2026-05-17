@@ -10,6 +10,7 @@ using UnityEngine.Events;
 
 public partial class ModuleExporter
 {
+    private const string PackageName = "com.plyground.export";
     private const string DefaultFeatureCatalogRelativePath = "Editor/FeatureCatalog/default-feature-catalog.json";
     private static readonly HashSet<string> UnityLifecycleMethods = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -1711,7 +1712,8 @@ public partial class ModuleExporter
     {
         try
         {
-            PackageInfo packageInfo = PackageInfo.FindForAssembly(GetType().Assembly);
+            PackageInfo packageInfo = PackageInfo.GetAllRegisteredPackages()
+                .FirstOrDefault(package => string.Equals(package.name, PackageName, StringComparison.OrdinalIgnoreCase));
             if (packageInfo != null && !string.IsNullOrWhiteSpace(packageInfo.resolvedPath))
             {
                 return Path.Combine(packageInfo.resolvedPath, "Editor", "FeatureCatalog", "default-feature-catalog.json");
@@ -1719,7 +1721,7 @@ public partial class ModuleExporter
         }
         catch (Exception exception)
         {
-            Debug.LogWarning("Plyground Exporter: failed to resolve package path for default feature catalog: " + exception.Message);
+            Debug.LogWarning("Plyground Exporter: failed to resolve installed package path for default feature catalog: " + exception.Message);
         }
 
         return Path.Combine(Directory.GetCurrentDirectory(), DefaultFeatureCatalogRelativePath.Replace('/', Path.DirectorySeparatorChar));
