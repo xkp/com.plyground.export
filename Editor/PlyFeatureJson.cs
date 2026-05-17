@@ -92,6 +92,7 @@ public static class PlyFeatureJson
             id = ReadString(featureObject, "id", ""),
             name = ReadString(featureObject, "name", ""),
             description = ReadString(featureObject, "description", ""),
+            origin = ReadString(featureObject, "origin", "catalog"),
             intentExamples = ReadStringList(featureObject, "intentExamples"),
             targetRoles = ReadStringList(featureObject, "targetRoles"),
             category = ReadString(featureObject, "category", ""),
@@ -183,6 +184,7 @@ public static class PlyFeatureJson
             id = ReadString(featureObject, "featureId", ReadString(featureObject, "id", "")),
             name = ReadString(featureObject, "name", ""),
             description = ReadString(featureObject, "description", ""),
+            origin = "catalog",
             intentExamples = ReadLegacyIntentExamples(featureObject),
             targetRoles = ReadStringList(featureObject, "targetRoles"),
             category = ReadFirstString(featureObject, "categories"),
@@ -607,6 +609,7 @@ public static class PlyFeatureJson
         WriteProperty(builder, indent, "id", feature.id, true);
         WriteProperty(builder, indent, "name", feature.name, true);
         WriteProperty(builder, indent, "description", feature.description, true);
+        WriteProperty(builder, indent, "origin", feature.origin, true);
         WriteStringArray(builder, indent, "intentExamples", feature.intentExamples, true);
         WriteStringArray(builder, indent, "targetRoles", feature.targetRoles, true);
         WriteProperty(builder, indent, "category", feature.category, true);

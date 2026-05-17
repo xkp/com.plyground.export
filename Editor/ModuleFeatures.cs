@@ -9,10 +9,13 @@ using UnityEngine.Events;
 
 public partial class ModuleExporter
 {
+    private const string DefaultFeatureCatalogRelativePath = "Editor/FeatureCatalog/default-feature-catalog.json";
     private static readonly HashSet<string> UnityLifecycleMethods = new HashSet<string>(StringComparer.Ordinal)
     {
         "Awake", "Start", "Update", "LateUpdate", "FixedUpdate", "OnEnable", "OnDisable"
     };
+    private static List<PlySemanticFeatureDefinition> cachedDefaultFeatureCatalog;
+    private static string cachedDefaultFeatureCatalogPath = "";
 
     private enum FeatureMappingSection
     {
@@ -73,9 +76,12 @@ public partial class ModuleExporter
     private Vector2 featureListScroll;
     private Vector2 featureDetailsScroll;
     private Vector2 featureEditorScroll;
+    private Vector2 catalogAddScroll;
     private List<PlyFeatureValidationIssue> featureValidationIssues = new List<PlyFeatureValidationIssue>();
     private bool includeLifecycleMethods;
     private string componentSearchTerm = "";
+    private string catalogAddSearchTerm = "";
+    private bool showCatalogAddBrowser;
     private bool featureValidationDirty = true;
     private string cachedComponentSearchTerm = "";
     private bool cachedIncludeLifecycleMethods;
@@ -127,6 +133,11 @@ public partial class ModuleExporter
             CreateSemanticFeature();
         }
 
+        if (GUILayout.Button("Add From Catalog", GUILayout.Width(130f)))
+        {
+            showCatalogAddBrowser = !showCatalogAddBrowser;
+        }
+
         includeLifecycleMethods = EditorGUILayout.ToggleLeft("Include Lifecycle Methods", includeLifecycleMethods, GUILayout.Width(180f));
         EditorGUILayout.EndHorizontal();
 
@@ -149,33 +160,50 @@ public partial class ModuleExporter
 
     private void DrawFeatureWorkspace()
     {
-        List<AvailableFeatureDefinition> catalog = GetAvailableFeatureCatalog();
-        selectedFeatureCatalogIndex = Mathf.Clamp(selectedFeatureCatalogIndex < 0 ? 0 : selectedFeatureCatalogIndex, 0, Mathf.Max(0, catalog.Count - 1));
-        AvailableFeatureDefinition selectedFeature = catalog.Count > 0 ? catalog[selectedFeatureCatalogIndex] : null;
+        List<AvailableFeatureDefinition> activeFeatures = GetActiveFeatureList();
+        selectedFeatureCatalogIndex = Mathf.Clamp(selectedFeatureCatalogIndex < 0 ? 0 : selectedFeatureCatalogIndex, 0, Mathf.Max(0, activeFeatures.Count - 1));
+        AvailableFeatureDefinition selectedFeature = activeFeatures.Count > 0 ? activeFeatures[selectedFeatureCatalogIndex] : null;
         PlyFeatureImplementation implementation = selectedFeature != null ? FindFeatureImplementation(selectedFeature.id) : null;
 
         EditorGUILayout.BeginHorizontal();
 
         EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(220f, position.width * 0.18f)), GUILayout.Height(640f));
-        GUILayout.Label("Semantic Features", EditorStyles.boldLabel);
+        GUILayout.Label("Module Features", EditorStyles.boldLabel);
+        if (showCatalogAddBrowser)
+        {
+            DrawCatalogAddBrowser();
+            EditorGUILayout.Space(6f);
+        }
+
         featureListScroll = EditorGUILayout.BeginScrollView(featureListScroll);
-        foreach (AvailableFeatureDefinition feature in catalog)
+        foreach (AvailableFeatureDefinition feature in activeFeatures)
         {
             bool implemented = FindFeatureImplementation(feature.id) != null;
-            string label = feature.name + (implemented ? " [Implemented]" : "");
-            int index = catalog.IndexOf(feature);
+            string label = feature.name + (feature.isBuiltIn ? " [Catalog]" : " [Custom]");
+            if (implemented)
+            {
+                label += " [Implemented]";
+            }
+
+            int index = activeFeatures.IndexOf(feature);
             if (DrawSelectableListButton(label, selectedFeatureCatalogIndex == index, GUILayout.Height(32f)))
             {
                 selectedFeatureCatalogIndex = index;
             }
         }
         EditorGUILayout.EndScrollView();
-        if (selectedFeature != null && !selectedFeature.isBuiltIn)
+        if (activeFeatures.Count == 0)
+        {
+            EditorGUILayout.HelpBox("No active features yet. Add one from the catalog or create a new feature.", MessageType.Info);
+        }
+
+        if (selectedFeature != null)
         {
             EditorGUILayout.Space(6f);
-            if (GUILayout.Button("Remove Feature", GUILayout.Width(120f)))
+            string removeLabel = selectedFeature.isBuiltIn ? "Remove Implementation" : "Remove Feature";
+            if (GUILayout.Button(removeLabel, GUILayout.Width(150f)))
             {
-                RemoveSemanticFeature(selectedFeature.id);
+                RemoveSelectedFeature(selectedFeature.id);
                 selectedFeatureCatalogIndex = 0;
                 GUIUtility.ExitGUI();
             }
@@ -1408,6 +1436,32 @@ public partial class ModuleExporter
         return catalog.Values.OrderBy(feature => feature.name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    private List<AvailableFeatureDefinition> GetActiveFeatureList()
+    {
+        return GetAvailableFeatureCatalog()
+            .Where(feature => !feature.isBuiltIn || FindFeatureImplementation(feature.id) != null)
+            .OrderBy(feature => feature.name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private List<AvailableFeatureDefinition> GetAddableCatalogFeatures()
+    {
+        IEnumerable<AvailableFeatureDefinition> query = GetAvailableFeatureCatalog()
+            .Where(feature => feature.isBuiltIn && FindFeatureImplementation(feature.id) == null);
+
+        if (!string.IsNullOrWhiteSpace(catalogAddSearchTerm))
+        {
+            string needle = catalogAddSearchTerm.Trim();
+            query = query.Where(feature =>
+                ContainsIgnoreCase(feature.name, needle) ||
+                ContainsIgnoreCase(feature.id, needle) ||
+                ContainsIgnoreCase(feature.description, needle) ||
+                feature.tags.Any(tag => ContainsIgnoreCase(tag, needle)));
+        }
+
+        return query.OrderBy(feature => feature.name, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
     private PlyFeatureImplementation FindFeatureImplementation(string featureId)
     {
         return FeatureManifestState.implementations.FirstOrDefault(feature =>
@@ -1472,7 +1526,7 @@ public partial class ModuleExporter
             id = feature.id,
             name = feature.name,
             description = feature.description,
-            isBuiltIn = IsBuiltInFeatureId(feature.id),
+            isBuiltIn = string.Equals(feature.origin, "catalog", StringComparison.OrdinalIgnoreCase),
             provides = new List<string>(feature.provides ?? new List<string>()),
             requires = new List<string>(feature.requires ?? new List<string>()),
             targetRoles = new List<string>(feature.targetRoles ?? new List<string>()),
@@ -1500,11 +1554,12 @@ public partial class ModuleExporter
             id = featureId,
             name = "New Feature",
             description = "Describe this semantic feature.",
+            origin = "user",
             category = "custom"
         }));
 
-        List<AvailableFeatureDefinition> catalog = GetAvailableFeatureCatalog();
-        selectedFeatureCatalogIndex = catalog.FindIndex(feature => string.Equals(feature.id, featureId, StringComparison.OrdinalIgnoreCase));
+        List<AvailableFeatureDefinition> activeFeatures = GetActiveFeatureList();
+        selectedFeatureCatalogIndex = activeFeatures.FindIndex(feature => string.Equals(feature.id, featureId, StringComparison.OrdinalIgnoreCase));
         if (selectedFeatureCatalogIndex < 0)
         {
             selectedFeatureCatalogIndex = 0;
@@ -1513,14 +1568,84 @@ public partial class ModuleExporter
         featureValidationDirty = true;
     }
 
-    private void RemoveSemanticFeature(string featureId)
+    private void DrawCatalogAddBrowser()
     {
-        if (string.IsNullOrWhiteSpace(featureId) || IsBuiltInFeatureId(featureId))
+        List<AvailableFeatureDefinition> addableFeatures = GetAddableCatalogFeatures();
+        EditorGUILayout.BeginVertical("helpbox");
+        EditorGUILayout.BeginHorizontal();
+        GUILayout.Label("Catalog", EditorStyles.miniBoldLabel);
+        GUILayout.FlexibleSpace();
+        if (GUILayout.Button("Close", GUILayout.Width(60f)))
+        {
+            showCatalogAddBrowser = false;
+            GUIUtility.ExitGUI();
+        }
+
+        EditorGUILayout.EndHorizontal();
+        catalogAddSearchTerm = EditorGUILayout.TextField("Search", catalogAddSearchTerm);
+
+        if (addableFeatures.Count == 0)
+        {
+            EditorGUILayout.HelpBox("No catalog features match the current filter.", MessageType.Info);
+        }
+        else
+        {
+            catalogAddScroll = EditorGUILayout.BeginScrollView(catalogAddScroll, GUILayout.Height(180f));
+            foreach (AvailableFeatureDefinition feature in addableFeatures)
+            {
+                string label = feature.name + " [" + feature.id + "]";
+                if (GUILayout.Button(label, GUILayout.Height(28f)))
+                {
+                    CreateFeatureImplementation(feature);
+                    List<AvailableFeatureDefinition> activeFeatures = GetActiveFeatureList();
+                    selectedFeatureCatalogIndex = activeFeatures.FindIndex(entry => string.Equals(entry.id, feature.id, StringComparison.OrdinalIgnoreCase));
+                    showCatalogAddBrowser = false;
+                    GUIUtility.ExitGUI();
+                }
+            }
+
+            EditorGUILayout.EndScrollView();
+        }
+
+        EditorGUILayout.EndVertical();
+    }
+
+    private void RemoveSelectedFeature(string featureId)
+    {
+        AvailableFeatureDefinition feature = GetAvailableFeatureCatalog()
+            .FirstOrDefault(entry => string.Equals(entry.id, featureId, StringComparison.OrdinalIgnoreCase));
+        if (feature == null)
         {
             return;
         }
 
+        if (feature.isBuiltIn)
+        {
+            RemoveFeatureImplementation(featureId);
+            return;
+        }
+
+        RemoveSemanticFeature(featureId);
+    }
+
+    private void RemoveFeatureImplementation(string featureId)
+    {
+        PlyFeatureImplementation implementation = FindFeatureImplementation(featureId);
+        if (implementation != null)
+        {
+            FeatureManifestState.implementations.Remove(implementation);
+            featureValidationDirty = true;
+        }
+    }
+
+    private void RemoveSemanticFeature(string featureId)
+    {
         PlySemanticFeatureDefinition feature = FindSemanticFeature(featureId);
+        if (string.IsNullOrWhiteSpace(featureId) || feature == null || string.Equals(feature.origin, "catalog", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
         if (feature != null)
         {
             FeatureManifestState.features.Remove(feature);
@@ -1543,86 +1668,78 @@ public partial class ModuleExporter
 
     private List<PlySemanticFeatureDefinition> GetBuiltInSemanticFeatures()
     {
-        return new List<PlySemanticFeatureDefinition>
+        string catalogPath = GetDefaultFeatureCatalogPath();
+        if (cachedDefaultFeatureCatalog != null &&
+            string.Equals(cachedDefaultFeatureCatalogPath, catalogPath, StringComparison.OrdinalIgnoreCase))
         {
-            new PlySemanticFeatureDefinition
+            return cachedDefaultFeatureCatalog
+                .Select(CloneSemanticFeatureAsCatalog)
+                .ToList();
+        }
+
+        List<PlySemanticFeatureDefinition> loadedCatalog = new List<PlySemanticFeatureDefinition>();
+        try
+        {
+            if (File.Exists(catalogPath))
             {
-                id = "enemy_aggression",
-                name = "Enemy Aggression",
-                description = "Makes enemies hostile toward a target.",
-                intentExamples = new List<string> { "guard ai", "enemy aggression", "hostile npc", "combat ai" },
-                targetRoles = new List<string> { "Enemy" },
-                category = "behavior",
-                tags = new List<string> { "combat", "ai", "enemy" },
-                provides = new List<string> { "aggression_control" },
-                requires = new List<string> { "spotted_state" },
-                inputs = new List<PlySemanticFeaturePort>
-                {
-                    new PlySemanticFeaturePort { name = "SetAggressive", kind = PlyFeaturePortKind.Action, dataType = PlyFeatureDataType.Void, required = true },
-                    new PlySemanticFeaturePort { name = "ApplyThreat", kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Float, required = false }
-                },
-                outputs = new List<PlySemanticFeaturePort>
-                {
-                    new PlySemanticFeaturePort { name = "OnTargetVisible", kind = PlyFeaturePortKind.Event, dataType = PlyFeatureDataType.Void, required = true },
-                    new PlySemanticFeaturePort { name = "OnAggroChanged", kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Float, required = true }
-                },
-                parameters = new List<PlySemanticFeatureParameter>
-                {
-                    new PlySemanticFeatureParameter { name = "AggroRadius", type = PlyFeatureDataType.Float, defaultValue = "20" }
-                }
-            },
-            new PlySemanticFeatureDefinition
-            {
-                id = "health_state",
-                name = "Health State",
-                description = "Exposes health values, damage intake, and death state.",
-                intentExamples = new List<string> { "health", "hp", "damageable", "hit points" },
-                targetRoles = new List<string> { "Enemy", "Player", "NPC" },
-                category = "state",
-                tags = new List<string> { "combat", "health", "damage" },
-                provides = new List<string> { "health_value" },
-                inputs = new List<PlySemanticFeaturePort>
-                {
-                    new PlySemanticFeaturePort { name = "ApplyDamage", kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Float, required = true }
-                },
-                outputs = new List<PlySemanticFeaturePort>
-                {
-                    new PlySemanticFeaturePort { name = "OnDeath", kind = PlyFeaturePortKind.Event, dataType = PlyFeatureDataType.Void, required = true },
-                    new PlySemanticFeaturePort { name = "OnHealthChanged", kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Float, required = true }
-                },
-                parameters = new List<PlySemanticFeatureParameter>
-                {
-                    new PlySemanticFeatureParameter { name = "MaxHealth", type = PlyFeatureDataType.Float, defaultValue = "100" },
-                    new PlySemanticFeatureParameter { name = "CurrentHealth", type = PlyFeatureDataType.Float }
-                }
-            },
-            new PlySemanticFeatureDefinition
-            {
-                id = "interaction_prompt",
-                name = "Interaction Prompt",
-                description = "Exposes interactable prompt text and interaction availability.",
-                intentExamples = new List<string> { "interact prompt", "use prompt", "pickup prompt" },
-                targetRoles = new List<string> { "Interactable" },
-                category = "ui",
-                tags = new List<string> { "interaction", "prompt", "ui" },
-                provides = new List<string> { "prompt_text" },
-                outputs = new List<PlySemanticFeaturePort>
-                {
-                    new PlySemanticFeaturePort { name = "OnPromptShown", kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.String, required = true }
-                },
-                parameters = new List<PlySemanticFeatureParameter>
-                {
-                    new PlySemanticFeatureParameter { name = "PromptText", type = PlyFeatureDataType.String },
-                    new PlySemanticFeatureParameter { name = "CanInteract", type = PlyFeatureDataType.Bool }
-                }
+                loadedCatalog = (PlyFeatureJson.ImportFromFile(catalogPath).features ?? new List<PlySemanticFeatureDefinition>())
+                    .Where(feature => feature != null && !string.IsNullOrWhiteSpace(feature.id))
+                    .Select(CloneSemanticFeatureAsCatalog)
+                    .ToList();
             }
-        };
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning("Failed to load default feature catalog from " + catalogPath + ": " + exception.Message);
+        }
+
+        if (loadedCatalog.Count == 0)
+        {
+            loadedCatalog = new List<PlySemanticFeatureDefinition>
+            {
+                new PlySemanticFeatureDefinition
+                {
+                    id = "health_state",
+                    name = "Health State",
+                    description = "Exposes health values, damage intake, and death state.",
+                    origin = "catalog"
+                },
+                new PlySemanticFeatureDefinition
+                {
+                    id = "interaction_prompt",
+                    name = "Interaction Prompt",
+                    description = "Exposes interactable prompt text and interaction availability.",
+                    origin = "catalog"
+                },
+                new PlySemanticFeatureDefinition
+                {
+                    id = "enemy_aggression",
+                    name = "Enemy Aggression",
+                    description = "Makes enemies hostile toward a target.",
+                    origin = "catalog"
+                }
+            };
+        }
+
+        cachedDefaultFeatureCatalogPath = catalogPath;
+        cachedDefaultFeatureCatalog = loadedCatalog
+            .Select(CloneSemanticFeatureAsCatalog)
+            .ToList();
+        return loadedCatalog;
     }
 
-    private bool IsBuiltInFeatureId(string featureId)
+    private string GetDefaultFeatureCatalogPath()
     {
-        return GetBuiltInSemanticFeatures().Any(feature =>
-            string.Equals(feature.id, featureId, StringComparison.OrdinalIgnoreCase));
+        return Path.Combine(Directory.GetCurrentDirectory(), DefaultFeatureCatalogRelativePath.Replace('/', Path.DirectorySeparatorChar));
+    }
+
+    private PlySemanticFeatureDefinition CloneSemanticFeatureAsCatalog(PlySemanticFeatureDefinition feature)
+    {
+        PlySemanticFeatureDefinition clone = feature == null
+            ? new PlySemanticFeatureDefinition()
+            : JsonUtility.FromJson<PlySemanticFeatureDefinition>(JsonUtility.ToJson(feature)) ?? new PlySemanticFeatureDefinition();
+        clone.origin = "catalog";
+        return PlyFeatureSchemaUtility.NormalizeFeatureDefinition(clone);
     }
 
     private List<PlyFeaturePortMapping> CreatePortMappings(PlySemanticFeatureDefinition feature)

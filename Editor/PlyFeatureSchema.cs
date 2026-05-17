@@ -65,6 +65,7 @@ public class PlySemanticFeatureDefinition
     public string id = "";
     public string name = "";
     public string description = "";
+    public string origin = "catalog";
     public List<string> intentExamples = new List<string>();
     public List<string> targetRoles = new List<string>();
     public string category = "";
@@ -277,6 +278,7 @@ public static class PlyFeatureSchemaUtility
         feature.id = feature.id ?? "";
         feature.name = feature.name ?? "";
         feature.description = feature.description ?? "";
+        feature.origin = NormalizeFeatureOrigin(feature.origin);
         feature.intentExamples = NormalizeStrings(feature.intentExamples);
         feature.targetRoles = NormalizeStrings(feature.targetRoles);
         feature.category = feature.category ?? "";
@@ -474,5 +476,16 @@ public static class PlyFeatureSchemaUtility
              !string.IsNullOrWhiteSpace(implementation.adapter.setupAdapter) ||
              !string.IsNullOrWhiteSpace(implementation.adapter.factoryId));
         return hasAdapter ? "adapter" : "bindings";
+    }
+
+    private static string NormalizeFeatureOrigin(string origin)
+    {
+        if (string.IsNullOrWhiteSpace(origin))
+        {
+            return "catalog";
+        }
+
+        string normalized = origin.Trim().ToLowerInvariant();
+        return normalized == "user" ? "user" : "catalog";
     }
 }

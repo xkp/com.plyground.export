@@ -1,0 +1,6828 @@
+{
+  "version": "1.0",
+  "targetRoles": [
+    "self",
+    "player",
+    "enemy",
+    "nearby_enemies",
+    "ally",
+    "target",
+    "world",
+    "ui",
+    "system",
+    "quest_manager",
+    "spawn_system",
+    "vehicle"
+  ],
+  "semanticCapabilities": [
+    "damage",
+    "health_state",
+    "death",
+    "visibility",
+    "spotted_state",
+    "aggression_control",
+    "pickup_collection",
+    "inventory_item",
+    "ammo_state",
+    "interaction",
+    "movement",
+    "vehicle_control",
+    "weapon_fire",
+    "spawn",
+    "score",
+    "timer",
+    "checkpoint",
+    "dialog_state",
+    "quest_state"
+  ],
+  "features": [
+    {
+      "id": "line_of_sight_sensor",
+      "name": "Line Of Sight Sensor",
+      "description": "Detects whether a source can currently see a target.",
+      "intentExamples": [
+        "enemy can see the player",
+        "break line of sight"
+      ],
+      "targetRoles": [
+        "enemy",
+        "self",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        },
+        {
+          "name": "range",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 20
+        },
+        {
+          "name": "fieldOfViewDegrees",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 120
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnTargetVisible",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnTargetHidden",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnVisibilityChanged",
+          "type": "bool",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "visibility"
+      ],
+      "requires": [],
+      "implements": [
+        "visibility"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "stealth",
+        "vision",
+        "visibility"
+      ],
+      "category": "sensor"
+    },
+    {
+      "id": "vision_cone_sensor",
+      "name": "Vision Cone Sensor",
+      "description": "Performs cone-based target sensing for vision gameplay.",
+      "intentExamples": [
+        "vision cone",
+        "guard field of view"
+      ],
+      "targetRoles": [
+        "enemy",
+        "self",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        },
+        {
+          "name": "range",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 15
+        },
+        {
+          "name": "coneAngleDegrees",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 90
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnTargetEnteredCone",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnTargetExitedCone",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "TargetsVisible",
+          "type": "int",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "visibility"
+      ],
+      "requires": [],
+      "implements": [
+        "visibility"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "stealth",
+        "vision"
+      ],
+      "category": "sensor"
+    },
+    {
+      "id": "proximity_trigger",
+      "name": "Proximity Trigger",
+      "description": "Fires when a target enters or exits a radius.",
+      "intentExamples": [
+        "when player gets near",
+        "nearby enemy trigger"
+      ],
+      "targetRoles": [
+        "enemy",
+        "self",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        },
+        {
+          "name": "radius",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 5
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnEnter",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnExit",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Inside",
+          "type": "bool",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "interaction"
+      ],
+      "requires": [],
+      "implements": [
+        "interaction"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "trigger",
+        "nearby"
+      ],
+      "category": "sensor"
+    },
+    {
+      "id": "area_trigger",
+      "name": "Area Trigger",
+      "description": "Detects overlap with a configured volume.",
+      "intentExamples": [
+        "enter the zone",
+        "inside an area"
+      ],
+      "targetRoles": [
+        "enemy",
+        "self",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnEnter",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnExit",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OccupancyCount",
+          "type": "int",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "interaction"
+      ],
+      "requires": [],
+      "implements": [
+        "interaction"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "trigger",
+        "area"
+      ],
+      "category": "sensor"
+    },
+    {
+      "id": "interaction",
+      "name": "Interaction",
+      "description": "Represents an interact action between actor and target.",
+      "intentExamples": [
+        "press to interact",
+        "use object"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "interactionName",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "interact"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnInteracted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "interaction"
+      ],
+      "requires": [],
+      "implements": [
+        "interaction"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "interaction"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "detection_meter",
+      "name": "Detection Meter",
+      "description": "Tracks a value that rises and falls based on visibility or suspicion.",
+      "intentExamples": [
+        "detection meter rises when seen",
+        "stealth meter fills up"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "minValue",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 0
+        },
+        {
+          "name": "maxValue",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 100
+        },
+        {
+          "name": "increaseRate",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 25
+        },
+        {
+          "name": "decreaseRate",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 15
+        }
+      ],
+      "inputs": [
+        {
+          "name": "SetIncreasing",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "SetDecreasing",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "AddValue",
+          "type": "float",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "SetValue",
+          "type": "float",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Reset",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnFull",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnEmpty",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnValueChanged",
+          "type": "float",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "spotted_state"
+      ],
+      "requires": [
+        "visibility"
+      ],
+      "implements": [
+        "spotted_state"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "meter",
+        "stealth",
+        "detection"
+      ],
+      "category": "meter"
+    },
+    {
+      "id": "generic_meter",
+      "name": "Generic Meter",
+      "description": "General-purpose meter for fill, depletion, and threshold behavior.",
+      "intentExamples": [
+        "increase meter",
+        "resource meter"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system"
+      ],
+      "parameters": [
+        {
+          "name": "minValue",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 0
+        },
+        {
+          "name": "maxValue",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 100
+        }
+      ],
+      "inputs": [
+        {
+          "name": "AddValue",
+          "type": "float",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "SetValue",
+          "type": "float",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Reset",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnFull",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnEmpty",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnValueChanged",
+          "type": "float",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "timer"
+      ],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "meter",
+        "resource"
+      ],
+      "category": "meter"
+    },
+    {
+      "id": "state_flag",
+      "name": "State Flag",
+      "description": "Stores a named boolean gameplay state.",
+      "intentExamples": [
+        "becomes spotted",
+        "set alarmed to true"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system"
+      ],
+      "parameters": [
+        {
+          "name": "flagName",
+          "type": "string",
+          "description": "",
+          "required": true
+        }
+      ],
+      "inputs": [
+        {
+          "name": "SetTrue",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "SetFalse",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "SetValue",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnTrue",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFalse",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "ValueChanged",
+          "type": "bool",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "spotted_state"
+      ],
+      "requires": [],
+      "implements": [
+        "spotted_state"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "state",
+        "flag"
+      ],
+      "category": "state"
+    },
+    {
+      "id": "state_value",
+      "name": "State Value",
+      "description": "Stores a named numeric or string state value.",
+      "intentExamples": [
+        "track alertness",
+        "store numeric state"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system"
+      ],
+      "parameters": [
+        {
+          "name": "stateName",
+          "type": "string",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "initialValue",
+          "type": "Any",
+          "description": "",
+          "required": false
+        }
+      ],
+      "inputs": [
+        {
+          "name": "SetValue",
+          "type": "Any",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Reset",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ValueChanged",
+          "type": "Any",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "state",
+        "value"
+      ],
+      "category": "state"
+    },
+    {
+      "id": "state_compare",
+      "name": "State Compare",
+      "description": "Compares a state value against a threshold or target.",
+      "intentExamples": [
+        "when meter is full",
+        "if health is below 10"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "operator",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "gte",
+          "enumValues": [
+            "eq",
+            "neq",
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ]
+        },
+        {
+          "name": "expectedValue",
+          "type": "Any",
+          "description": "",
+          "required": true
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Value",
+          "type": "Any",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnTrue",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFalse",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Matches",
+          "type": "bool",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "state",
+        "compare",
+        "condition"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "condition_check",
+      "name": "Condition Check",
+      "description": "Evaluates a boolean condition and emits branch-friendly outputs.",
+      "intentExamples": [
+        "if player is spotted",
+        "unless dead"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Condition",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnTrue",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFalse",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "condition",
+        "branch"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "event_router",
+      "name": "Event Router",
+      "description": "Routes one event to multiple semantic outputs.",
+      "intentExamples": [
+        "when X happens, do Y and Z"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "In",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OutA",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OutB",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OutC",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "event",
+        "routing"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "gate",
+      "name": "Gate",
+      "description": "Allows events to pass only while open.",
+      "intentExamples": [
+        "while condition is true",
+        "only once"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "startsOpen",
+          "type": "bool",
+          "description": "",
+          "required": false,
+          "defaultValue": true
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Enter",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "SetOpen",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Passed",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "gate",
+        "control"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "cooldown",
+      "name": "Cooldown",
+      "description": "Prevents an event from retriggering until a delay expires.",
+      "intentExamples": [
+        "with a cooldown",
+        "can only happen every 5 seconds"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "cooldownSeconds",
+          "type": "float",
+          "description": "",
+          "required": true,
+          "defaultValue": 1
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnReady",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnBlocked",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [
+        "timer"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "cooldown",
+        "timer"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "timer_delay",
+      "name": "Timer Delay",
+      "description": "Delays an event by a configured duration.",
+      "intentExamples": [
+        "after 3 seconds",
+        "wait then trigger"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "delaySeconds",
+          "type": "float",
+          "description": "",
+          "required": true,
+          "defaultValue": 1
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "AfterDelay",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [
+        "timer"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "delay",
+        "timer"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "counter",
+      "name": "Counter",
+      "description": "Counts increments or decrements and exposes threshold events.",
+      "intentExamples": [
+        "count kills",
+        "increment counter"
+      ],
+      "targetRoles": [
+        "system",
+        "player",
+        "enemy",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "initialValue",
+          "type": "int",
+          "description": "",
+          "required": false,
+          "defaultValue": 0
+        },
+        {
+          "name": "targetValue",
+          "type": "int",
+          "description": "",
+          "required": false
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Increment",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Decrement",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Add",
+          "type": "int",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Reset",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnTargetReached",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "ValueChanged",
+          "type": "int",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "counter"
+      ],
+      "category": "state"
+    },
+    {
+      "id": "sequence",
+      "name": "Sequence",
+      "description": "Executes configured steps in order.",
+      "intentExamples": [
+        "do X then Y",
+        "multi-step behavior"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Start",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Step1",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Step2",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Completed",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "sequence"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "branch",
+      "name": "Branch",
+      "description": "Branches flow based on a bool input.",
+      "intentExamples": [
+        "if X do Y otherwise Z"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Condition",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "True",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "False",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "branch"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "random_chance",
+      "name": "Random Chance",
+      "description": "Routes flow based on probability.",
+      "intentExamples": [
+        "random chance to crit",
+        "sometimes trigger"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "probability",
+          "type": "float",
+          "description": "",
+          "required": true,
+          "defaultValue": 0.5
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Success",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Failure",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "random",
+        "chance"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "repeat_until",
+      "name": "Repeat Until",
+      "description": "Repeats a trigger until a stop condition succeeds.",
+      "intentExamples": [
+        "repeat until dead",
+        "keep trying until spotted"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Start",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "StopCondition",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Tick",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Completed",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [
+        "timer"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "repeat",
+        "loop"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "damage_receiver",
+      "name": "Damage Receiver",
+      "description": "Accepts incoming damage and forwards it to a health-state consumer.",
+      "intentExamples": [
+        "takes damage",
+        "can be hurt"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ApplyDamage",
+          "type": "float",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "DamageTaken",
+          "type": "float",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "damage"
+      ],
+      "requires": [],
+      "implements": [
+        "damage"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "damage"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "health",
+      "name": "Health",
+      "description": "Tracks current and maximum health.",
+      "intentExamples": [
+        "health bar",
+        "track hit points"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system"
+      ],
+      "parameters": [
+        {
+          "name": "maxHealth",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 100
+        },
+        {
+          "name": "currentHealth",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 100
+        }
+      ],
+      "inputs": [
+        {
+          "name": "ApplyDamage",
+          "type": "float",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "ApplyHealing",
+          "type": "float",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "SetHealth",
+          "type": "float",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "HealthChanged",
+          "type": "float",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnDepleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "health_state"
+      ],
+      "requires": [],
+      "implements": [
+        "health_state"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "health"
+      ],
+      "category": "state"
+    },
+    {
+      "id": "death_event",
+      "name": "Death Event",
+      "description": "Emits death semantics when a health-state source depletes.",
+      "intentExamples": [
+        "when dead",
+        "on death"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnDeath",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Died",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "death"
+      ],
+      "requires": [
+        "health_state"
+      ],
+      "implements": [
+        "death"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "death"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "healing",
+      "name": "Healing",
+      "description": "Applies healing to a health state.",
+      "intentExamples": [
+        "heal player",
+        "restore health"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ApplyHealing",
+          "type": "float",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Completed",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [
+        "health_state"
+      ],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "healing",
+        "health"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "weapon_fire",
+      "name": "Weapon Fire",
+      "description": "Handles weapon firing intent.",
+      "intentExamples": [
+        "fire weapon",
+        "shoot"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnFired",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "ProjectileSpawnRequest",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "weapon_fire"
+      ],
+      "requires": [],
+      "implements": [
+        "weapon_fire"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "weapon",
+        "shooting"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "projectile_spawner",
+      "name": "Projectile Spawner",
+      "description": "Spawns configured projectiles.",
+      "intentExamples": [
+        "spawn bullet",
+        "launch projectile"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "projectilePrefab",
+          "type": "GameObject",
+          "description": "",
+          "required": false
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "SpawnProjectile",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ProjectileSpawned",
+          "type": "GameObject",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "spawn"
+      ],
+      "requires": [],
+      "implements": [
+        "spawn"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "projectile",
+        "spawn"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "pickup",
+      "name": "Pickup",
+      "description": "Handles collection of a world item.",
+      "intentExamples": [
+        "pick up coin",
+        "collect ammo"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Collected",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "pickup_collection"
+      ],
+      "requires": [],
+      "implements": [
+        "pickup_collection"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "pickup",
+        "collect"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "inventory",
+      "name": "Inventory",
+      "description": "Stores collected items.",
+      "intentExamples": [
+        "inventory system",
+        "bag slots"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "AddItem",
+          "type": "GameObject",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "RemoveItem",
+          "type": "GameObject",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "InventoryChanged",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "inventory_item"
+      ],
+      "requires": [],
+      "implements": [
+        "inventory_item"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "inventory"
+      ],
+      "category": "state"
+    },
+    {
+      "id": "ammo",
+      "name": "Ammo",
+      "description": "Tracks ammunition state.",
+      "intentExamples": [
+        "ammo count",
+        "needs bullets"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system"
+      ],
+      "parameters": [
+        {
+          "name": "maxAmmo",
+          "type": "int",
+          "description": "",
+          "required": false,
+          "defaultValue": 30
+        }
+      ],
+      "inputs": [
+        {
+          "name": "ConsumeAmmo",
+          "type": "int",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "AddAmmo",
+          "type": "int",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "AmmoChanged",
+          "type": "int",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnEmpty",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "ammo_state"
+      ],
+      "requires": [],
+      "implements": [
+        "ammo_state"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "ammo"
+      ],
+      "category": "state"
+    },
+    {
+      "id": "currency",
+      "name": "Currency",
+      "description": "Tracks money-like numeric state.",
+      "intentExamples": [
+        "coins",
+        "currency amount"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "AddCurrency",
+          "type": "int",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "SpendCurrency",
+          "type": "int",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CurrencyChanged",
+          "type": "int",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "currency"
+      ],
+      "category": "state"
+    },
+    {
+      "id": "quest_state",
+      "name": "Quest State",
+      "description": "Tracks quest progression or status.",
+      "intentExamples": [
+        "quest started",
+        "quest complete"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "SetValue",
+          "type": "string",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Reset",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ValueChanged",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "quest_state"
+      ],
+      "requires": [],
+      "implements": [
+        "quest_state"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "quest"
+      ],
+      "category": "state"
+    },
+    {
+      "id": "dialog",
+      "name": "Dialog",
+      "description": "Represents dialog state and triggers.",
+      "intentExamples": [
+        "start dialog",
+        "conversation state"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "SetValue",
+          "type": "string",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Reset",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ValueChanged",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "dialog_state"
+      ],
+      "requires": [],
+      "implements": [
+        "dialog_state"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "dialog"
+      ],
+      "category": "state"
+    },
+    {
+      "id": "checkpoint",
+      "name": "Checkpoint",
+      "description": "Records a restore point.",
+      "intentExamples": [
+        "save checkpoint",
+        "respawn checkpoint"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "CheckpointReached",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "checkpoint"
+      ],
+      "requires": [],
+      "implements": [
+        "checkpoint"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "checkpoint"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "spawn_point",
+      "name": "Spawn Point",
+      "description": "Provides a spawn location.",
+      "intentExamples": [
+        "spawn here",
+        "player spawn point"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Spawned",
+          "type": "GameObject",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "spawn"
+      ],
+      "requires": [],
+      "implements": [
+        "spawn"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "spawn"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "spawn_wave",
+      "name": "Spawn Wave",
+      "description": "Spawns groups of enemies or actors.",
+      "intentExamples": [
+        "enemy wave",
+        "spawn multiple enemies"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "count",
+          "type": "int",
+          "description": "",
+          "required": false,
+          "defaultValue": 5
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "WaveSpawned",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "spawn"
+      ],
+      "requires": [],
+      "implements": [
+        "spawn"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "spawn",
+        "wave"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "score",
+      "name": "Score",
+      "description": "Tracks score state.",
+      "intentExamples": [
+        "score goes up",
+        "award points"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "SetValue",
+          "type": "int",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Reset",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ValueChanged",
+          "type": "int",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "score"
+      ],
+      "requires": [],
+      "implements": [
+        "score"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "score"
+      ],
+      "category": "state"
+    },
+    {
+      "id": "team_affiliation",
+      "name": "Team Affiliation",
+      "description": "Stores which team an actor belongs to.",
+      "intentExamples": [
+        "enemy team",
+        "friendly team"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "SetValue",
+          "type": "string",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Reset",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "ValueChanged",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "team"
+      ],
+      "category": "state"
+    },
+    {
+      "id": "enemy_aggression",
+      "name": "Enemy Aggression",
+      "description": "Makes enemies hostile toward a target.",
+      "intentExamples": [
+        "nearby enemies become aggressive",
+        "guards attack the player"
+      ],
+      "targetRoles": [
+        "enemy",
+        "nearby_enemies"
+      ],
+      "parameters": [
+        {
+          "name": "aggressionTargetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "SetAggressive",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "SetPassive",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnAggressive",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "AggressionChanged",
+          "type": "bool",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "aggression_control"
+      ],
+      "requires": [],
+      "implements": [
+        "aggression_control"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "aggression",
+        "enemy"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "enemy_alert",
+      "name": "Enemy Alert",
+      "description": "Raises or clears enemy alert state.",
+      "intentExamples": [
+        "alert guards",
+        "raise alarm"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Alert",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "ClearAlert",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "AlertChanged",
+          "type": "bool",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "alert",
+        "enemy"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "search_last_known_position",
+      "name": "Search Last Known Position",
+      "description": "Directs an actor to search a remembered location.",
+      "intentExamples": [
+        "search the last known position",
+        "investigate where player was seen"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Search",
+          "type": "Vector3",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "SearchStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [
+        "movement"
+      ],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "search",
+        "movement"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "pathfinding_move_to",
+      "name": "Pathfinding Move To",
+      "description": "Moves an actor to a world position using navigation.",
+      "intentExamples": [
+        "move enemy to target",
+        "walk to the player"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "MoveTo",
+          "type": "Vector3",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Arrived",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "movement"
+      ],
+      "requires": [],
+      "implements": [
+        "movement"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "move",
+        "pathfinding"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "vehicle_control",
+      "name": "Vehicle Control",
+      "description": "Provides semantic vehicle driving control.",
+      "intentExamples": [
+        "drive vehicle",
+        "vehicle movement"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Completed",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "vehicle_control"
+      ],
+      "requires": [],
+      "implements": [
+        "vehicle_control"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "vehicle"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "player_control",
+      "name": "Player Control",
+      "description": "Provides player movement or input control.",
+      "intentExamples": [
+        "player control",
+        "move the player"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Completed",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "movement"
+      ],
+      "requires": [],
+      "implements": [
+        "movement"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "player",
+        "movement"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "animation_trigger",
+      "name": "Animation Trigger",
+      "description": "Triggers an animation event.",
+      "intentExamples": [
+        "play animation",
+        "set trigger"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "animationName",
+          "type": "string",
+          "description": "",
+          "required": false
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Play",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "AnimationTriggered",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "animation"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "ui_update",
+      "name": "UI Update",
+      "description": "Pushes state to UI.",
+      "intentExamples": [
+        "update HUD",
+        "show score"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Value",
+          "type": "Any",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Updated",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "ui"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "unity_trigger_event",
+      "name": "Unity Trigger Event",
+      "description": "Built-in Unity bridge for trigger callbacks.",
+      "intentExamples": [
+        "OnTriggerEnter",
+        "when collider enters trigger"
+      ],
+      "targetRoles": [
+        "self",
+        "world",
+        "player",
+        "enemy"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        },
+        {
+          "name": "unityEventName",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "OnTriggerEnter"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnTriggerEnter",
+          "type": "GameObject",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnTriggerExit",
+          "type": "GameObject",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnTriggerStay",
+          "type": "GameObject",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": "builtin.unity.PlyUnityTriggerBridge",
+      "setupAdapter": "builtin.unity.trigger_bridge",
+      "tags": [
+        "unity",
+        "bridge",
+        "trigger"
+      ],
+      "category": "bridge"
+    },
+    {
+      "id": "unity_collision_event",
+      "name": "Unity Collision Event",
+      "description": "Built-in Unity bridge for collision callbacks.",
+      "intentExamples": [
+        "OnCollisionEnter",
+        "when collision happens"
+      ],
+      "targetRoles": [
+        "self",
+        "world",
+        "player",
+        "enemy"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        },
+        {
+          "name": "unityEventName",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "OnCollisionEnter"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnCollisionEnter",
+          "type": "GameObject",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCollisionExit",
+          "type": "GameObject",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": "builtin.unity.PlyUnityCollisionBridge",
+      "setupAdapter": "builtin.unity.collision_bridge",
+      "tags": [
+        "unity",
+        "bridge",
+        "collision"
+      ],
+      "category": "bridge"
+    },
+    {
+      "id": "unity_lifecycle_event",
+      "name": "Unity Lifecycle Event",
+      "description": "Built-in Unity bridge for lifecycle callbacks.",
+      "intentExamples": [
+        "Start",
+        "OnEnable",
+        "OnDisable"
+      ],
+      "targetRoles": [
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        },
+        {
+          "name": "unityEventName",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "Start"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Start",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnEnable",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnDisable",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": "builtin.unity.PlyUnityLifecycleBridge",
+      "setupAdapter": "builtin.unity.lifecycle_bridge",
+      "tags": [
+        "unity",
+        "bridge",
+        "lifecycle"
+      ],
+      "category": "bridge"
+    },
+    {
+      "id": "unity_visibility_event",
+      "name": "Unity Visibility Event",
+      "description": "Built-in Unity bridge for renderer visibility callbacks.",
+      "intentExamples": [
+        "OnBecameVisible",
+        "OnBecameInvisible"
+      ],
+      "targetRoles": [
+        "self",
+        "world"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnBecameVisible",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnBecameInvisible",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": "builtin.unity.PlyUnityVisibilityBridge",
+      "setupAdapter": "builtin.unity.visibility_bridge",
+      "tags": [
+        "unity",
+        "bridge",
+        "visibility"
+      ],
+      "category": "bridge"
+    },
+    {
+      "id": "unity_input_event",
+      "name": "Unity Input Event",
+      "description": "Built-in Unity bridge for gameplay input.",
+      "intentExamples": [
+        "button pressed",
+        "input action"
+      ],
+      "targetRoles": [
+        "player",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        },
+        {
+          "name": "inputName",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "Fire1"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnPressed",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnReleased",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": "builtin.unity.PlyUnityInputBridge",
+      "setupAdapter": "builtin.unity.input_bridge",
+      "tags": [
+        "unity",
+        "bridge",
+        "input"
+      ],
+      "category": "bridge"
+    },
+    {
+      "id": "unity_pointer_event",
+      "name": "Unity Pointer Event",
+      "description": "Built-in Unity bridge for pointer and click callbacks.",
+      "intentExamples": [
+        "pointer click",
+        "mouse click event"
+      ],
+      "targetRoles": [
+        "ui",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnPointerClick",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnPointerEnter",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnPointerExit",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": "builtin.unity.PlyUnityPointerBridge",
+      "setupAdapter": "builtin.unity.pointer_bridge",
+      "tags": [
+        "unity",
+        "bridge",
+        "pointer"
+      ],
+      "category": "bridge"
+    },
+    {
+      "id": "unity_animation_event",
+      "name": "Unity Animation Event",
+      "description": "Built-in Unity bridge for animation event callbacks.",
+      "intentExamples": [
+        "animation event fired",
+        "animation callback"
+      ],
+      "targetRoles": [
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnAnimationEvent",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": "builtin.unity.PlyUnityAnimationBridge",
+      "setupAdapter": "builtin.unity.animation_bridge",
+      "tags": [
+        "unity",
+        "bridge",
+        "animation"
+      ],
+      "category": "bridge"
+    },
+    {
+      "id": "unity_timer_event",
+      "name": "Unity Timer Event",
+      "description": "Built-in Unity bridge for periodic timer ticks.",
+      "intentExamples": [
+        "every 2 seconds",
+        "periodic tick"
+      ],
+      "targetRoles": [
+        "system",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        },
+        {
+          "name": "intervalSeconds",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 1
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnTick",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "ElapsedSeconds",
+          "type": "float",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "timer"
+      ],
+      "requires": [],
+      "implements": [
+        "timer"
+      ],
+      "adapterId": "builtin.unity.PlyUnityTimerBridge",
+      "setupAdapter": "builtin.unity.timer_bridge",
+      "tags": [
+        "unity",
+        "bridge",
+        "timer"
+      ],
+      "category": "bridge"
+    },
+    {
+      "id": "unity_update_tick",
+      "name": "Unity Update Tick",
+      "description": "Built-in Unity bridge for Update and FixedUpdate ticks.",
+      "intentExamples": [
+        "every frame",
+        "fixed update"
+      ],
+      "targetRoles": [
+        "system",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "sourceRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "self"
+        },
+        {
+          "name": "targetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "Enable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "Disable",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "Update",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "FixedUpdate",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": "builtin.unity.PlyUnityUpdateTickBridge",
+      "setupAdapter": "builtin.unity.update_tick_bridge",
+      "tags": [
+        "unity",
+        "bridge",
+        "update"
+      ],
+      "category": "bridge"
+    },
+    {
+      "id": "move_to_target",
+      "name": "Move To Target",
+      "description": "Asynchronously moves an actor to a target.",
+      "intentExamples": [
+        "go to the shop keeper",
+        "move to target"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "ally",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "destinationRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "target"
+        },
+        {
+          "name": "speed",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 3.5
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "SetDestination",
+          "type": "Vector3",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "AssignTarget",
+          "type": "GameObject",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Arrived",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "movement"
+      ],
+      "requires": [],
+      "implements": [
+        "movement"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "action",
+        "move",
+        "async"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "hide_behavior",
+      "name": "Hide Behavior",
+      "description": "Moves or switches an actor into a hidden state.",
+      "intentExamples": [
+        "hide",
+        "take cover"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "ally",
+        "self"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Hidden",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "action",
+        "hide",
+        "async"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "talk_to_npc",
+      "name": "Talk To NPC",
+      "description": "Executes a talk interaction with an NPC.",
+      "intentExamples": [
+        "talk to the shop keeper",
+        "speak with npc"
+      ],
+      "targetRoles": [
+        "player",
+        "ally",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "conversationTargetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "target"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "DialogFinished",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "dialog_state"
+      ],
+      "requires": [],
+      "implements": [
+        "dialog_state"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "action",
+        "talk",
+        "dialog"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "attack_target",
+      "name": "Attack Target",
+      "description": "Asynchronously attacks a target.",
+      "intentExamples": [
+        "attack target",
+        "fight enemy"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "ally"
+      ],
+      "parameters": [
+        {
+          "name": "attackTargetRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "target"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Completed",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "action",
+        "attack",
+        "combat"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "play_animation",
+      "name": "Play Animation",
+      "description": "Plays an animation and completes when it finishes.",
+      "intentExamples": [
+        "play animation",
+        "animate then continue"
+      ],
+      "targetRoles": [
+        "self",
+        "player",
+        "enemy"
+      ],
+      "parameters": [
+        {
+          "name": "animationName",
+          "type": "string",
+          "description": "",
+          "required": false
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "AnimationFinished",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "action",
+        "animation"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "wait",
+      "name": "Wait",
+      "description": "Waits for a duration before completing.",
+      "intentExamples": [
+        "wait 2 seconds",
+        "pause before next step"
+      ],
+      "targetRoles": [
+        "system",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "durationSeconds",
+          "type": "float",
+          "description": "",
+          "required": false,
+          "defaultValue": 1
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Completed",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "timer"
+      ],
+      "requires": [],
+      "implements": [
+        "timer"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "action",
+        "wait",
+        "timer"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "patrol",
+      "name": "Patrol",
+      "description": "Patrols through configured patrol points.",
+      "intentExamples": [
+        "patrol between towers",
+        "guard patrol"
+      ],
+      "targetRoles": [
+        "enemy",
+        "ally",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "patrolRoute",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "default_route"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Completed",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "movement"
+      ],
+      "requires": [],
+      "implements": [
+        "movement"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "action",
+        "patrol",
+        "movement"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "flee",
+      "name": "Flee",
+      "description": "Flees from a threat source.",
+      "intentExamples": [
+        "flee when low health",
+        "run away"
+      ],
+      "targetRoles": [
+        "enemy",
+        "ally",
+        "player",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "threatRole",
+          "type": "string",
+          "description": "",
+          "required": false,
+          "defaultValue": "player"
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Completed",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [
+        "movement"
+      ],
+      "requires": [],
+      "implements": [
+        "movement"
+      ],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "action",
+        "flee",
+        "movement"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "search_area",
+      "name": "Search Area",
+      "description": "Searches an area until completion or interruption.",
+      "intentExamples": [
+        "search area",
+        "investigate location"
+      ],
+      "targetRoles": [
+        "enemy",
+        "ally",
+        "self"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Completed",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "action",
+        "search",
+        "async"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "open_behavior",
+      "name": "Open Behavior",
+      "description": "Opens a door, gate, or interactable object.",
+      "intentExamples": [
+        "open the door",
+        "unlock and open gate"
+      ],
+      "targetRoles": [
+        "world",
+        "self",
+        "target"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Trigger",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Opened",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "action",
+        "open"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "inventory_has_item",
+      "name": "Inventory Has Item",
+      "description": "Evaluates whether an inventory contains a named item.",
+      "intentExamples": [
+        "player has red key",
+        "has key item"
+      ],
+      "targetRoles": [
+        "player",
+        "ally",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "itemName",
+          "type": "string",
+          "description": "",
+          "required": true
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Check",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnTrue",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFalse",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "HasItem",
+          "type": "bool",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [
+        "inventory_item"
+      ],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "inventory",
+        "condition"
+      ],
+      "category": "action"
+    },
+    {
+      "id": "parallel",
+      "name": "Parallel",
+      "description": "Runs multiple child actions at the same time.",
+      "intentExamples": [
+        "at the same time",
+        "while moving and shooting"
+      ],
+      "targetRoles": [
+        "system",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "childNodeIds",
+          "type": "Any",
+          "description": "",
+          "required": false,
+          "defaultValue": []
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ChildCompleted",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "flow",
+        "parallel"
+      ],
+      "category": "flow_control"
+    },
+    {
+      "id": "selector",
+      "name": "Selector",
+      "description": "Tries child actions in order until one succeeds.",
+      "intentExamples": [
+        "try A or B",
+        "fallback behavior"
+      ],
+      "targetRoles": [
+        "system",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "childNodeIds",
+          "type": "Any",
+          "description": "",
+          "required": false,
+          "defaultValue": []
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ChildSelected",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "flow",
+        "selector"
+      ],
+      "category": "flow_control"
+    },
+    {
+      "id": "loop",
+      "name": "Loop",
+      "description": "Repeatedly runs a child action while enabled.",
+      "intentExamples": [
+        "loop forever",
+        "keep repeating"
+      ],
+      "targetRoles": [
+        "system",
+        "self"
+      ],
+      "parameters": [
+        {
+          "name": "childNodeIds",
+          "type": "Any",
+          "description": "",
+          "required": false,
+          "defaultValue": []
+        }
+      ],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Iteration",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "flow",
+        "loop"
+      ],
+      "category": "flow_control"
+    },
+    {
+      "id": "wait_until",
+      "name": "Wait Until",
+      "description": "Waits until a bool condition becomes true.",
+      "intentExamples": [
+        "wait until spotted",
+        "pause until condition"
+      ],
+      "targetRoles": [
+        "system",
+        "self"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Condition",
+          "type": "bool",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ConditionMet",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "flow",
+        "wait",
+        "condition"
+      ],
+      "category": "flow_control"
+    },
+    {
+      "id": "sound_event",
+      "name": "Sound Event",
+      "description": "Triggers a sound cue.",
+      "intentExamples": [
+        "play sound",
+        "alarm sound"
+      ],
+      "targetRoles": [
+        "player",
+        "enemy",
+        "self",
+        "system",
+        "world"
+      ],
+      "parameters": [],
+      "inputs": [
+        {
+          "name": "StartAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "CancelAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "PauseAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "ResumeAction",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Play",
+          "type": "Event",
+          "direction": "input",
+          "description": "",
+          "required": true
+        }
+      ],
+      "outputs": [
+        {
+          "name": "OnStarted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnCompleted",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        },
+        {
+          "name": "OnFailed",
+          "type": "string",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "OnCancelled",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": false
+        },
+        {
+          "name": "Played",
+          "type": "Event",
+          "direction": "output",
+          "description": "",
+          "required": true
+        }
+      ],
+      "provides": [],
+      "requires": [],
+      "implements": [],
+      "adapterId": null,
+      "setupAdapter": null,
+      "tags": [
+        "sound",
+        "audio"
+      ],
+      "category": "action"
+    }
+  ]
+}
