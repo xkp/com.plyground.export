@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using UnityEditor;
+using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -1669,6 +1670,7 @@ public partial class ModuleExporter
     private List<PlySemanticFeatureDefinition> GetBuiltInSemanticFeatures()
     {
         string catalogPath = GetDefaultFeatureCatalogPath();
+        Debug.Log("Plyground Exporter: loading default feature catalog from " + catalogPath);
         if (cachedDefaultFeatureCatalog != null &&
             string.Equals(cachedDefaultFeatureCatalogPath, catalogPath, StringComparison.OrdinalIgnoreCase))
         {
@@ -1707,6 +1709,19 @@ public partial class ModuleExporter
 
     private string GetDefaultFeatureCatalogPath()
     {
+        try
+        {
+            PackageInfo packageInfo = PackageInfo.FindForAssembly(GetType().Assembly);
+            if (packageInfo != null && !string.IsNullOrWhiteSpace(packageInfo.resolvedPath))
+            {
+                return Path.Combine(packageInfo.resolvedPath, "Editor", "FeatureCatalog", "default-feature-catalog.json");
+            }
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning("Plyground Exporter: failed to resolve package path for default feature catalog: " + exception.Message);
+        }
+
         return Path.Combine(Directory.GetCurrentDirectory(), DefaultFeatureCatalogRelativePath.Replace('/', Path.DirectorySeparatorChar));
     }
 
