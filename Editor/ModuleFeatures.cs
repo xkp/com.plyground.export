@@ -1695,30 +1695,7 @@ public partial class ModuleExporter
 
         if (loadedCatalog.Count == 0)
         {
-            loadedCatalog = new List<PlySemanticFeatureDefinition>
-            {
-                new PlySemanticFeatureDefinition
-                {
-                    id = "health_state",
-                    name = "Health State",
-                    description = "Exposes health values, damage intake, and death state.",
-                    origin = "catalog"
-                },
-                new PlySemanticFeatureDefinition
-                {
-                    id = "interaction_prompt",
-                    name = "Interaction Prompt",
-                    description = "Exposes interactable prompt text and interaction availability.",
-                    origin = "catalog"
-                },
-                new PlySemanticFeatureDefinition
-                {
-                    id = "enemy_aggression",
-                    name = "Enemy Aggression",
-                    description = "Makes enemies hostile toward a target.",
-                    origin = "catalog"
-                }
-            };
+            Debug.LogWarning("Default feature catalog is empty or could not be loaded from " + catalogPath + ".");
         }
 
         cachedDefaultFeatureCatalogPath = catalogPath;
