@@ -1204,7 +1204,7 @@ public partial class ModuleExporter
 				CapabilityParameterInfo parameter = selectedComponent.parameters[i];
 				string editableLabel = parameter.userEditable ? "Editable" : "Locked";
 				string label = (string.IsNullOrWhiteSpace(parameter.name) ? "New Property" : parameter.name) + " [" + editableLabel + "]";
-				if (GUILayout.Button(label, selectedComponentArtifactIndex == i ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(26f)))
+				if (DrawSelectableListButton(label, selectedComponentArtifactIndex == i, GUILayout.Height(26f)))
 				{
 					selectedComponentArtifactIndex = i;
 				}
@@ -1316,7 +1316,7 @@ public partial class ModuleExporter
 				: GetLeafTypeName(entry.typeName);
 			EditorGUILayout.BeginHorizontal();
 			GUILayout.Space((depth + (string.IsNullOrWhiteSpace(node.fullPath) ? 0 : 1)) * 14f);
-			if (GUILayout.Button(label, selectedComponentIndex == componentIndex ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(34f)))
+			if (DrawSelectableListButton(label, selectedComponentIndex == componentIndex, GUILayout.Height(34f)))
 			{
 				selectedComponentIndex = componentIndex;
 				selectedComponentArtifactIndex = -1;
@@ -1628,7 +1628,7 @@ public partial class ModuleExporter
 		{
 			CapabilityFeatureInfo entry = values[i];
 			string tileLabel = string.IsNullOrWhiteSpace(entry.featureId) ? "New Feature" : entry.featureId;
-			if (GUILayout.Button(tileLabel, selectedIndex == i ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(32f)))
+			if (DrawSelectableListButton(tileLabel, selectedIndex == i, GUILayout.Height(32f)))
 			{
 				selectedIndex = i;
 			}
@@ -1725,6 +1725,24 @@ public partial class ModuleExporter
 		EditorGUILayout.EndVertical();
 	}
 
+	private bool DrawSelectableListButton(string label, bool selected, params GUILayoutOption[] options)
+	{
+		Color previousBackground = GUI.backgroundColor;
+		if (selected)
+		{
+			GUI.backgroundColor = new Color(0.72f, 0.82f, 1f, 1f);
+		}
+
+		try
+		{
+			return GUILayout.Button(label, GUI.skin.button, options);
+		}
+		finally
+		{
+			GUI.backgroundColor = previousBackground;
+		}
+	}
+
 	private void DrawTypeTreeEditor(List<CapabilityTypeInfo> values)
 	{
 		values ??= new List<CapabilityTypeInfo>();
@@ -1755,7 +1773,7 @@ public partial class ModuleExporter
 		{
 			CapabilityTypeInfo typeEntry = values[i];
 			string typeLabel = string.IsNullOrWhiteSpace(typeEntry.name) ? "New Type" : typeEntry.name;
-			if (GUILayout.Button(typeLabel, selectedTypeIndex == i && selectedTypeFieldIndex < 0 ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(30f)))
+			if (DrawSelectableListButton(typeLabel, selectedTypeIndex == i && selectedTypeFieldIndex < 0, GUILayout.Height(30f)))
 			{
 				selectedTypeIndex = i;
 				selectedTypeFieldIndex = -1;

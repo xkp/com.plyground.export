@@ -26,6 +26,7 @@ public partial class ModuleExporter
         public string id;
         public string name;
         public string description;
+        public bool isBuiltIn;
         public List<string> provides = new List<string>();
         public List<string> requires = new List<string>();
         public List<string> targetRoles = new List<string>();
@@ -121,6 +122,11 @@ public partial class ModuleExporter
             ExportFeatureManifestToJson();
         }
 
+        if (GUILayout.Button("New Feature", GUILayout.Width(100f)))
+        {
+            CreateSemanticFeature();
+        }
+
         includeLifecycleMethods = EditorGUILayout.ToggleLeft("Include Lifecycle Methods", includeLifecycleMethods, GUILayout.Width(180f));
         EditorGUILayout.EndHorizontal();
 
@@ -158,12 +164,22 @@ public partial class ModuleExporter
             bool implemented = FindFeatureImplementation(feature.id) != null;
             string label = feature.name + (implemented ? " [Implemented]" : "");
             int index = catalog.IndexOf(feature);
-            if (GUILayout.Button(label, selectedFeatureCatalogIndex == index ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(32f)))
+            if (DrawSelectableListButton(label, selectedFeatureCatalogIndex == index, GUILayout.Height(32f)))
             {
                 selectedFeatureCatalogIndex = index;
             }
         }
         EditorGUILayout.EndScrollView();
+        if (selectedFeature != null && !selectedFeature.isBuiltIn)
+        {
+            EditorGUILayout.Space(6f);
+            if (GUILayout.Button("Remove Feature", GUILayout.Width(120f)))
+            {
+                RemoveSemanticFeature(selectedFeature.id);
+                selectedFeatureCatalogIndex = 0;
+                GUIUtility.ExitGUI();
+            }
+        }
         EditorGUILayout.EndVertical();
 
         EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(280f, position.width * 0.24f)), GUILayout.Height(640f));
@@ -199,18 +215,45 @@ public partial class ModuleExporter
 
     private void DrawSelectedFeatureDefinition(AvailableFeatureDefinition feature, bool implemented)
     {
+        PlySemanticFeatureDefinition semanticFeature = FindSemanticFeature(feature.id);
+        string featureName = semanticFeature != null ? semanticFeature.name : feature.name;
+        string featureDescription = semanticFeature != null ? semanticFeature.description : feature.description;
+        string featureCategory = semanticFeature != null ? semanticFeature.category : feature.category;
+        List<string> featureProvides = semanticFeature != null ? semanticFeature.provides : feature.provides;
+        List<string> featureRequires = semanticFeature != null ? semanticFeature.requires : feature.requires;
+        List<string> featureTargetRoles = semanticFeature != null ? semanticFeature.targetRoles : feature.targetRoles;
+        List<string> featureIntentExamples = semanticFeature != null ? semanticFeature.intentExamples : feature.intentExamples;
+
         EditorGUILayout.LabelField("Id", feature.id);
-        EditorGUILayout.LabelField("Name", feature.name);
-        EditorGUILayout.LabelField("Description", feature.description, EditorStyles.wordWrappedLabel);
-        EditorGUILayout.Space(4f);
-        EditorGUILayout.LabelField("Category", string.IsNullOrWhiteSpace(feature.category) ? "-" : feature.category);
-        EditorGUILayout.LabelField("Provides", string.Join(", ", feature.provides.ToArray()));
-        EditorGUILayout.LabelField("Requires", string.Join(", ", feature.requires.ToArray()));
-        EditorGUILayout.LabelField("Target Roles", string.Join(", ", feature.targetRoles.ToArray()));
-        EditorGUILayout.LabelField("Status", implemented ? "Implemented in this module" : "No implementation yet");
-        if (feature.intentExamples.Count > 0)
+        if (semanticFeature != null && !feature.isBuiltIn)
         {
-            EditorGUILayout.LabelField("Intent Examples", string.Join(", ", feature.intentExamples.ToArray()), EditorStyles.wordWrappedLabel);
+            semanticFeature.name = EditorGUILayout.TextField("Name", semanticFeature.name);
+            GUILayout.Label("Description", EditorStyles.label);
+            semanticFeature.description = EditorGUILayout.TextArea(semanticFeature.description ?? "", GUILayout.MinHeight(54f));
+            semanticFeature.category = EditorGUILayout.TextField("Category", semanticFeature.category);
+            DrawEditableStringList("Intent Examples", semanticFeature.intentExamples);
+            DrawEditableStringList("Provides", semanticFeature.provides);
+            DrawEditableStringList("Requires", semanticFeature.requires);
+            DrawEditableStringList("Target Roles", semanticFeature.targetRoles);
+            DrawEditableStringList("Tags", semanticFeature.tags);
+            featureValidationDirty = true;
+        }
+        else
+        {
+            EditorGUILayout.LabelField("Name", featureName);
+            EditorGUILayout.LabelField("Description", featureDescription, EditorStyles.wordWrappedLabel);
+        }
+
+        EditorGUILayout.LabelField("Source", feature.isBuiltIn ? "Built-in catalog feature" : "Module feature");
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Category", string.IsNullOrWhiteSpace(featureCategory) ? "-" : featureCategory);
+        EditorGUILayout.LabelField("Provides", string.Join(", ", (featureProvides ?? new List<string>()).ToArray()));
+        EditorGUILayout.LabelField("Requires", string.Join(", ", (featureRequires ?? new List<string>()).ToArray()));
+        EditorGUILayout.LabelField("Target Roles", string.Join(", ", (featureTargetRoles ?? new List<string>()).ToArray()));
+        EditorGUILayout.LabelField("Status", implemented ? "Implemented in this module" : "No implementation yet");
+        if ((featureIntentExamples ?? new List<string>()).Count > 0)
+        {
+            EditorGUILayout.LabelField("Intent Examples", string.Join(", ", featureIntentExamples.ToArray()), EditorStyles.wordWrappedLabel);
         }
         EditorGUILayout.Space(8f);
 
@@ -252,18 +295,13 @@ public partial class ModuleExporter
         }
 
         implementation = PlyFeatureSchemaUtility.NormalizeImplementation(implementation);
-        implementation.id = EditorGUILayout.TextField("Implementation Id", implementation.id);
+        implementation.id = BuildImplementationId(definition.id);
+        EditorGUILayout.LabelField("Implementation Id", implementation.id);
         implementation.name = EditorGUILayout.TextField("Name", implementation.name);
         implementation.description = EditorGUILayout.TextField("Description", implementation.description);
         implementation.integrationMode = DrawStringPopup("Integration Mode", implementation.integrationMode, new[] { "bindings", "adapter" });
-        implementation.source.kind = DrawStringPopup("Source Kind", implementation.source.kind, new[] { "module", "builtin", "reflected", "producer" });
-        implementation.source.system = EditorGUILayout.TextField("Source System", implementation.source.system);
-        implementation.source.moduleId = EditorGUILayout.TextField("Source Module", implementation.source.moduleId);
         DrawEditableStringList("Target Roles", implementation.targetRoles);
         DrawEditableStringList("Tags", implementation.tags);
-        DrawEditableStringList("Provides", implementation.capabilities.provides);
-        DrawEditableStringList("Requires", implementation.capabilities.requires);
-        componentSearchTerm = EditorGUILayout.TextField("Component Search", componentSearchTerm);
         EditorGUILayout.Space(6f);
 
         if (string.Equals(implementation.integrationMode, "adapter", StringComparison.OrdinalIgnoreCase))
@@ -1383,10 +1421,9 @@ public partial class ModuleExporter
             return;
         }
 
-        string normalizedModuleId = string.IsNullOrWhiteSpace(moduleId) ? "module" : moduleId.Trim().ToLowerInvariant();
         PlyFeatureImplementation implementation = new PlyFeatureImplementation
         {
-            id = normalizedModuleId + "." + definition.id,
+            id = BuildImplementationId(definition.id),
             featureId = definition.id,
             name = definition.name,
             description = definition.description,
@@ -1435,6 +1472,7 @@ public partial class ModuleExporter
             id = feature.id,
             name = feature.name,
             description = feature.description,
+            isBuiltIn = IsBuiltInFeatureId(feature.id),
             provides = new List<string>(feature.provides ?? new List<string>()),
             requires = new List<string>(feature.requires ?? new List<string>()),
             targetRoles = new List<string>(feature.targetRoles ?? new List<string>()),
@@ -1444,6 +1482,63 @@ public partial class ModuleExporter
             ports = CreatePortMappings(feature),
             parameters = CreateParameterMappings(feature)
         };
+    }
+
+    private void CreateSemanticFeature()
+    {
+        int suffix = 1;
+        string featureId;
+        do
+        {
+            featureId = "custom_feature_" + suffix;
+            suffix++;
+        }
+        while (FindSemanticFeature(featureId) != null);
+
+        FeatureManifestState.features.Add(PlyFeatureSchemaUtility.NormalizeFeatureDefinition(new PlySemanticFeatureDefinition
+        {
+            id = featureId,
+            name = "New Feature",
+            description = "Describe this semantic feature.",
+            category = "custom"
+        }));
+
+        List<AvailableFeatureDefinition> catalog = GetAvailableFeatureCatalog();
+        selectedFeatureCatalogIndex = catalog.FindIndex(feature => string.Equals(feature.id, featureId, StringComparison.OrdinalIgnoreCase));
+        if (selectedFeatureCatalogIndex < 0)
+        {
+            selectedFeatureCatalogIndex = 0;
+        }
+
+        featureValidationDirty = true;
+    }
+
+    private void RemoveSemanticFeature(string featureId)
+    {
+        if (string.IsNullOrWhiteSpace(featureId) || IsBuiltInFeatureId(featureId))
+        {
+            return;
+        }
+
+        PlySemanticFeatureDefinition feature = FindSemanticFeature(featureId);
+        if (feature != null)
+        {
+            FeatureManifestState.features.Remove(feature);
+        }
+
+        PlyFeatureImplementation implementation = FindFeatureImplementation(featureId);
+        if (implementation != null)
+        {
+            FeatureManifestState.implementations.Remove(implementation);
+        }
+
+        featureValidationDirty = true;
+    }
+
+    private PlySemanticFeatureDefinition FindSemanticFeature(string featureId)
+    {
+        return FeatureManifestState.features.FirstOrDefault(feature =>
+            string.Equals(feature.id, featureId, StringComparison.OrdinalIgnoreCase));
     }
 
     private List<PlySemanticFeatureDefinition> GetBuiltInSemanticFeatures()
@@ -1522,6 +1617,12 @@ public partial class ModuleExporter
                 }
             }
         };
+    }
+
+    private bool IsBuiltInFeatureId(string featureId)
+    {
+        return GetBuiltInSemanticFeatures().Any(feature =>
+            string.Equals(feature.id, featureId, StringComparison.OrdinalIgnoreCase));
     }
 
     private List<PlyFeaturePortMapping> CreatePortMappings(PlySemanticFeatureDefinition feature)
@@ -1643,6 +1744,23 @@ public partial class ModuleExporter
         index = Mathf.Max(0, index);
         int newIndex = EditorGUILayout.Popup(label, index, options);
         return options[Mathf.Clamp(newIndex, 0, options.Length - 1)];
+    }
+
+    private string BuildImplementationId(string featureId)
+    {
+        return NormalizeFeatureToken(!string.IsNullOrWhiteSpace(moduleName) ? moduleName : moduleId) + "." + featureId;
+    }
+
+    private string NormalizeFeatureToken(string value)
+    {
+        string normalized = new string((value ?? "")
+            .Trim()
+            .ToLowerInvariant()
+            .Select(character => char.IsLetterOrDigit(character) ? character : '_')
+            .ToArray())
+            .Trim('_');
+
+        return string.IsNullOrWhiteSpace(normalized) ? "module" : normalized;
     }
 
     private void DrawEditableStringList(string label, List<string> values)
