@@ -26,13 +26,12 @@ public partial class ModuleExporter
         public string id;
         public string name;
         public string description;
-        public string aiMatchDescription;
-        public List<string> implements = new List<string>();
         public List<string> provides = new List<string>();
-        public List<string> consumes = new List<string>();
+        public List<string> requires = new List<string>();
         public List<string> targetRoles = new List<string>();
         public List<string> tags = new List<string>();
-        public List<string> categories = new List<string>();
+        public string category;
+        public List<string> intentExamples = new List<string>();
         public List<PlyFeaturePortMapping> ports = new List<PlyFeaturePortMapping>();
         public List<PlyFeatureParameterMapping> parameters = new List<PlyFeatureParameterMapping>();
     }
@@ -87,6 +86,7 @@ public partial class ModuleExporter
     {
         FeatureManifestState = PlyFeatureSchemaUtility.NormalizeManifest(FeatureManifestState);
         FeatureManifestState.moduleId = moduleId ?? "";
+        MergeAvailableFeatureCatalogIntoManifest();
     }
 
     private PlyFeatureManifest PrepareFeatureManifestForPersistence()
@@ -101,7 +101,7 @@ public partial class ModuleExporter
         InitializeFeatureManifest();
         EnsureFeatureEditorCacheState();
 
-        EditorGUILayout.HelpBox("Map existing Plyground features to existing project components. Choose a feature from the catalog, then bind its Inputs, Outputs, and Parameters to compatible project members.", MessageType.Info);
+        EditorGUILayout.HelpBox("Define semantic features for planning, then attach module-specific implementations. Implementations are exported separately and can use either adapter mode or direct bindings.", MessageType.Info);
 
         EditorGUI.BeginChangeCheck();
         EditorGUILayout.BeginHorizontal();
@@ -146,17 +146,17 @@ public partial class ModuleExporter
         List<AvailableFeatureDefinition> catalog = GetAvailableFeatureCatalog();
         selectedFeatureCatalogIndex = Mathf.Clamp(selectedFeatureCatalogIndex < 0 ? 0 : selectedFeatureCatalogIndex, 0, Mathf.Max(0, catalog.Count - 1));
         AvailableFeatureDefinition selectedFeature = catalog.Count > 0 ? catalog[selectedFeatureCatalogIndex] : null;
-        PlyFeatureProfile implementation = selectedFeature != null ? FindFeatureImplementation(selectedFeature.id) : null;
+        PlyFeatureImplementation implementation = selectedFeature != null ? FindFeatureImplementation(selectedFeature.id) : null;
 
         EditorGUILayout.BeginHorizontal();
 
-        EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(230f, position.width * 0.22f)), GUILayout.Height(640f));
-        GUILayout.Label("Available", EditorStyles.boldLabel);
+        EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(220f, position.width * 0.18f)), GUILayout.Height(640f));
+        GUILayout.Label("Semantic Features", EditorStyles.boldLabel);
         featureListScroll = EditorGUILayout.BeginScrollView(featureListScroll);
         foreach (AvailableFeatureDefinition feature in catalog)
         {
             bool implemented = FindFeatureImplementation(feature.id) != null;
-            string label = feature.name + (implemented ? " [Mapped]" : "");
+            string label = feature.name + (implemented ? " [Implemented]" : "");
             int index = catalog.IndexOf(feature);
             if (GUILayout.Button(label, selectedFeatureCatalogIndex == index ? EditorStyles.toolbarButton : GUI.skin.button, GUILayout.Height(32f)))
             {
@@ -166,8 +166,8 @@ public partial class ModuleExporter
         EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
 
-        EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(300f, position.width * 0.30f)), GUILayout.Height(640f));
-        GUILayout.Label("Selected", EditorStyles.boldLabel);
+        EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(280f, position.width * 0.24f)), GUILayout.Height(640f));
+        GUILayout.Label("Feature Definition", EditorStyles.boldLabel);
         featureDetailsScroll = EditorGUILayout.BeginScrollView(featureDetailsScroll);
         if (selectedFeature == null)
         {
@@ -185,7 +185,7 @@ public partial class ModuleExporter
         featureEditorScroll = EditorGUILayout.BeginScrollView(featureEditorScroll);
         if (selectedFeature == null)
         {
-            EditorGUILayout.HelpBox("Select a feature to map.", MessageType.Info);
+            EditorGUILayout.HelpBox("Select a feature to implement.", MessageType.Info);
         }
         else
         {
@@ -203,11 +203,15 @@ public partial class ModuleExporter
         EditorGUILayout.LabelField("Name", feature.name);
         EditorGUILayout.LabelField("Description", feature.description, EditorStyles.wordWrappedLabel);
         EditorGUILayout.Space(4f);
-        EditorGUILayout.LabelField("Implements", string.Join(", ", feature.implements.ToArray()));
+        EditorGUILayout.LabelField("Category", string.IsNullOrWhiteSpace(feature.category) ? "-" : feature.category);
         EditorGUILayout.LabelField("Provides", string.Join(", ", feature.provides.ToArray()));
-        EditorGUILayout.LabelField("Consumes", string.Join(", ", feature.consumes.ToArray()));
+        EditorGUILayout.LabelField("Requires", string.Join(", ", feature.requires.ToArray()));
         EditorGUILayout.LabelField("Target Roles", string.Join(", ", feature.targetRoles.ToArray()));
-        EditorGUILayout.LabelField("Status", implemented ? "Mapped in this module" : "Not mapped");
+        EditorGUILayout.LabelField("Status", implemented ? "Implemented in this module" : "No implementation yet");
+        if (feature.intentExamples.Count > 0)
+        {
+            EditorGUILayout.LabelField("Intent Examples", string.Join(", ", feature.intentExamples.ToArray()), EditorStyles.wordWrappedLabel);
+        }
         EditorGUILayout.Space(8f);
 
         GUILayout.Label("Inputs", EditorStyles.boldLabel);
@@ -229,7 +233,7 @@ public partial class ModuleExporter
         }
     }
 
-    private void DrawFeatureImplementationEditor(AvailableFeatureDefinition definition, PlyFeatureProfile profile)
+    private void DrawFeatureImplementationEditor(AvailableFeatureDefinition definition, PlyFeatureImplementation implementation)
     {
         if (GetSelectedCapabilityComponents().Count == 0)
         {
@@ -237,59 +241,83 @@ public partial class ModuleExporter
             return;
         }
 
-        if (profile == null)
+        if (implementation == null)
         {
-            EditorGUILayout.HelpBox("This feature has not been mapped in the current module yet.", MessageType.Info);
-            if (GUILayout.Button("Implement Feature", GUILayout.Width(150f)))
+            EditorGUILayout.HelpBox("This feature does not have a concrete implementation in the current module yet.", MessageType.Info);
+            if (GUILayout.Button("Create Implementation", GUILayout.Width(160f)))
             {
                 CreateFeatureImplementation(definition);
             }
             return;
         }
 
-        profile = PlyFeatureSchemaUtility.NormalizeFeature(profile);
-        profile.id = EditorGUILayout.TextField("Binding Profile Id", profile.id);
+        implementation = PlyFeatureSchemaUtility.NormalizeImplementation(implementation);
+        implementation.id = EditorGUILayout.TextField("Implementation Id", implementation.id);
+        implementation.name = EditorGUILayout.TextField("Name", implementation.name);
+        implementation.description = EditorGUILayout.TextField("Description", implementation.description);
+        implementation.integrationMode = DrawStringPopup("Integration Mode", implementation.integrationMode, new[] { "bindings", "adapter" });
+        implementation.source.kind = DrawStringPopup("Source Kind", implementation.source.kind, new[] { "module", "builtin", "reflected", "producer" });
+        implementation.source.system = EditorGUILayout.TextField("Source System", implementation.source.system);
+        implementation.source.moduleId = EditorGUILayout.TextField("Source Module", implementation.source.moduleId);
+        DrawEditableStringList("Target Roles", implementation.targetRoles);
+        DrawEditableStringList("Tags", implementation.tags);
+        DrawEditableStringList("Provides", implementation.capabilities.provides);
+        DrawEditableStringList("Requires", implementation.capabilities.requires);
         componentSearchTerm = EditorGUILayout.TextField("Component Search", componentSearchTerm);
         EditorGUILayout.Space(6f);
 
-        DrawInputMappingsSection(profile);
-        EditorGUILayout.Space(8f);
-        DrawOutputMappingsSection(profile);
-        EditorGUILayout.Space(8f);
-        DrawParameterMappingsSection(profile);
+        if (string.Equals(implementation.integrationMode, "adapter", StringComparison.OrdinalIgnoreCase))
+        {
+            EditorGUILayout.HelpBox("Adapter implementations skip direct parameter/input/output bindings and rely on an adapter contract instead.", MessageType.Info);
+            implementation.adapter.adapterId = EditorGUILayout.TextField("Adapter Id", implementation.adapter.adapterId);
+            implementation.adapter.setupAdapter = EditorGUILayout.TextField("Setup Adapter", implementation.adapter.setupAdapter);
+            implementation.adapter.factoryId = EditorGUILayout.TextField("Factory Id", implementation.adapter.factoryId);
+        }
+        else
+        {
+            DrawInputMappingsSection(definition, implementation);
+            EditorGUILayout.Space(8f);
+            DrawOutputMappingsSection(definition, implementation);
+            EditorGUILayout.Space(8f);
+            DrawParameterMappingsSection(definition, implementation);
+        }
+
         EditorGUILayout.Space(8f);
 
-        if (GUILayout.Button("Remove Mapping Profile", GUILayout.Width(170f)))
+        if (GUILayout.Button("Remove Implementation", GUILayout.Width(170f)))
         {
-            FeatureManifestState.features.Remove(profile);
+            FeatureManifestState.implementations.Remove(implementation);
             featureValidationDirty = true;
         }
     }
 
-    private void DrawInputMappingsSection(PlyFeatureProfile profile)
+    private void DrawInputMappingsSection(AvailableFeatureDefinition definition, PlyFeatureImplementation implementation)
     {
         GUILayout.Label("Inputs", EditorStyles.boldLabel);
-        foreach (PlyFeaturePortMapping port in profile.ports.Where(entry => entry.direction == PlyFeaturePortDirection.Input))
+        foreach (PlyFeaturePortMapping port in definition.ports.Where(entry => entry.direction == PlyFeaturePortDirection.Input))
         {
-            DrawPortMappingRow(port, FeatureMappingSection.Input);
+            PlyFeaturePortBinding binding = GetOrCreateInputBinding(implementation, port.name);
+            DrawPortMappingRow(CreateBoundPortMapping(port, binding.binding), FeatureMappingSection.Input);
         }
     }
 
-    private void DrawOutputMappingsSection(PlyFeatureProfile profile)
+    private void DrawOutputMappingsSection(AvailableFeatureDefinition definition, PlyFeatureImplementation implementation)
     {
         GUILayout.Label("Outputs", EditorStyles.boldLabel);
-        foreach (PlyFeaturePortMapping port in profile.ports.Where(entry => entry.direction == PlyFeaturePortDirection.Output))
+        foreach (PlyFeaturePortMapping port in definition.ports.Where(entry => entry.direction == PlyFeaturePortDirection.Output))
         {
-            DrawPortMappingRow(port, FeatureMappingSection.Output);
+            PlyFeaturePortBinding binding = GetOrCreateOutputBinding(implementation, port.name);
+            DrawPortMappingRow(CreateBoundPortMapping(port, binding.binding), FeatureMappingSection.Output);
         }
     }
 
-    private void DrawParameterMappingsSection(PlyFeatureProfile profile)
+    private void DrawParameterMappingsSection(AvailableFeatureDefinition definition, PlyFeatureImplementation implementation)
     {
         GUILayout.Label("Parameters", EditorStyles.boldLabel);
-        foreach (PlyFeatureParameterMapping parameter in profile.parameters)
+        foreach (PlyFeatureParameterMapping parameter in definition.parameters)
         {
-            DrawParameterMappingRow(parameter);
+            PlyFeatureParameterBinding binding = GetOrCreateParameterBinding(implementation, parameter.name);
+            DrawParameterMappingRow(CreateBoundParameterMapping(parameter, binding.binding));
         }
     }
 
@@ -1018,32 +1046,54 @@ public partial class ModuleExporter
         manifest = PlyFeatureSchemaUtility.NormalizeManifest(manifest);
 
         HashSet<string> featureIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < manifest.features.Count; i++)
+        HashSet<string> semanticIds = new HashSet<string>(manifest.features.Select(feature => feature.id), StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < manifest.implementations.Count; i++)
         {
-            PlyFeatureProfile profile = manifest.features[i];
-            string path = "Feature[" + i + "]";
-            if (string.IsNullOrWhiteSpace(profile.featureId))
+            PlyFeatureImplementation implementation = manifest.implementations[i];
+            string path = "Implementation[" + i + "]";
+            if (string.IsNullOrWhiteSpace(implementation.featureId))
             {
-                issues.Add(CreateIssue("error", path, "Feature catalog id is required."));
+                issues.Add(CreateIssue("error", path, "Feature id is required."));
             }
-            else if (!featureIds.Add(profile.featureId))
+            else if (!semanticIds.Contains(implementation.featureId))
             {
-                issues.Add(CreateIssue("error", path, "Only one binding profile is allowed per feature."));
+                issues.Add(CreateIssue("error", path, "Feature id does not match any semantic feature definition."));
             }
-
-            foreach (PlyFeaturePortMapping port in profile.ports.Where(entry => entry.direction == PlyFeaturePortDirection.Input))
+            else if (!featureIds.Add(implementation.featureId))
             {
-                ValidatePortBinding(port, FeatureMappingSection.Input, issues);
-            }
-
-            foreach (PlyFeaturePortMapping port in profile.ports.Where(entry => entry.direction == PlyFeaturePortDirection.Output))
-            {
-                ValidatePortBinding(port, FeatureMappingSection.Output, issues);
+                issues.Add(CreateIssue("error", path, "Only one implementation is allowed per semantic feature in this module."));
             }
 
-            foreach (PlyFeatureParameterMapping parameter in profile.parameters)
+            if (string.Equals(implementation.integrationMode, "adapter", StringComparison.OrdinalIgnoreCase))
             {
-                ValidateParameterBinding(parameter, issues);
+                if (string.IsNullOrWhiteSpace(implementation.adapter.adapterId))
+                {
+                    issues.Add(CreateIssue("error", path, "Adapter implementations must provide an adapter id."));
+                }
+
+                continue;
+            }
+
+            AvailableFeatureDefinition definition = GetAvailableFeatureCatalog()
+                .FirstOrDefault(feature => string.Equals(feature.id, implementation.featureId, StringComparison.OrdinalIgnoreCase));
+            if (definition == null)
+            {
+                continue;
+            }
+
+            foreach (PlyFeaturePortMapping port in definition.ports.Where(entry => entry.direction == PlyFeaturePortDirection.Input))
+            {
+                ValidatePortBinding(CreateBoundPortMapping(port, GetOrCreateInputBinding(implementation, port.name).binding), FeatureMappingSection.Input, issues);
+            }
+
+            foreach (PlyFeaturePortMapping port in definition.ports.Where(entry => entry.direction == PlyFeaturePortDirection.Output))
+            {
+                ValidatePortBinding(CreateBoundPortMapping(port, GetOrCreateOutputBinding(implementation, port.name).binding), FeatureMappingSection.Output, issues);
+            }
+
+            foreach (PlyFeatureParameterMapping parameter in definition.parameters)
+            {
+                ValidateParameterBinding(CreateBoundParameterMapping(parameter, GetOrCreateParameterBinding(implementation, parameter.name).binding), issues);
             }
         }
 
@@ -1143,7 +1193,7 @@ public partial class ModuleExporter
 
     private void ImportFeatureManifestFromJson()
     {
-        string filePath = EditorUtility.OpenFilePanel("Import Feature Binding Profile", Application.dataPath, "json");
+        string filePath = EditorUtility.OpenFilePanel("Import Feature Catalog", Application.dataPath, "json");
         if (string.IsNullOrWhiteSpace(filePath))
         {
             return;
@@ -1163,7 +1213,7 @@ public partial class ModuleExporter
 
     private void ExportFeatureManifestToJson()
     {
-        string filePath = EditorUtility.SaveFilePanel("Export Feature Binding Profile", Application.dataPath, "feature-bindings.json", "json");
+        string filePath = EditorUtility.SaveFilePanel("Export Feature Catalog", Application.dataPath, "feature-catalog.json", "json");
         if (string.IsNullOrWhiteSpace(filePath))
         {
             return;
@@ -1304,76 +1354,25 @@ public partial class ModuleExporter
 
     private List<AvailableFeatureDefinition> GetAvailableFeatureCatalog()
     {
-        return new List<AvailableFeatureDefinition>
+        Dictionary<string, AvailableFeatureDefinition> catalog = GetBuiltInSemanticFeatures()
+            .ToDictionary(feature => feature.id, CreateAvailableFeatureDefinition, StringComparer.OrdinalIgnoreCase);
+
+        foreach (PlySemanticFeatureDefinition feature in FeatureManifestState.features ?? new List<PlySemanticFeatureDefinition>())
         {
-            new AvailableFeatureDefinition
+            if (feature == null || string.IsNullOrWhiteSpace(feature.id))
             {
-                id = "enemy_aggression",
-                name = "Enemy Aggression",
-                description = "Maps hostile AI aggression controls and state into semantic gameplay bindings.",
-                aiMatchDescription = "guard ai, enemy aggression, hostile npc, combat ai",
-                implements = new List<string> { "enemy_aggression" },
-                provides = new List<string> { "aggression_control" },
-                consumes = new List<string> { "spotted_state" },
-                targetRoles = new List<string> { "Enemy" },
-                ports = new List<PlyFeaturePortMapping>
-                {
-                    new PlyFeaturePortMapping { name = "SetAggressive", direction = PlyFeaturePortDirection.Input, kind = PlyFeaturePortKind.Action, dataType = PlyFeatureDataType.Void },
-                    new PlyFeaturePortMapping { name = "ApplyThreat", direction = PlyFeaturePortDirection.Input, kind = PlyFeaturePortKind.Action, dataType = PlyFeatureDataType.Float },
-                    new PlyFeaturePortMapping { name = "OnTargetVisible", direction = PlyFeaturePortDirection.Output, kind = PlyFeaturePortKind.Event, dataType = PlyFeatureDataType.Void },
-                    new PlyFeaturePortMapping { name = "OnAggroChanged", direction = PlyFeaturePortDirection.Output, kind = PlyFeaturePortKind.Event, dataType = PlyFeatureDataType.Float }
-                },
-                parameters = new List<PlyFeatureParameterMapping>
-                {
-                    new PlyFeatureParameterMapping { name = "AggroRadius", type = PlyFeatureDataType.Float, accessMode = PlyFeatureParameterAccess.ReadWrite, defaultValue = "20" }
-                }
-            },
-            new AvailableFeatureDefinition
-            {
-                id = "health_state",
-                name = "Health State",
-                description = "Maps health values, death events, and health configuration into semantic gameplay bindings.",
-                aiMatchDescription = "health, hp, damageable, hit points",
-                implements = new List<string> { "health_state" },
-                provides = new List<string> { "health_value" },
-                targetRoles = new List<string> { "Enemy", "Player", "NPC" },
-                ports = new List<PlyFeaturePortMapping>
-                {
-                    new PlyFeaturePortMapping { name = "ApplyDamage", direction = PlyFeaturePortDirection.Input, kind = PlyFeaturePortKind.Action, dataType = PlyFeatureDataType.Float },
-                    new PlyFeaturePortMapping { name = "OnDeath", direction = PlyFeaturePortDirection.Output, kind = PlyFeaturePortKind.Event, dataType = PlyFeatureDataType.Void },
-                    new PlyFeaturePortMapping { name = "OnHealthChanged", direction = PlyFeaturePortDirection.Output, kind = PlyFeaturePortKind.Event, dataType = PlyFeatureDataType.Float }
-                },
-                parameters = new List<PlyFeatureParameterMapping>
-                {
-                    new PlyFeatureParameterMapping { name = "MaxHealth", type = PlyFeatureDataType.Float, accessMode = PlyFeatureParameterAccess.ReadWrite, defaultValue = "100" },
-                    new PlyFeatureParameterMapping { name = "CurrentHealth", type = PlyFeatureDataType.Float, accessMode = PlyFeatureParameterAccess.ReadOnly, defaultValue = "" }
-                }
-            },
-            new AvailableFeatureDefinition
-            {
-                id = "interaction_prompt",
-                name = "Interaction Prompt",
-                description = "Maps interactable prompt text and availability state into semantic gameplay bindings.",
-                aiMatchDescription = "interact prompt, use prompt, pickup prompt",
-                implements = new List<string> { "interaction_prompt" },
-                provides = new List<string> { "prompt_text" },
-                targetRoles = new List<string> { "Interactable" },
-                ports = new List<PlyFeaturePortMapping>
-                {
-                    new PlyFeaturePortMapping { name = "OnPromptShown", direction = PlyFeaturePortDirection.Output, kind = PlyFeaturePortKind.Event, dataType = PlyFeatureDataType.String }
-                },
-                parameters = new List<PlyFeatureParameterMapping>
-                {
-                    new PlyFeatureParameterMapping { name = "PromptText", type = PlyFeatureDataType.String, accessMode = PlyFeatureParameterAccess.ReadWrite, defaultValue = "" },
-                    new PlyFeatureParameterMapping { name = "CanInteract", type = PlyFeatureDataType.Bool, accessMode = PlyFeatureParameterAccess.ReadOnly, defaultValue = "" }
-                }
+                continue;
             }
-        };
+
+            catalog[feature.id] = CreateAvailableFeatureDefinition(feature);
+        }
+
+        return catalog.Values.OrderBy(feature => feature.name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    private PlyFeatureProfile FindFeatureImplementation(string featureId)
+    private PlyFeatureImplementation FindFeatureImplementation(string featureId)
     {
-        return FeatureManifestState.features.FirstOrDefault(feature =>
+        return FeatureManifestState.implementations.FirstOrDefault(feature =>
             string.Equals(feature.featureId, featureId, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -1384,53 +1383,282 @@ public partial class ModuleExporter
             return;
         }
 
-        PlyFeatureProfile profile = new PlyFeatureProfile
+        string normalizedModuleId = string.IsNullOrWhiteSpace(moduleId) ? "module" : moduleId.Trim().ToLowerInvariant();
+        PlyFeatureImplementation implementation = new PlyFeatureImplementation
         {
-            id = "binding." + definition.id,
+            id = normalizedModuleId + "." + definition.id,
             featureId = definition.id,
             name = definition.name,
             description = definition.description,
-            aiMatchDescription = definition.aiMatchDescription,
-            implements = new List<string>(definition.implements),
-            provides = new List<string>(definition.provides),
-            consumes = new List<string>(definition.consumes),
             targetRoles = new List<string>(definition.targetRoles),
             tags = new List<string>(definition.tags),
-            categories = new List<string>(definition.categories),
-            ports = ClonePorts(definition.ports),
-            parameters = CloneParameters(definition.parameters)
+            integrationMode = "bindings",
+            source = new PlyFeatureImplementationSource
+            {
+                kind = "module",
+                moduleId = moduleId ?? ""
+            },
+            capabilities = new PlyFeatureCapabilitySet
+            {
+                provides = new List<string>(definition.provides),
+                requires = new List<string>(definition.requires)
+            }
         };
-        FeatureManifestState.features.Add(profile);
+        FeatureManifestState.implementations.Add(implementation);
         featureValidationDirty = true;
     }
 
-    private List<PlyFeaturePortMapping> ClonePorts(List<PlyFeaturePortMapping> source)
+    private void MergeAvailableFeatureCatalogIntoManifest()
     {
-        return (source ?? new List<PlyFeaturePortMapping>())
-            .Select(port => new PlyFeaturePortMapping
+        Dictionary<string, PlySemanticFeatureDefinition> merged = FeatureManifestState.features
+            .Where(feature => feature != null && !string.IsNullOrWhiteSpace(feature.id))
+            .ToDictionary(feature => feature.id, feature => feature, StringComparer.OrdinalIgnoreCase);
+
+        foreach (PlySemanticFeatureDefinition feature in GetBuiltInSemanticFeatures())
+        {
+            if (!merged.ContainsKey(feature.id))
             {
-                name = port.name,
-                direction = port.direction,
-                kind = port.kind,
-                dataType = port.dataType,
-                binding = new PlyFeatureBinding()
+                merged[feature.id] = feature;
+            }
+        }
+
+        FeatureManifestState.features = merged.Values
+            .Select(PlyFeatureSchemaUtility.NormalizeFeatureDefinition)
+            .OrderBy(feature => feature.name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private AvailableFeatureDefinition CreateAvailableFeatureDefinition(PlySemanticFeatureDefinition feature)
+    {
+        return new AvailableFeatureDefinition
+        {
+            id = feature.id,
+            name = feature.name,
+            description = feature.description,
+            provides = new List<string>(feature.provides ?? new List<string>()),
+            requires = new List<string>(feature.requires ?? new List<string>()),
+            targetRoles = new List<string>(feature.targetRoles ?? new List<string>()),
+            tags = new List<string>(feature.tags ?? new List<string>()),
+            category = feature.category,
+            intentExamples = new List<string>(feature.intentExamples ?? new List<string>()),
+            ports = CreatePortMappings(feature),
+            parameters = CreateParameterMappings(feature)
+        };
+    }
+
+    private List<PlySemanticFeatureDefinition> GetBuiltInSemanticFeatures()
+    {
+        return new List<PlySemanticFeatureDefinition>
+        {
+            new PlySemanticFeatureDefinition
+            {
+                id = "enemy_aggression",
+                name = "Enemy Aggression",
+                description = "Makes enemies hostile toward a target.",
+                intentExamples = new List<string> { "guard ai", "enemy aggression", "hostile npc", "combat ai" },
+                targetRoles = new List<string> { "Enemy" },
+                category = "behavior",
+                tags = new List<string> { "combat", "ai", "enemy" },
+                provides = new List<string> { "aggression_control" },
+                requires = new List<string> { "spotted_state" },
+                inputs = new List<PlySemanticFeaturePort>
+                {
+                    new PlySemanticFeaturePort { name = "SetAggressive", kind = PlyFeaturePortKind.Action, dataType = PlyFeatureDataType.Void, required = true },
+                    new PlySemanticFeaturePort { name = "ApplyThreat", kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Float, required = false }
+                },
+                outputs = new List<PlySemanticFeaturePort>
+                {
+                    new PlySemanticFeaturePort { name = "OnTargetVisible", kind = PlyFeaturePortKind.Event, dataType = PlyFeatureDataType.Void, required = true },
+                    new PlySemanticFeaturePort { name = "OnAggroChanged", kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Float, required = true }
+                },
+                parameters = new List<PlySemanticFeatureParameter>
+                {
+                    new PlySemanticFeatureParameter { name = "AggroRadius", type = PlyFeatureDataType.Float, defaultValue = "20" }
+                }
+            },
+            new PlySemanticFeatureDefinition
+            {
+                id = "health_state",
+                name = "Health State",
+                description = "Exposes health values, damage intake, and death state.",
+                intentExamples = new List<string> { "health", "hp", "damageable", "hit points" },
+                targetRoles = new List<string> { "Enemy", "Player", "NPC" },
+                category = "state",
+                tags = new List<string> { "combat", "health", "damage" },
+                provides = new List<string> { "health_value" },
+                inputs = new List<PlySemanticFeaturePort>
+                {
+                    new PlySemanticFeaturePort { name = "ApplyDamage", kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Float, required = true }
+                },
+                outputs = new List<PlySemanticFeaturePort>
+                {
+                    new PlySemanticFeaturePort { name = "OnDeath", kind = PlyFeaturePortKind.Event, dataType = PlyFeatureDataType.Void, required = true },
+                    new PlySemanticFeaturePort { name = "OnHealthChanged", kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.Float, required = true }
+                },
+                parameters = new List<PlySemanticFeatureParameter>
+                {
+                    new PlySemanticFeatureParameter { name = "MaxHealth", type = PlyFeatureDataType.Float, defaultValue = "100" },
+                    new PlySemanticFeatureParameter { name = "CurrentHealth", type = PlyFeatureDataType.Float }
+                }
+            },
+            new PlySemanticFeatureDefinition
+            {
+                id = "interaction_prompt",
+                name = "Interaction Prompt",
+                description = "Exposes interactable prompt text and interaction availability.",
+                intentExamples = new List<string> { "interact prompt", "use prompt", "pickup prompt" },
+                targetRoles = new List<string> { "Interactable" },
+                category = "ui",
+                tags = new List<string> { "interaction", "prompt", "ui" },
+                provides = new List<string> { "prompt_text" },
+                outputs = new List<PlySemanticFeaturePort>
+                {
+                    new PlySemanticFeaturePort { name = "OnPromptShown", kind = PlyFeaturePortKind.Value, dataType = PlyFeatureDataType.String, required = true }
+                },
+                parameters = new List<PlySemanticFeatureParameter>
+                {
+                    new PlySemanticFeatureParameter { name = "PromptText", type = PlyFeatureDataType.String },
+                    new PlySemanticFeatureParameter { name = "CanInteract", type = PlyFeatureDataType.Bool }
+                }
+            }
+        };
+    }
+
+    private List<PlyFeaturePortMapping> CreatePortMappings(PlySemanticFeatureDefinition feature)
+    {
+        List<PlyFeaturePortMapping> mappings = new List<PlyFeaturePortMapping>();
+        foreach (PlySemanticFeaturePort input in feature.inputs ?? new List<PlySemanticFeaturePort>())
+        {
+            mappings.Add(new PlyFeaturePortMapping
+            {
+                name = input.name,
+                direction = PlyFeaturePortDirection.Input,
+                kind = input.kind,
+                dataType = input.dataType
+            });
+        }
+
+        foreach (PlySemanticFeaturePort output in feature.outputs ?? new List<PlySemanticFeaturePort>())
+        {
+            mappings.Add(new PlyFeaturePortMapping
+            {
+                name = output.name,
+                direction = PlyFeaturePortDirection.Output,
+                kind = output.kind,
+                dataType = output.dataType
+            });
+        }
+
+        return mappings;
+    }
+
+    private List<PlyFeatureParameterMapping> CreateParameterMappings(PlySemanticFeatureDefinition feature)
+    {
+        return (feature.parameters ?? new List<PlySemanticFeatureParameter>())
+            .Select(parameter => new PlyFeatureParameterMapping
+            {
+                name = parameter.name,
+                type = parameter.type,
+                defaultValue = parameter.defaultValue,
+                required = parameter.required,
+                accessMode = PlyFeatureParameterAccess.ReadWrite
             })
             .ToList();
     }
 
-    private List<PlyFeatureParameterMapping> CloneParameters(List<PlyFeatureParameterMapping> source)
+    private PlyFeaturePortBinding GetOrCreateInputBinding(PlyFeatureImplementation implementation, string featureInput)
     {
-        return (source ?? new List<PlyFeatureParameterMapping>())
-            .Select(parameter => new PlyFeatureParameterMapping
-            {
-                name = parameter.name,
-                direction = string.IsNullOrWhiteSpace(parameter.direction) ? "parameter" : parameter.direction,
-                type = parameter.type,
-                defaultValue = parameter.defaultValue,
-                accessMode = parameter.accessMode,
-                binding = new PlyFeatureBinding()
-            })
-            .ToList();
+        implementation.inputBindings ??= new List<PlyFeaturePortBinding>();
+        PlyFeaturePortBinding binding = implementation.inputBindings.FirstOrDefault(entry =>
+            string.Equals(entry.featureInput, featureInput, StringComparison.OrdinalIgnoreCase));
+        if (binding != null)
+        {
+            return binding;
+        }
+
+        binding = new PlyFeaturePortBinding { featureInput = featureInput, binding = new PlyFeatureBinding() };
+        implementation.inputBindings.Add(binding);
+        return binding;
+    }
+
+    private PlyFeaturePortBinding GetOrCreateOutputBinding(PlyFeatureImplementation implementation, string featureOutput)
+    {
+        implementation.outputBindings ??= new List<PlyFeaturePortBinding>();
+        PlyFeaturePortBinding binding = implementation.outputBindings.FirstOrDefault(entry =>
+            string.Equals(entry.featureOutput, featureOutput, StringComparison.OrdinalIgnoreCase));
+        if (binding != null)
+        {
+            return binding;
+        }
+
+        binding = new PlyFeaturePortBinding { featureOutput = featureOutput, binding = new PlyFeatureBinding() };
+        implementation.outputBindings.Add(binding);
+        return binding;
+    }
+
+    private PlyFeatureParameterBinding GetOrCreateParameterBinding(PlyFeatureImplementation implementation, string featureParameter)
+    {
+        implementation.parameterBindings ??= new List<PlyFeatureParameterBinding>();
+        PlyFeatureParameterBinding binding = implementation.parameterBindings.FirstOrDefault(entry =>
+            string.Equals(entry.featureParameter, featureParameter, StringComparison.OrdinalIgnoreCase));
+        if (binding != null)
+        {
+            return binding;
+        }
+
+        binding = new PlyFeatureParameterBinding { featureParameter = featureParameter, binding = new PlyFeatureBinding() };
+        implementation.parameterBindings.Add(binding);
+        return binding;
+    }
+
+    private PlyFeaturePortMapping CreateBoundPortMapping(PlyFeaturePortMapping source, PlyFeatureBinding binding)
+    {
+        return new PlyFeaturePortMapping
+        {
+            name = source.name,
+            direction = source.direction,
+            kind = source.kind,
+            dataType = source.dataType,
+            binding = binding ?? new PlyFeatureBinding()
+        };
+    }
+
+    private PlyFeatureParameterMapping CreateBoundParameterMapping(PlyFeatureParameterMapping source, PlyFeatureBinding binding)
+    {
+        return new PlyFeatureParameterMapping
+        {
+            name = source.name,
+            direction = source.direction,
+            type = source.type,
+            defaultValue = source.defaultValue,
+            required = source.required,
+            accessMode = source.accessMode,
+            binding = binding ?? new PlyFeatureBinding()
+        };
+    }
+
+    private string DrawStringPopup(string label, string currentValue, string[] options)
+    {
+        int index = Array.FindIndex(options, option => string.Equals(option, currentValue, StringComparison.OrdinalIgnoreCase));
+        index = Mathf.Max(0, index);
+        int newIndex = EditorGUILayout.Popup(label, index, options);
+        return options[Mathf.Clamp(newIndex, 0, options.Length - 1)];
+    }
+
+    private void DrawEditableStringList(string label, List<string> values)
+    {
+        values ??= new List<string>();
+        string current = string.Join(", ", values.ToArray());
+        string updated = EditorGUILayout.TextField(label, current);
+        if (!string.Equals(current, updated, StringComparison.Ordinal))
+        {
+            values.Clear();
+            values.AddRange(updated.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(value => value.Trim())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase));
+        }
     }
 
     private PlyFeatureValidationIssue CreateIssue(string severity, string path, string message)
