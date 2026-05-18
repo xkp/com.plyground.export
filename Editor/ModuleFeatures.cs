@@ -1712,7 +1712,7 @@ public partial class ModuleExporter
     {
         try
         {
-            PackageInfo packageInfo = PackageInfo.GetAllRegisteredPackages()
+			UnityEditor.PackageManager.PackageInfo packageInfo = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages()
                 .FirstOrDefault(package => string.Equals(package.name, PackageName, StringComparison.OrdinalIgnoreCase));
             if (packageInfo != null && !string.IsNullOrWhiteSpace(packageInfo.resolvedPath))
             {
