@@ -269,12 +269,19 @@ public partial class ModuleExporter
 		DrawModulePropertiesSection();
 	}
 
+	private float GetOverviewSplitSectionWidth()
+	{
+		float spacing = 6f;
+		float availableWidth = Mathf.Max(560f, EditorGUIUtility.currentViewWidth - 32f);
+		return Mathf.Max(280f, (availableWidth - spacing) * 0.5f);
+	}
+
 	private void DrawModuleSettingsSection()
 	{
 		GUILayout.Label("MODULE SETTINGS", EditorStyles.boldLabel);
 		EditorGUILayout.BeginHorizontal();
 
-		float sectionWidth = Mathf.Max(280f, position.width * 0.5f - 24f);
+		float sectionWidth = GetOverviewSplitSectionWidth();
 
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(sectionWidth));
 		moduleName = EditorGUILayout.TextField("Module Name", moduleName);
@@ -289,18 +296,12 @@ public partial class ModuleExporter
 
 		moduleTypeIndex = EditorGUILayout.Popup("Module Type", moduleTypeIndex, allowedModuleTypes);
 		moduleType = allowedModuleTypes[moduleTypeIndex];
-		EditorGUILayout.Space(6f);
-		GUILayout.Label("Description", EditorStyles.miniBoldLabel);
-		description = EditorGUILayout.TextArea(description, GUILayout.MinHeight(70f));
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(sectionWidth));
 		author = EditorGUILayout.TextField("Author", author);
 		url = EditorGUILayout.TextField("URL", url);
 		GUILayout.Label($"Module ID: {(string.IsNullOrEmpty(moduleId) ? "Generated on export" : moduleId)}", EditorStyles.miniLabel);
-		EditorGUILayout.Space(6f);
-		GUILayout.Label("Match Description", EditorStyles.miniBoldLabel);
-		matchDescription = EditorGUILayout.TextArea(matchDescription, GUILayout.MinHeight(70f));
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.EndHorizontal();
@@ -336,7 +337,7 @@ public partial class ModuleExporter
 
 	private void DrawModulePropertiesEditor()
 	{
-		float sectionWidth = Mathf.Max(280f, position.width * 0.5f - 24f);
+		float sectionWidth = GetOverviewSplitSectionWidth();
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(sectionWidth));
 
 		EditorGUILayout.BeginHorizontal();
@@ -414,7 +415,7 @@ public partial class ModuleExporter
 	private void DrawModuleToolsEditor()
 	{
 		moduleTools ??= new List<ModuleTool>();
-		float sectionWidth = Mathf.Max(280f, position.width * 0.5f - 24f);
+		float sectionWidth = GetOverviewSplitSectionWidth();
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(sectionWidth));
 
 		EditorGUILayout.BeginHorizontal();
