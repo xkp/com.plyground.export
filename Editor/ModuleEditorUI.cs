@@ -27,7 +27,8 @@ public partial class ModuleExporter
 	private CapabilityWorkspaceTab activeCapabilityTab;
 
 	private ModuleEditorTab activeTab;
-	private Vector2 _assetScroll;
+	private Vector2 _modulePropertiesScroll;
+	private Vector2 _moduleToolsScroll;
 	private Vector2 _itemGridScroll;
 	private GUIStyle brandCardStyle;
 	private GUIStyle brandTitleStyle;
@@ -326,8 +327,11 @@ public partial class ModuleExporter
 
 	private void DrawModulePropertiesSection()
 	{
-		GUILayout.Label("MODULE PROPERTIES", EditorStyles.boldLabel);
+		GUILayout.Label("MODULE METADATA", EditorStyles.boldLabel);
+		EditorGUILayout.BeginHorizontal();
 		DrawModulePropertiesEditor();
+		DrawModuleToolsEditor();
+		EditorGUILayout.EndHorizontal();
 	}
 
 	private void DrawModulePropertiesEditor()
@@ -372,7 +376,7 @@ public partial class ModuleExporter
 			return;
 		}
 
-		_assetScroll = EditorGUILayout.BeginScrollView(_assetScroll, GUILayout.Height(110f));
+		_modulePropertiesScroll = EditorGUILayout.BeginScrollView(_modulePropertiesScroll, GUILayout.Height(110f));
 		for (int i = 0; i < moduleProperties.Count; i++)
 		{
 			Property prop = moduleProperties[i];
@@ -396,6 +400,86 @@ public partial class ModuleExporter
 			if (GUILayout.Button("X", GUILayout.Width(24f)))
 			{
 				moduleProperties.RemoveAt(i);
+				i--;
+				EditorGUILayout.EndHorizontal();
+				continue;
+			}
+
+			EditorGUILayout.EndHorizontal();
+		}
+		EditorGUILayout.EndScrollView();
+		EditorGUILayout.EndVertical();
+	}
+
+	private void DrawModuleToolsEditor()
+	{
+		moduleTools ??= new List<ModuleTool>();
+		float sectionWidth = Mathf.Max(280f, position.width * 0.5f - 24f);
+		EditorGUILayout.BeginVertical("box", GUILayout.Width(sectionWidth));
+
+		EditorGUILayout.BeginHorizontal();
+		GUILayout.Label("Module Tools", EditorStyles.boldLabel);
+		GUILayout.FlexibleSpace();
+		bool hasAvailableToolToAdd = allowedToolIds.Any(id => moduleTools.All(tool => tool.id != id));
+		EditorGUI.BeginDisabledGroup(!hasAvailableToolToAdd);
+		if (GUILayout.Button("Add Tool", GUILayout.Width(110f)))
+		{
+			moduleTools ??= new List<ModuleTool>();
+			string nextToolId = allowedToolIds.FirstOrDefault(id => moduleTools.All(tool => tool.id != id)) ?? allowedToolIds.FirstOrDefault() ?? string.Empty;
+			moduleTools.Add(new ModuleTool
+			{
+				id = nextToolId,
+				url = string.Empty
+			});
+		}
+		EditorGUI.EndDisabledGroup();
+		EditorGUILayout.EndHorizontal();
+
+		float reserved = 60f;
+		float gap = 3f;
+		float usable = sectionWidth - reserved - gap;
+		float idWidth = Mathf.Max(120f, usable * 0.42f);
+		float urlWidth = Mathf.Max(120f, usable * 0.58f);
+
+		EditorGUILayout.BeginHorizontal();
+		GUILayout.Label("Tool Id", EditorStyles.miniBoldLabel, GUILayout.Width(idWidth));
+		GUILayout.Label("Executor URL", EditorStyles.miniBoldLabel, GUILayout.Width(urlWidth));
+		GUILayout.Space(reserved);
+		EditorGUILayout.EndHorizontal();
+
+		if (moduleTools == null || moduleTools.Count == 0)
+		{
+			EditorGUILayout.HelpBox("No module tools yet. Click 'Add Tool' to register one.", MessageType.Info);
+			EditorGUILayout.EndVertical();
+			return;
+		}
+
+		_moduleToolsScroll = EditorGUILayout.BeginScrollView(_moduleToolsScroll, GUILayout.Height(110f));
+		for (int i = 0; i < moduleTools.Count; i++)
+		{
+			ModuleTool tool = moduleTools[i];
+			EditorGUILayout.BeginHorizontal("helpbox");
+
+			string currentToolId = string.IsNullOrWhiteSpace(tool.id) ? allowedToolIds.FirstOrDefault() ?? string.Empty : tool.id;
+			List<string> toolOptions = allowedToolIds
+				.Where(id => id == currentToolId || moduleTools.All(existingTool => existingTool == tool || existingTool.id != id))
+				.ToList();
+			if (toolOptions.Count == 0)
+			{
+				toolOptions.Add(currentToolId);
+			}
+
+			int selectedToolIndex = Mathf.Max(0, toolOptions.IndexOf(currentToolId));
+			selectedToolIndex = EditorGUILayout.Popup(selectedToolIndex, toolOptions.ToArray(), GUILayout.Width(idWidth));
+			tool.id = toolOptions[selectedToolIndex];
+
+			GUILayout.Space(gap);
+			tool.url = EditorGUILayout.TextField(tool.url ?? string.Empty, GUILayout.Width(urlWidth));
+			GUILayout.Space(6f);
+
+			if (GUILayout.Button("X", GUILayout.Width(24f)))
+			{
+				moduleTools.RemoveAt(i);
 				i--;
 				EditorGUILayout.EndHorizontal();
 				continue;

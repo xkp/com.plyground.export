@@ -48,9 +48,11 @@ public partial class ModuleExporter : EditorWindow
 	private Dictionary<int, bool> packageFoldouts = new Dictionary<int, bool>();
 
 	private List<Property> moduleProperties = new List<Property>();
+	private List<ModuleTool> moduleTools = new List<ModuleTool>();
 	private CapabilityManifest moduleCapabilities = new CapabilityManifest();
 	private PlyFeatureManifest featureManifest = new PlyFeatureManifest();
 	private List<string> capabilitySourceScriptPaths = new List<string>();
+	private readonly string[] allowedToolIds = new string[] { "Character Capabilities", "Character Builder" };
 
 	[System.Serializable]
 	public class PackageDefinition
@@ -92,6 +94,13 @@ public partial class ModuleExporter : EditorWindow
 		public string type;
 		public string data;
 		public string value;
+	}
+
+	[System.Serializable]
+	public class ModuleTool
+	{
+		public string id;
+		public string url;
 	}
 
 	[System.Serializable]
@@ -196,6 +205,19 @@ public partial class ModuleExporter : EditorWindow
 			foreach (var property in mod.moduleProperties)
 			{
 				moduleProperties.Add(property);
+			}
+		}
+
+		moduleTools.Clear();
+		if (mod.tools != null)
+		{
+			foreach (var tool in mod.tools)
+			{
+				moduleTools.Add(new ModuleTool
+				{
+					id = tool.id,
+					url = tool.url
+				});
 			}
 		}
 
@@ -403,6 +425,14 @@ public partial class ModuleExporter : EditorWindow
 		mod.dependencies = new List<string>(dependencies);
 		mod.customEditors = new List<string>(customEditors);
 		mod.moduleProperties = new List<Property>(moduleProperties);
+		moduleTools ??= new List<ModuleTool>();
+		mod.tools = moduleTools
+			.Select(tool => new ModuleTool
+			{
+				id = tool.id,
+				url = tool.url
+			})
+			.ToList();
 		PrepareCapabilitiesForPersistence();
 		mod.capabilities = CloneModuleCapabilities(moduleCapabilities);
 
@@ -708,6 +738,7 @@ public partial class ModuleExporter : EditorWindow
 		public List<string> dependencies;
 		public List<ExportedGroup> itemGroups;
 		public List<Property> moduleProperties;
+		public List<ModuleTool> tools;
 		public CapabilityManifest capabilities;
 	}
 
