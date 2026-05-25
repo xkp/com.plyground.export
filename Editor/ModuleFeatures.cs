@@ -102,7 +102,24 @@ public partial class ModuleExporter
     {
         InitializeFeatureManifest();
         FeatureManifestState.moduleId = moduleId ?? "";
-        return PlyFeatureSchemaUtility.NormalizeManifest(FeatureManifestState);
+
+        PlyFeatureManifest normalized = PlyFeatureSchemaUtility.NormalizeManifest(FeatureManifestState);
+        PlyFeatureManifest exportManifest = JsonUtility.FromJson<PlyFeatureManifest>(JsonUtility.ToJson(normalized)) ?? new PlyFeatureManifest();
+        HashSet<string> implementedFeatureIds = new HashSet<string>(
+            (exportManifest.implementations ?? new List<PlyFeatureImplementation>())
+                .Where(implementation => !string.IsNullOrWhiteSpace(implementation.featureId))
+                .Select(implementation => implementation.featureId),
+            StringComparer.OrdinalIgnoreCase);
+
+        exportManifest.features = (exportManifest.features ?? new List<PlySemanticFeatureDefinition>())
+            .Where(feature =>
+                feature != null &&
+                !string.IsNullOrWhiteSpace(feature.id) &&
+                (!string.Equals(feature.origin, "catalog", StringComparison.OrdinalIgnoreCase) ||
+                 implementedFeatureIds.Contains(feature.id)))
+            .ToList();
+
+        return PlyFeatureSchemaUtility.NormalizeManifest(exportManifest);
     }
 
     private void DrawFeaturesTab()

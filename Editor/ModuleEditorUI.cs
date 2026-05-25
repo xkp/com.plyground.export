@@ -281,7 +281,7 @@ public partial class ModuleExporter
 		GUILayout.Label("MODULE SETTINGS", EditorStyles.boldLabel);
 		EditorGUILayout.BeginHorizontal();
 
-		float sectionWidth = GetOverviewSplitSectionWidth();
+		float sectionWidth = GetOverviewSplitSectionWidth() + 18f;
 
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(sectionWidth));
 		moduleName = EditorGUILayout.TextField("Module Name", moduleName);
