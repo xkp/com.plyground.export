@@ -586,7 +586,8 @@ public partial class ModuleExporter : EditorWindow
 		assetsFromGroups = assetsFromGroups.Distinct().ToList();
 		if (assetsFromGroups.Any())
 		{
-			BuildBundleFromPaths(assetsFromGroups, "AssetBundle", Path.Combine(moduleFolder, "Assets"));
+			//TODO: keep it for editor change.
+			//BuildBundleFromPaths(assetsFromGroups, "AssetBundle", Path.Combine(moduleFolder, "Assets"));
 		}
 
 		//build zip file
@@ -719,6 +720,12 @@ public partial class ModuleExporter : EditorWindow
 		{
 			foreach (DirectoryInfo subdir in dirs)
 			{
+				string relativePath = GetRelativeTemplatePath(templateRootDir, subdir.FullName);
+				if (ShouldSkipTemplateFile(relativePath, ignoredRelativePaths))
+				{
+					continue;
+				}
+
 				string temppath = Path.Combine(destDirName, subdir.Name);
 				DirectoryCopy(subdir.FullName, temppath, copySubDirs, excludedRootDirectories, ignoredRelativePaths, templateRootDir, false);
 			}
@@ -754,6 +761,12 @@ public partial class ModuleExporter : EditorWindow
 		}
 
 		if (ignoredRelativePaths.Contains(normalized))
+		{
+			return true;
+		}
+
+		var ext = Path.GetExtension(normalized);
+		if (ext == ".bgm" || ext == ".meta")
 		{
 			return true;
 		}
