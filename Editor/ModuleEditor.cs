@@ -513,22 +513,23 @@ public partial class ModuleExporter : EditorWindow
 			Directory.CreateDirectory(destTemplateFolder);
 			string sourceAssets = Path.Combine(projectRoot, "Assets");
 			string sourceProjectSettings = Path.Combine(projectRoot, "ProjectSettings");
+			HashSet<string> ignoredTemplateFiles = CreateTemplateIgnoreSet(filesToRemove);
 
 			var excludedPackageFolders = new HashSet<string>(
 				unityPackages
 					.Where(package => IsDirectAssetsChildFolder(package.assetFolder))
 					.Select(package => Path.GetFileName(GetPackageAssetFolderPath(package.assetFolder))));
 
-			DirectoryCopy(sourceAssets, Path.Combine(destTemplateFolder, "Assets"), true, excludedPackageFolders);
+			DirectoryCopy(sourceAssets, Path.Combine(destTemplateFolder, "Assets"), true, excludedPackageFolders, ignoredTemplateFiles, projectRoot);
 			if (Directory.Exists(sourceProjectSettings))
 			{
-				DirectoryCopy(sourceProjectSettings, Path.Combine(destTemplateFolder, "ProjectSettings"), true);
+				DirectoryCopy(sourceProjectSettings, Path.Combine(destTemplateFolder, "ProjectSettings"), true, null, ignoredTemplateFiles, projectRoot);
 			}
 
 			string sourcePackages = Path.Combine(projectRoot, "Packages");
 			if (Directory.Exists(sourcePackages))
 			{
-				DirectoryCopy(sourcePackages, Path.Combine(destTemplateFolder, "Packages"), true);
+				DirectoryCopy(sourcePackages, Path.Combine(destTemplateFolder, "Packages"), true, null, ignoredTemplateFiles, projectRoot);
 			}
 
 			Debug.Log("Copied template files to " + destTemplateFolder);
@@ -679,7 +680,14 @@ public partial class ModuleExporter : EditorWindow
 			Debug.Log($"AssetBundleUtility: Built '{bundleName}' with {filtered.Count} assets at {fullOutput}");
 	}
 
-	private static void DirectoryCopy(string sourceDirName, string destDirName, bool copySubDirs, HashSet<string> excludedRootDirectories = null, bool isRoot = true)
+	private static void DirectoryCopy(
+		string sourceDirName,
+		string destDirName,
+		bool copySubDirs,
+		HashSet<string> excludedRootDirectories = null,
+		HashSet<string> ignoredRelativePaths = null,
+		string templateRootDir = null,
+		bool isRoot = true)
 	{
 		DirectoryInfo dir = new DirectoryInfo(sourceDirName);
 		if (!dir.Exists)
@@ -698,6 +706,12 @@ public partial class ModuleExporter : EditorWindow
 		FileInfo[] files = dir.GetFiles();
 		foreach (FileInfo file in files)
 		{
+			string relativePath = GetRelativeTemplatePath(templateRootDir, file.FullName);
+			if (ShouldSkipTemplateFile(relativePath, ignoredRelativePaths))
+			{
+				continue;
+			}
+
 			string temppath = Path.Combine(destDirName, file.Name);
 			file.CopyTo(temppath, true);
 		}
@@ -706,9 +720,90 @@ public partial class ModuleExporter : EditorWindow
 			foreach (DirectoryInfo subdir in dirs)
 			{
 				string temppath = Path.Combine(destDirName, subdir.Name);
-				DirectoryCopy(subdir.FullName, temppath, copySubDirs, excludedRootDirectories, false);
+				DirectoryCopy(subdir.FullName, temppath, copySubDirs, excludedRootDirectories, ignoredRelativePaths, templateRootDir, false);
 			}
 		}
+	}
+
+	private static HashSet<string> CreateTemplateIgnoreSet(IEnumerable<string> paths)
+	{
+		HashSet<string> ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		foreach (string path in paths ?? Enumerable.Empty<string>())
+		{
+			string normalized = NormalizeTemplateRelativePath(path);
+			if (!string.IsNullOrWhiteSpace(normalized))
+			{
+				ignored.Add(normalized);
+			}
+		}
+
+		return ignored;
+	}
+
+	private static bool ShouldSkipTemplateFile(string relativePath, HashSet<string> ignoredRelativePaths)
+	{
+		if (string.IsNullOrWhiteSpace(relativePath) || ignoredRelativePaths == null || ignoredRelativePaths.Count == 0)
+		{
+			return false;
+		}
+
+		string normalized = NormalizeTemplateRelativePath(relativePath);
+		if (string.IsNullOrWhiteSpace(normalized))
+		{
+			return false;
+		}
+
+		if (ignoredRelativePaths.Contains(normalized))
+		{
+			return true;
+		}
+
+		string flattened = normalized.Replace('/', '.');
+		return ignoredRelativePaths.Contains(flattened);
+	}
+
+	private static string GetRelativeTemplatePath(string templateRootDir, string fullPath)
+	{
+		if (string.IsNullOrWhiteSpace(templateRootDir) || string.IsNullOrWhiteSpace(fullPath))
+		{
+			return "";
+		}
+
+		Uri rootUri = new Uri(AppendDirectorySeparatorChar(Path.GetFullPath(templateRootDir)));
+		Uri fileUri = new Uri(Path.GetFullPath(fullPath));
+		return NormalizeTemplateRelativePath(Uri.UnescapeDataString(rootUri.MakeRelativeUri(fileUri).ToString()));
+	}
+
+	private static string NormalizeTemplateRelativePath(string path)
+	{
+		if (string.IsNullOrWhiteSpace(path))
+		{
+			return "";
+		}
+
+		string normalized = path.Trim().Replace('\\', '/');
+		while (normalized.StartsWith("./", StringComparison.Ordinal))
+		{
+			normalized = normalized.Substring(2);
+		}
+
+		return normalized.TrimStart('/');
+	}
+
+	private static string AppendDirectorySeparatorChar(string path)
+	{
+		if (string.IsNullOrWhiteSpace(path))
+		{
+			return path;
+		}
+
+		if (!path.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal) &&
+			!path.EndsWith(Path.AltDirectorySeparatorChar.ToString(), StringComparison.Ordinal))
+		{
+			return path + Path.DirectorySeparatorChar;
+		}
+
+		return path;
 	}
 
 	private ExportedProperty CopyProperty(Property prop)
