@@ -41,7 +41,7 @@ using System;
 	private Dictionary<int, bool> compFoldouts = new Dictionary<int, bool>();
 
 	// Allowed types for properties.
-	private readonly string[] allowedTypes = new string[] { "string", "int", "float", "bool", "enum", "gameitem", "role", "asset", "object" };
+	private readonly string[] allowedTypes = new string[] { "string", "int", "float", "bool", "enum", "gameitem", "roles", "asset", "object" };
 	public const string PropertyAudienceUser = "user";
 	public const string PropertyAudienceSystem = "system";
 
@@ -1760,7 +1760,7 @@ public class CustomPropertiesPopup : EditorWindow
 {
 	private List<ModuleExporter.Property> properties;
 	private ReorderableList reorderableList;
-	private readonly string[] allowedTypes = new string[] { "string", "int", "float", "bool", "role", "object" };
+	private readonly string[] allowedTypes = new string[] { "string", "int", "float", "bool", "roles", "object" };
 
 	public static void ShowPopup(List<ModuleExporter.Property> properties)
 	{

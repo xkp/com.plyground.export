@@ -7,80 +7,119 @@ using UnityEngine;
 
 public class RolePropertyEditor : EditorWindow
 {
-	private string inputJson = "{\"name\":\"\",\"components\":[]}";
-	private string roleName = "";
-	private Vector2 componentScroll;
+	private class RoleDefinition
+	{
+		public string name = "";
+		public HashSet<string> components = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+	}
+
+	private string inputJson = "[]";
+	private Vector2 rolesScroll;
 	private List<string> availableComponents = new List<string>();
-	private HashSet<string> selectedComponents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+	private List<RoleDefinition> roles = new List<RoleDefinition>();
+	private Dictionary<int, bool> roleFoldouts = new Dictionary<int, bool>();
 
 	private static string resultJson;
 
 	public static string OpenWindow(string jsonString, List<string> availableComponents)
 	{
-		RolePropertyEditor window = GetWindow<RolePropertyEditor>("Role");
-		window.inputJson = string.IsNullOrWhiteSpace(jsonString) ? window.inputJson : jsonString;
+		RolePropertyEditor window = GetWindow<RolePropertyEditor>("Roles");
+		window.inputJson = string.IsNullOrWhiteSpace(jsonString) ? "[]" : jsonString;
 		window.availableComponents = (availableComponents ?? new List<string>())
 			.Where(component => !string.IsNullOrWhiteSpace(component))
 			.Distinct(StringComparer.OrdinalIgnoreCase)
 			.OrderBy(component => component, StringComparer.OrdinalIgnoreCase)
 			.ToList();
-		window.selectedComponents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-		window.roleName = "";
-		window.ParseInput();
+		window.roles = window.ParseRoles(window.inputJson);
+		window.roleFoldouts = new Dictionary<int, bool>();
 		window.ShowModal();
 		return resultJson;
 	}
 
-	private void ParseInput()
+	public static int GetRoleCount(string jsonString)
 	{
+		return ParseRolesFromJson(jsonString).Count;
+	}
+
+	private List<RoleDefinition> ParseRoles(string jsonString)
+	{
+		return ParseRolesFromJson(jsonString);
+	}
+
+	private static List<RoleDefinition> ParseRolesFromJson(string jsonString)
+	{
+		List<RoleDefinition> parsedRoles = new List<RoleDefinition>();
+		if (string.IsNullOrWhiteSpace(jsonString))
+		{
+			return parsedRoles;
+		}
+
 		try
 		{
-			JObject parsedJson = JObject.Parse(inputJson);
-			roleName = parsedJson["name"]?.ToString() ?? "";
-			foreach (JToken componentToken in parsedJson["components"] as JArray ?? new JArray())
+			JToken token = JToken.Parse(jsonString);
+			if (token is JObject singleRoleObject)
 			{
-				string componentName = componentToken?.ToString();
-				if (!string.IsNullOrWhiteSpace(componentName))
+				parsedRoles.Add(ParseRole(singleRoleObject));
+				return parsedRoles;
+			}
+
+			if (token is JArray array)
+			{
+				foreach (JObject roleObject in array.OfType<JObject>())
 				{
-					selectedComponents.Add(componentName);
+					parsedRoles.Add(ParseRole(roleObject));
 				}
 			}
 		}
 		catch (Exception)
 		{
-			roleName = "";
-			selectedComponents.Clear();
 		}
+
+		return parsedRoles;
+	}
+
+	private static RoleDefinition ParseRole(JObject roleObject)
+	{
+		RoleDefinition role = new RoleDefinition
+		{
+			name = roleObject["name"]?.ToString() ?? ""
+		};
+
+		foreach (JToken componentToken in roleObject["components"] as JArray ?? new JArray())
+		{
+			string componentName = componentToken?.ToString();
+			if (!string.IsNullOrWhiteSpace(componentName))
+			{
+				role.components.Add(componentName);
+			}
+		}
+
+		return role;
 	}
 
 	private void OnGUI()
 	{
 		GUILayout.Space(8f);
-		EditorGUILayout.LabelField("Role Name");
-		roleName = EditorGUILayout.TextField(roleName);
-
-		GUILayout.Space(10f);
-		EditorGUILayout.LabelField("Components");
-
-		if (availableComponents.Count == 0)
+		EditorGUILayout.BeginHorizontal();
+		EditorGUILayout.LabelField("Roles", EditorStyles.boldLabel);
+		GUILayout.FlexibleSpace();
+		if (GUILayout.Button("Add Role", GUILayout.Width(90f)))
 		{
-			EditorGUILayout.HelpBox("No capability components are available yet. Add components in the Caps tab first.", MessageType.Info);
+			roles.Add(new RoleDefinition());
+		}
+		EditorGUILayout.EndHorizontal();
+
+		GUILayout.Space(8f);
+		if (roles.Count == 0)
+		{
+			EditorGUILayout.HelpBox("No roles yet. Add a role to assign capability components.", MessageType.Info);
 		}
 		else
 		{
-			componentScroll = EditorGUILayout.BeginScrollView(componentScroll, GUILayout.MinHeight(180f));
-			foreach (string componentName in availableComponents)
+			rolesScroll = EditorGUILayout.BeginScrollView(rolesScroll, GUILayout.MinHeight(220f));
+			for (int i = 0; i < roles.Count; i++)
 			{
-				bool isSelected = selectedComponents.Contains(componentName);
-				bool nextSelected = EditorGUILayout.ToggleLeft(componentName, isSelected);
-				if (nextSelected)
-				{
-					selectedComponents.Add(componentName);
-				}
-				else
-				{
-					selectedComponents.Remove(componentName);
-				}
+				DrawRoleEditor(i, roles[i]);
 			}
 			EditorGUILayout.EndScrollView();
 		}
@@ -88,15 +127,73 @@ public class RolePropertyEditor : EditorWindow
 		GUILayout.Space(16f);
 		if (GUILayout.Button("Accept Values"))
 		{
-			JObject outputJson = new JObject
+			JArray output = new JArray();
+			foreach (RoleDefinition role in roles)
 			{
-				{ "name", roleName ?? "" },
-				{ "components", new JArray(selectedComponents.OrderBy(component => component, StringComparer.OrdinalIgnoreCase)) }
-			};
+				output.Add(new JObject
+				{
+					{ "name", role.name ?? "" },
+					{ "components", new JArray(role.components.OrderBy(component => component, StringComparer.OrdinalIgnoreCase)) }
+				});
+			}
 
-			resultJson = outputJson.ToString();
+			resultJson = output.ToString();
 			EditorGUIUtility.systemCopyBuffer = resultJson;
 			Close();
 		}
+	}
+
+	private void DrawRoleEditor(int index, RoleDefinition role)
+	{
+		if (!roleFoldouts.ContainsKey(index))
+		{
+			roleFoldouts[index] = true;
+		}
+
+		EditorGUILayout.BeginVertical("box");
+		EditorGUILayout.BeginHorizontal();
+		string label = string.IsNullOrWhiteSpace(role.name) ? $"Role {index + 1}" : role.name;
+		roleFoldouts[index] = EditorGUILayout.Foldout(roleFoldouts[index], label, true);
+		GUILayout.FlexibleSpace();
+		if (GUILayout.Button("Remove", GUILayout.Width(70f)))
+		{
+			roles.RemoveAt(index);
+			roleFoldouts.Remove(index);
+			EditorGUILayout.EndHorizontal();
+			EditorGUILayout.EndVertical();
+			GUIUtility.ExitGUI();
+			return;
+		}
+		EditorGUILayout.EndHorizontal();
+
+		if (roleFoldouts[index])
+		{
+			role.name = EditorGUILayout.TextField("Name", role.name);
+
+			GUILayout.Space(6f);
+			EditorGUILayout.LabelField("Components");
+			if (availableComponents.Count == 0)
+			{
+				EditorGUILayout.HelpBox("No capability components are available yet. Add components in the Caps tab first.", MessageType.Info);
+			}
+			else
+			{
+				foreach (string componentName in availableComponents)
+				{
+					bool selected = role.components.Contains(componentName);
+					bool nextSelected = EditorGUILayout.ToggleLeft(componentName, selected);
+					if (nextSelected)
+					{
+						role.components.Add(componentName);
+					}
+					else
+					{
+						role.components.Remove(componentName);
+					}
+				}
+			}
+		}
+
+		EditorGUILayout.EndVertical();
 	}
 }

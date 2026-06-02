@@ -28,7 +28,6 @@ public partial class ModuleExporter
 
 	private ModuleEditorTab activeTab;
 	private Vector2 _modulePropertiesScroll;
-	private readonly string[] propertyAudienceOptions = new string[] { PropertyAudienceUser, PropertyAudienceSystem };
 	private Vector2 _moduleToolsScroll;
 	private Vector2 _itemGridScroll;
 	private GUIStyle brandCardStyle;
@@ -358,20 +357,19 @@ public partial class ModuleExporter
 		}
 		EditorGUILayout.EndHorizontal();
 
-		float reserved = 96f;
+		float reserved = 88f;
 		float gap = 3f;
-		float usable = sectionWidth - reserved - (gap * 3f);
-		float nameWidth = Mathf.Max(60f, usable * 0.30f);
-		float typeWidth = Mathf.Max(60f, usable * 0.18f);
-		float audienceWidth = Mathf.Max(70f, usable * 0.22f);
-		float valueWidth = Mathf.Max(60f, usable * 0.30f);
+		float usable = sectionWidth - reserved - (gap * 2f);
+		float nameWidth = Mathf.Max(60f, usable * 0.34f);
+		float typeWidth = Mathf.Max(60f, usable * 0.20f);
+		float valueWidth = Mathf.Max(60f, usable * 0.46f);
 
 		EditorGUILayout.BeginHorizontal();
 		GUILayout.Label("Name", EditorStyles.miniBoldLabel, GUILayout.Width(nameWidth));
 		GUILayout.Label("Type", EditorStyles.miniBoldLabel, GUILayout.Width(typeWidth));
-		GUILayout.Label("Audience", EditorStyles.miniBoldLabel, GUILayout.Width(audienceWidth));
 		GUILayout.Label("Value", EditorStyles.miniBoldLabel, GUILayout.Width(valueWidth));
-		GUILayout.Space(reserved);
+		GUILayout.Label("System", EditorStyles.miniBoldLabel, GUILayout.Width(52f));
+		GUILayout.Space(36f);
 		EditorGUILayout.EndHorizontal();
 
 		if (moduleProperties == null || moduleProperties.Count == 0)
@@ -392,16 +390,25 @@ public partial class ModuleExporter
 			int typeIndex = System.Array.IndexOf(allowedTypes, prop.type);
 			if (typeIndex < 0)
 			{
-				typeIndex = 0;
-				prop.type = allowedTypes[0];
+				if (string.Equals(prop.type, "role", StringComparison.OrdinalIgnoreCase))
+				{
+					prop.type = "roles";
+					typeIndex = System.Array.IndexOf(allowedTypes, prop.type);
+				}
+				else
+				{
+					typeIndex = 0;
+					prop.type = allowedTypes[0];
+				}
 			}
 
 			typeIndex = EditorGUILayout.Popup(typeIndex, allowedTypes, GUILayout.Width(typeWidth));
 			prop.type = allowedTypes[typeIndex];
 			GUILayout.Space(gap);
-			prop.audience = DrawPropertyAudiencePopup(prop.audience, GUILayout.Width(audienceWidth));
-			GUILayout.Space(gap);
 			DrawInlinePropertyValue(prop, valueWidth);
+			prop.audience = EditorGUILayout.Toggle(IsSystemProperty(prop), GUILayout.Width(52f))
+				? PropertyAudienceSystem
+				: PropertyAudienceUser;
 
 			GUILayout.Space(6f);
 			if (GUILayout.Button("X", GUILayout.Width(24f)))
@@ -967,42 +974,31 @@ public partial class ModuleExporter
 			int typeIndex = System.Array.IndexOf(allowedTypes, entry.prop.type);
 			if (typeIndex < 0)
 			{
-				typeIndex = 0;
-				entry.prop.type = allowedTypes[0];
+				if (string.Equals(entry.prop.type, "role", StringComparison.OrdinalIgnoreCase))
+				{
+					entry.prop.type = "roles";
+					typeIndex = System.Array.IndexOf(allowedTypes, entry.prop.type);
+				}
+				else
+				{
+					typeIndex = 0;
+					entry.prop.type = allowedTypes[0];
+				}
 			}
 
 			typeIndex = EditorGUILayout.Popup("Type", typeIndex, allowedTypes);
 			entry.prop.type = allowedTypes[typeIndex];
-			entry.prop.audience = DrawPropertyAudiencePopup("Audience", entry.prop.audience);
+			entry.prop.audience = EditorGUILayout.Toggle("System", IsSystemProperty(entry.prop))
+				? PropertyAudienceSystem
+				: PropertyAudienceUser;
 			DrawExpandedPropertyValue(entry.prop);
 			EditorGUILayout.EndVertical();
 		}
 	}
 
-	private string DrawPropertyAudiencePopup(string audience, params GUILayoutOption[] layoutOptions)
+	private bool IsSystemProperty(Property prop)
 	{
-		audience = NormalizePropertyAudience(audience);
-		int audienceIndex = System.Array.IndexOf(propertyAudienceOptions, audience);
-		if (audienceIndex < 0)
-		{
-			audienceIndex = 0;
-		}
-
-		audienceIndex = EditorGUILayout.Popup(audienceIndex, propertyAudienceOptions, layoutOptions);
-		return propertyAudienceOptions[audienceIndex];
-	}
-
-	private string DrawPropertyAudiencePopup(string label, string audience)
-	{
-		audience = NormalizePropertyAudience(audience);
-		int audienceIndex = System.Array.IndexOf(propertyAudienceOptions, audience);
-		if (audienceIndex < 0)
-		{
-			audienceIndex = 0;
-		}
-
-		audienceIndex = EditorGUILayout.Popup(label, audienceIndex, propertyAudienceOptions);
-		return propertyAudienceOptions[audienceIndex];
+		return string.Equals(NormalizePropertyAudience(prop.audience), PropertyAudienceSystem, StringComparison.OrdinalIgnoreCase);
 	}
 
 	private void DrawExpandedPropertyValue(Property prop)
@@ -1019,7 +1015,8 @@ public partial class ModuleExporter
 				}
 				break;
 			case "role":
-				if (GUILayout.Button(string.IsNullOrEmpty(prop.data) ? "Edit..." : prop.data))
+			case "roles":
+				if (GUILayout.Button(GetRolesButtonLabel(prop.data)))
 				{
 					prop.data = RolePropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentNames());
 				}
@@ -1050,7 +1047,8 @@ public partial class ModuleExporter
 				}
 				break;
 			case "role":
-				if (GUILayout.Button(string.IsNullOrEmpty(prop.data) ? "Edit..." : prop.data, GUILayout.Width(width)))
+			case "roles":
+				if (GUILayout.Button(GetRolesButtonLabel(prop.data), GUILayout.Width(width)))
 				{
 					prop.data = RolePropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentNames());
 				}
@@ -1201,8 +1199,15 @@ public partial class ModuleExporter
 	private void OpenCapabilityScriptSelector()
 	{
 		capabilitySourceScriptPaths ??= new List<string>();
-		CSharpScriptSelectorWindow.OpenWindow(capabilitySourceScriptPaths);
-		capabilitySourceScriptPaths = capabilitySourceScriptPaths
+		List<string> existingSelection = capabilitySourceScriptPaths
+			.Where(path => !string.IsNullOrWhiteSpace(path))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		List<string> selectedScripts = new List<string>(existingSelection);
+		CSharpScriptSelectorWindow.OpenWindow(selectedScripts);
+		capabilitySourceScriptPaths = existingSelection
+			.Concat(selectedScripts ?? new List<string>())
 			.Where(path => !string.IsNullOrWhiteSpace(path))
 			.Distinct(StringComparer.OrdinalIgnoreCase)
 			.OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
@@ -1249,6 +1254,12 @@ public partial class ModuleExporter
 			.ToList();
 	}
 
+	private string GetRolesButtonLabel(string json)
+	{
+		int count = RolePropertyEditor.GetRoleCount(json);
+		return count <= 0 ? "Edit Roles..." : $"Edit Roles... ({count})";
+	}
+
 	private void DrawCapabilitiesFeaturesWorkspace()
 	{
 		EditorGUILayout.BeginVertical("box");
@@ -1265,7 +1276,7 @@ public partial class ModuleExporter
 		GUILayout.Space(10f);
 		GUILayout.Label(GetCapabilityScriptSelectionSummary(), EditorStyles.miniLabel);
 		GUILayout.FlexibleSpace();
-		if (GUILayout.Button("Select Scripts", GUILayout.Width(110f)))
+		if (GUILayout.Button("Add Scripts...", GUILayout.Width(110f)))
 		{
 			OpenCapabilityScriptSelector();
 		}
@@ -1289,7 +1300,7 @@ public partial class ModuleExporter
 
 		if (capabilitySourceScriptPaths == null || capabilitySourceScriptPaths.Count == 0)
 		{
-			EditorGUILayout.HelpBox("No C# source files selected. Use Select Scripts to populate reflected components.", MessageType.Info);
+			EditorGUILayout.HelpBox("No C# source files selected. Use Add Scripts... to populate reflected components.", MessageType.Info);
 		}
 
 		if (components.Count == 0)

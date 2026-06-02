@@ -9,6 +9,7 @@ public class CSharpScriptSelectorWindow : EditorWindow
 	private TreeViewState treeState;
 	private ScriptTreeView treeView;
 	private List<string> externalSelection;
+	private bool shouldApplySelection;
 
 	public static void OpenWindow(List<string> selectedScripts)
 	{
@@ -77,6 +78,7 @@ public class CSharpScriptSelectorWindow : EditorWindow
 		EditorGUILayout.BeginHorizontal();
 		if (GUILayout.Button("OK"))
 		{
+			shouldApplySelection = true;
 			ApplySelection();
 			Close();
 		}
@@ -115,7 +117,10 @@ public class CSharpScriptSelectorWindow : EditorWindow
 
 	private void OnDisable()
 	{
-		ApplySelection();
+		if (shouldApplySelection)
+		{
+			ApplySelection();
+		}
 	}
 
 	private class ScriptTreeView : TreeView
