@@ -8,8 +8,8 @@ using System.Reflection;
 using System.Linq;
 using System;
 
-public partial class ModuleExporter : EditorWindow
-{
+	public partial class ModuleExporter : EditorWindow
+	{
 	private string moduleId = "";
 
 	private string moduleName = "";
@@ -42,8 +42,8 @@ public partial class ModuleExporter : EditorWindow
 
 	// Allowed types for properties.
 	private readonly string[] allowedTypes = new string[] { "string", "int", "float", "bool", "enum", "gameitem", "role", "asset", "object" };
-	protected const string PropertyAudienceUser = "user";
-	protected const string PropertyAudienceSystem = "system";
+	public const string PropertyAudienceUser = "user";
+	public const string PropertyAudienceSystem = "system";
 
 	// NEW: A dictionary to track property foldout states (keyed by property key).
 	private Dictionary<string, bool> propertyFoldouts = new Dictionary<string, bool>();
@@ -1853,7 +1853,7 @@ public class CustomPropertiesPopup : EditorWindow
 				name = "NewProperty",
 				type = "string",
 				data = "",
-				audience = PropertyAudienceUser
+				audience = ModuleExporter.PropertyAudienceUser
 			});
 		};
 
@@ -1964,7 +1964,7 @@ public class ComponentPropertiesPopup : EditorWindow
 						name = entry.field.Name,
 						type = ModuleExporter.TranslateType(entry.field.FieldType),
 						data = entry.comp.GetType().Name,
-						audience = PropertyAudienceUser,
+						audience = ModuleExporter.PropertyAudienceUser,
 					});
 
 					PopulateAvailableFields();
