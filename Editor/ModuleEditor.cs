@@ -41,7 +41,9 @@ public partial class ModuleExporter : EditorWindow
 	private Dictionary<int, bool> compFoldouts = new Dictionary<int, bool>();
 
 	// Allowed types for properties.
-	private readonly string[] allowedTypes = new string[] { "string", "int", "float", "bool", "enum", "gameitem", "asset", "object" };
+	private readonly string[] allowedTypes = new string[] { "string", "int", "float", "bool", "enum", "gameitem", "role", "asset", "object" };
+	protected const string PropertyAudienceUser = "user";
+	protected const string PropertyAudienceSystem = "system";
 
 	// NEW: A dictionary to track property foldout states (keyed by property key).
 	private Dictionary<string, bool> propertyFoldouts = new Dictionary<string, bool>();
@@ -94,6 +96,7 @@ public partial class ModuleExporter : EditorWindow
 		public string type;
 		public string data;
 		public string value;
+		public string audience;
 	}
 
 	[System.Serializable]
@@ -204,6 +207,7 @@ public partial class ModuleExporter : EditorWindow
 		{
 			foreach (var property in mod.moduleProperties)
 			{
+				property.audience = NormalizePropertyAudience(property.audience);
 				moduleProperties.Add(property);
 			}
 		}
@@ -277,7 +281,8 @@ public partial class ModuleExporter : EditorWindow
 							{
 								name = ep.name,
 								type = ep.type,
-								data = ep.data
+								data = ep.data,
+								audience = NormalizePropertyAudience(ep.audience)
 							});
 						}
 					}
@@ -424,7 +429,11 @@ public partial class ModuleExporter : EditorWindow
 		mod.filesToRemove = new List<string>(filesToRemove);
 		mod.dependencies = new List<string>(dependencies);
 		mod.customEditors = new List<string>(customEditors);
-		mod.moduleProperties = new List<Property>(moduleProperties);
+		mod.moduleProperties = new List<Property>(moduleProperties.Select(property =>
+		{
+			property.audience = NormalizePropertyAudience(property.audience);
+			return property;
+		}));
 		moduleTools ??= new List<ModuleTool>();
 		mod.tools = moduleTools
 			.Select(tool => new ModuleTool
@@ -825,7 +834,15 @@ public partial class ModuleExporter : EditorWindow
 		ep.name = prop.name;
 		ep.type = prop.type;
 		ep.data = prop.data;
+		ep.audience = NormalizePropertyAudience(prop.audience);
 		return ep;
+	}
+
+	protected string NormalizePropertyAudience(string audience)
+	{
+		return string.Equals(audience, PropertyAudienceSystem, StringComparison.OrdinalIgnoreCase)
+			? PropertyAudienceSystem
+			: PropertyAudienceUser;
 	}
 
 	[System.Serializable]
@@ -901,6 +918,7 @@ public partial class ModuleExporter : EditorWindow
 		public string name;
 		public string type;
 		public string data;
+		public string audience;
 	}
 
 	private void CreateCustomItem(ItemGroup group)
@@ -1742,7 +1760,7 @@ public class CustomPropertiesPopup : EditorWindow
 {
 	private List<ModuleExporter.Property> properties;
 	private ReorderableList reorderableList;
-	private readonly string[] allowedTypes = new string[] { "string", "int", "float", "bool", "object" };
+	private readonly string[] allowedTypes = new string[] { "string", "int", "float", "bool", "role", "object" };
 
 	public static void ShowPopup(List<ModuleExporter.Property> properties)
 	{
@@ -1830,7 +1848,13 @@ public class CustomPropertiesPopup : EditorWindow
 
 		reorderableList.onAddCallback = (ReorderableList list) =>
 		{
-			properties.Add(new ModuleExporter.Property { name = "NewProperty", type = "string", data = "" });
+			properties.Add(new ModuleExporter.Property
+			{
+				name = "NewProperty",
+				type = "string",
+				data = "",
+				audience = PropertyAudienceUser
+			});
 		};
 
 		reorderableList.onRemoveCallback = (ReorderableList list) =>
@@ -1940,6 +1964,7 @@ public class ComponentPropertiesPopup : EditorWindow
 						name = entry.field.Name,
 						type = ModuleExporter.TranslateType(entry.field.FieldType),
 						data = entry.comp.GetType().Name,
+						audience = PropertyAudienceUser,
 					});
 
 					PopulateAvailableFields();

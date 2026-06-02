@@ -28,6 +28,7 @@ public partial class ModuleExporter
 
 	private ModuleEditorTab activeTab;
 	private Vector2 _modulePropertiesScroll;
+	private readonly string[] propertyAudienceOptions = new string[] { PropertyAudienceUser, PropertyAudienceSystem };
 	private Vector2 _moduleToolsScroll;
 	private Vector2 _itemGridScroll;
 	private GUIStyle brandCardStyle;
@@ -351,21 +352,24 @@ public partial class ModuleExporter
 				name = "NewProperty",
 				type = allowedTypes[0],
 				data = string.Empty,
-				value = string.Empty
+				value = string.Empty,
+				audience = PropertyAudienceUser
 			});
 		}
 		EditorGUILayout.EndHorizontal();
 
-		float reserved = 44f;
+		float reserved = 96f;
 		float gap = 3f;
-		float usable = sectionWidth - reserved - (gap * 2f);
-		float nameWidth = Mathf.Max(60f, usable * 0.40f);
-		float typeWidth = Mathf.Max(60f, usable * 0.20f);
-		float valueWidth = Mathf.Max(60f, usable * 0.40f);
+		float usable = sectionWidth - reserved - (gap * 3f);
+		float nameWidth = Mathf.Max(60f, usable * 0.30f);
+		float typeWidth = Mathf.Max(60f, usable * 0.18f);
+		float audienceWidth = Mathf.Max(70f, usable * 0.22f);
+		float valueWidth = Mathf.Max(60f, usable * 0.30f);
 
 		EditorGUILayout.BeginHorizontal();
 		GUILayout.Label("Name", EditorStyles.miniBoldLabel, GUILayout.Width(nameWidth));
 		GUILayout.Label("Type", EditorStyles.miniBoldLabel, GUILayout.Width(typeWidth));
+		GUILayout.Label("Audience", EditorStyles.miniBoldLabel, GUILayout.Width(audienceWidth));
 		GUILayout.Label("Value", EditorStyles.miniBoldLabel, GUILayout.Width(valueWidth));
 		GUILayout.Space(reserved);
 		EditorGUILayout.EndHorizontal();
@@ -394,6 +398,8 @@ public partial class ModuleExporter
 
 			typeIndex = EditorGUILayout.Popup(typeIndex, allowedTypes, GUILayout.Width(typeWidth));
 			prop.type = allowedTypes[typeIndex];
+			GUILayout.Space(gap);
+			prop.audience = DrawPropertyAudiencePopup(prop.audience, GUILayout.Width(audienceWidth));
 			GUILayout.Space(gap);
 			DrawInlinePropertyValue(prop, valueWidth);
 
@@ -906,7 +912,8 @@ public partial class ModuleExporter
 				name = "NewProperty",
 				type = "string",
 				data = string.Empty,
-				value = string.Empty
+				value = string.Empty,
+				audience = PropertyAudienceUser
 			});
 		}
 
@@ -966,9 +973,36 @@ public partial class ModuleExporter
 
 			typeIndex = EditorGUILayout.Popup("Type", typeIndex, allowedTypes);
 			entry.prop.type = allowedTypes[typeIndex];
+			entry.prop.audience = DrawPropertyAudiencePopup("Audience", entry.prop.audience);
 			DrawExpandedPropertyValue(entry.prop);
 			EditorGUILayout.EndVertical();
 		}
+	}
+
+	private string DrawPropertyAudiencePopup(string audience, params GUILayoutOption[] layoutOptions)
+	{
+		audience = NormalizePropertyAudience(audience);
+		int audienceIndex = System.Array.IndexOf(propertyAudienceOptions, audience);
+		if (audienceIndex < 0)
+		{
+			audienceIndex = 0;
+		}
+
+		audienceIndex = EditorGUILayout.Popup(audienceIndex, propertyAudienceOptions, layoutOptions);
+		return propertyAudienceOptions[audienceIndex];
+	}
+
+	private string DrawPropertyAudiencePopup(string label, string audience)
+	{
+		audience = NormalizePropertyAudience(audience);
+		int audienceIndex = System.Array.IndexOf(propertyAudienceOptions, audience);
+		if (audienceIndex < 0)
+		{
+			audienceIndex = 0;
+		}
+
+		audienceIndex = EditorGUILayout.Popup(label, audienceIndex, propertyAudienceOptions);
+		return propertyAudienceOptions[audienceIndex];
 	}
 
 	private void DrawExpandedPropertyValue(Property prop)
@@ -982,6 +1016,12 @@ public partial class ModuleExporter
 				if (GUILayout.Button(string.IsNullOrEmpty(prop.data) ? "Edit..." : prop.data))
 				{
 					prop.data = GameItemPropertyEditor.OpenWindow(prop.data);
+				}
+				break;
+			case "role":
+				if (GUILayout.Button(string.IsNullOrEmpty(prop.data) ? "Edit..." : prop.data))
+				{
+					prop.data = RolePropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentNames());
 				}
 				break;
 			case "enum":
@@ -1007,6 +1047,12 @@ public partial class ModuleExporter
 				if (GUILayout.Button(string.IsNullOrEmpty(prop.data) ? "Edit..." : prop.data, GUILayout.Width(width)))
 				{
 					prop.data = GameItemPropertyEditor.OpenWindow(prop.data);
+				}
+				break;
+			case "role":
+				if (GUILayout.Button(string.IsNullOrEmpty(prop.data) ? "Edit..." : prop.data, GUILayout.Width(width)))
+				{
+					prop.data = RolePropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentNames());
 				}
 				break;
 			case "enum":
@@ -1190,6 +1236,17 @@ public partial class ModuleExporter
 		EditorGUILayout.BeginVertical("box");
 		DrawComponentBrowser(moduleCapabilities.unity.components);
 		EditorGUILayout.EndVertical();
+	}
+
+	private List<string> GetAvailableCapabilityComponentNames()
+	{
+		moduleCapabilities ??= new CapabilityManifest();
+		return (moduleCapabilities.unity.components ?? new List<UnityCapabilityComponentInfo>())
+			.Select(component => !string.IsNullOrWhiteSpace(component.typeName) ? component.typeName : component.componentId)
+			.Where(name => !string.IsNullOrWhiteSpace(name))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
 	}
 
 	private void DrawCapabilitiesFeaturesWorkspace()
