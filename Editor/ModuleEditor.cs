@@ -774,6 +774,20 @@ using System;
 			return true;
 		}
 
+		foreach (string ignoredPath in ignoredRelativePaths)
+		{
+			if (string.IsNullOrWhiteSpace(ignoredPath))
+			{
+				continue;
+			}
+
+			string ignoredPrefix = ignoredPath.EndsWith("/", StringComparison.Ordinal) ? ignoredPath : ignoredPath + "/";
+			if (normalized.StartsWith(ignoredPrefix, StringComparison.OrdinalIgnoreCase))
+			{
+				return true;
+			}
+		}
+
 		var ext = Path.GetExtension(normalized);
 		if (ext == ".bgm" || ext == ".meta")
 		{

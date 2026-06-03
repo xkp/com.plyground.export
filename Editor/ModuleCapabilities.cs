@@ -1216,7 +1216,7 @@ public partial class ModuleExporter
 			.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
 			.Where(property =>
 				property.GetIndexParameters().Length == 0 &&
-				property.GetGetMethod() != null)
+				property.GetGetMethod(false) != null)
 			.OrderBy(property => property.Name, StringComparer.OrdinalIgnoreCase);
 	}
 
@@ -1567,20 +1567,20 @@ public partial class ModuleExporter
 	private static IEnumerable<FieldInfo> GetSerializedFields(Type type)
 	{
 		return type
-			.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+			.GetFields(BindingFlags.Instance | BindingFlags.Public)
 			.Where(field =>
 				!field.IsStatic &&
-				(field.IsPublic || field.GetCustomAttributes(typeof(SerializeField), true).Length > 0) &&
+				field.IsPublic &&
 				IsCapabilitySupportedFieldType(field.FieldType));
 	}
 
 	private static IEnumerable<FieldInfo> GetInspectorFields(Type type)
 	{
 		return type
-			.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+			.GetFields(BindingFlags.Instance | BindingFlags.Public)
 			.Where(field =>
 				!field.IsStatic &&
-				(field.IsPublic || field.GetCustomAttributes(typeof(SerializeField), true).Length > 0));
+				field.IsPublic);
 	}
 
 	private static bool IsCapabilitySupportedFieldType(Type type)
