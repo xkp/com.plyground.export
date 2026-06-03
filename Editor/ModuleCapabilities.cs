@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -1015,19 +1016,7 @@ public partial class ModuleExporter
 			}
 
 			sourceFieldMap.TryGetValue(field.Name, out SourceFieldInfo sourceField);
-			string defaultValue = "";
-			if (instance != null)
-			{
-				try
-				{
-					object value = field.GetValue(instance);
-					defaultValue = value != null ? value.ToString() : "";
-				}
-				catch
-				{
-					defaultValue = "";
-				}
-			}
+			string defaultValue = GetCapabilityDefaultValue(field.FieldType, () => instance != null ? field.GetValue(instance) : null);
 
 			parameterMap["field|" + field.Name] = new CapabilityParameterInfo
 			{
@@ -1052,19 +1041,9 @@ public partial class ModuleExporter
 			}
 
 			sourceFieldMap.TryGetValue(property.Name, out SourceFieldInfo sourceField);
-			string defaultValue = "";
-			if (instance != null && property.CanRead && property.GetIndexParameters().Length == 0)
-			{
-				try
-				{
-					object value = property.GetValue(instance, null);
-					defaultValue = value != null ? value.ToString() : "";
-				}
-				catch
-				{
-					defaultValue = "";
-				}
-			}
+			string defaultValue = property.CanRead && property.GetIndexParameters().Length == 0
+				? GetCapabilityDefaultValue(property.PropertyType, () => instance != null ? property.GetValue(instance, null) : null)
+				: GuessCapabilityDefaultValue(property.PropertyType);
 
 			parameterMap["property|" + property.Name] = new CapabilityParameterInfo
 			{
@@ -1083,6 +1062,127 @@ public partial class ModuleExporter
 
 		parameters.AddRange(parameterMap.Values.OrderBy(parameter => parameter.name, StringComparer.OrdinalIgnoreCase));
 		return parameters;
+	}
+
+	private static string GetCapabilityDefaultValue(Type valueType, Func<object> valueFactory)
+	{
+		if (valueFactory != null)
+		{
+			try
+			{
+				object value = valueFactory();
+				return FormatCapabilityDefaultValue(value, valueType);
+			}
+			catch
+			{
+			}
+		}
+
+		return GuessCapabilityDefaultValue(valueType);
+	}
+
+	private static string FormatCapabilityDefaultValue(object value, Type valueType)
+	{
+		if (value == null)
+		{
+			return GuessCapabilityDefaultValue(valueType);
+		}
+
+		Type actualType = value.GetType();
+		if (actualType == typeof(bool))
+		{
+			return ((bool)value) ? "true" : "false";
+		}
+
+		if (actualType == typeof(float))
+		{
+			return ((float)value).ToString(CultureInfo.InvariantCulture);
+		}
+
+		if (actualType == typeof(double))
+		{
+			return ((double)value).ToString(CultureInfo.InvariantCulture);
+		}
+
+		if (actualType == typeof(decimal))
+		{
+			return ((decimal)value).ToString(CultureInfo.InvariantCulture);
+		}
+
+		if (actualType.IsPrimitive)
+		{
+			return Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
+		}
+
+		return value.ToString() ?? "";
+	}
+
+	private static string GuessCapabilityDefaultValue(Type valueType)
+	{
+		if (valueType == null)
+		{
+			return "";
+		}
+
+		Type normalizedType = Nullable.GetUnderlyingType(valueType) ?? valueType;
+		if (normalizedType == typeof(string))
+		{
+			return "";
+		}
+
+		if (normalizedType == typeof(bool))
+		{
+			return "false";
+		}
+
+		if (normalizedType == typeof(float))
+		{
+			return 0f.ToString(CultureInfo.InvariantCulture);
+		}
+
+		if (normalizedType == typeof(double))
+		{
+			return 0d.ToString(CultureInfo.InvariantCulture);
+		}
+
+		if (normalizedType == typeof(decimal))
+		{
+			return 0m.ToString(CultureInfo.InvariantCulture);
+		}
+
+		if (normalizedType.IsPrimitive)
+		{
+			object primitiveDefault = Activator.CreateInstance(normalizedType);
+			return Convert.ToString(primitiveDefault, CultureInfo.InvariantCulture) ?? "";
+		}
+
+		if (normalizedType.IsEnum)
+		{
+			string[] enumNames = Enum.GetNames(normalizedType);
+			return enumNames.Length > 0 ? enumNames[0] : "";
+		}
+
+		if (normalizedType == typeof(Vector2))
+		{
+			return Vector2.zero.ToString();
+		}
+
+		if (normalizedType == typeof(Vector3))
+		{
+			return Vector3.zero.ToString();
+		}
+
+		if (normalizedType == typeof(Vector4))
+		{
+			return Vector4.zero.ToString();
+		}
+
+		if (normalizedType == typeof(Color))
+		{
+			return Color.clear.ToString();
+		}
+
+		return "";
 	}
 
 	private List<CapabilityParameterInfo> BuildParameterInfos(SourceScriptInfo sourceInfo)
