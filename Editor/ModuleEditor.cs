@@ -595,8 +595,7 @@ using System;
 		assetsFromGroups = assetsFromGroups.Distinct().ToList();
 		if (assetsFromGroups.Any())
 		{
-			//TODO: keep it for editor change.
-			//BuildBundleFromPaths(assetsFromGroups, "AssetBundle", Path.Combine(moduleFolder, "Assets"));
+			BuildBundleFromPaths(assetsFromGroups, "AssetBundle", Path.Combine(moduleFolder, "Assets"));
 		}
 
 		//build zip file
