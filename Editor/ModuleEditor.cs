@@ -595,7 +595,7 @@ using System;
 		assetsFromGroups = assetsFromGroups.Distinct().ToList();
 		if (assetsFromGroups.Any())
 		{
-			BuildBundleFromPaths(assetsFromGroups, "AssetBundle", Path.Combine(moduleFolder, "Assets"));
+			BuildBundleFromPaths(assetsFromGroups, "AssetBundle", Path.Combine(moduleFolder, "Assets"), BuildTarget.WebGL);
 		}
 
 		//build zip file
@@ -639,7 +639,7 @@ using System;
 
 		processed.Add(mesh);
 	}
-	public static void BuildBundleFromPaths(List<string> assetPaths, string bundleName, string outputDirectory)
+	public static void BuildBundleFromPaths(List<string> assetPaths, string bundleName, string outputDirectory, BuildTarget buildTarget)
 	{
 		if (assetPaths == null || assetPaths.Count == 0)
 		{
@@ -684,13 +684,13 @@ using System;
 			fullOutput,
 			new[] { buildMap },
 			buildOptions,
-			EditorUserBuildSettings.activeBuildTarget
+			buildTarget
 		);
 
 		if (manifest == null)
-			Debug.LogError($"AssetBundleUtility: Failted Building'{bundleName}' with {filtered.Count} assets at {fullOutput}");
+			Debug.LogError($"AssetBundleUtility: Failted Building'{bundleName}' with {filtered.Count} assets at {fullOutput} for {buildTarget}");
 		else
-			Debug.Log($"AssetBundleUtility: Built '{bundleName}' with {filtered.Count} assets at {fullOutput} using {buildOptions}");
+			Debug.Log($"AssetBundleUtility: Built '{bundleName}' with {filtered.Count} assets at {fullOutput} for {buildTarget} using {buildOptions}");
 	}
 
 	private static void DirectoryCopy(
