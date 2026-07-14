@@ -675,18 +675,22 @@ using System;
 			assetNames = filtered.ToArray()
 		};
 
+		// WebGL cannot consume bundles built with LZMA streaming decompression, so
+		// export with chunk-based compression to keep them browser-decompressible.
+		var buildOptions = BuildAssetBundleOptions.ChunkBasedCompression;
+
 		// Execute build
 		var manifest = BuildPipeline.BuildAssetBundles(
 			fullOutput,
 			new[] { buildMap },
-			BuildAssetBundleOptions.None,
+			buildOptions,
 			EditorUserBuildSettings.activeBuildTarget
 		);
 
 		if (manifest == null)
 			Debug.LogError($"AssetBundleUtility: Failted Building'{bundleName}' with {filtered.Count} assets at {fullOutput}");
 		else
-			Debug.Log($"AssetBundleUtility: Built '{bundleName}' with {filtered.Count} assets at {fullOutput}");
+			Debug.Log($"AssetBundleUtility: Built '{bundleName}' with {filtered.Count} assets at {fullOutput} using {buildOptions}");
 	}
 
 	private static void DirectoryCopy(
