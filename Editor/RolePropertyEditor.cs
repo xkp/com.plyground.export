@@ -25,6 +25,7 @@ public class RolePropertyEditor : EditorWindow
 	public static string OpenWindow(string jsonString, List<string> availableComponents)
 	{
 		RolePropertyEditor window = GetWindow<RolePropertyEditor>("Roles");
+		window.minSize = new Vector2(460f, 420f);
 		window.inputJson = string.IsNullOrWhiteSpace(jsonString) ? "[]" : jsonString;
 		window.availableComponents = (availableComponents ?? new List<string>())
 			.Where(component => !string.IsNullOrWhiteSpace(component))
@@ -101,6 +102,8 @@ public class RolePropertyEditor : EditorWindow
 
 	private void OnGUI()
 	{
+		EditorGUILayout.BeginVertical(GUILayout.ExpandHeight(true));
+
 		GUILayout.Space(8f);
 		EditorGUILayout.BeginHorizontal();
 		EditorGUILayout.LabelField("Roles", EditorStyles.boldLabel);
@@ -118,7 +121,7 @@ public class RolePropertyEditor : EditorWindow
 		}
 		else
 		{
-			rolesScroll = EditorGUILayout.BeginScrollView(rolesScroll, GUILayout.MinHeight(220f));
+			rolesScroll = EditorGUILayout.BeginScrollView(rolesScroll, GUILayout.ExpandHeight(true), GUILayout.MinHeight(220f));
 			for (int i = 0; i < roles.Count; i++)
 			{
 				DrawRoleEditor(i, roles[i]);
@@ -126,8 +129,9 @@ public class RolePropertyEditor : EditorWindow
 			EditorGUILayout.EndScrollView();
 		}
 
+		GUILayout.FlexibleSpace();
 		GUILayout.Space(16f);
-		if (GUILayout.Button("Accept Values"))
+		if (GUILayout.Button("Save", GUILayout.Height(28f)))
 		{
 			JArray output = new JArray();
 			foreach (RoleDefinition role in roles)
@@ -144,6 +148,8 @@ public class RolePropertyEditor : EditorWindow
 			EditorGUIUtility.systemCopyBuffer = resultJson;
 			Close();
 		}
+
+		EditorGUILayout.EndVertical();
 	}
 
 	private void DrawRoleEditor(int index, RoleDefinition role)
