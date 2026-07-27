@@ -678,7 +678,7 @@ using System;
 
 		if (incompatibleShaders.Count > 0)
 		{
-			Debug.LogWarning($"AssetBundleUtility: Exported prefabs use shaders that look built-in-pipeline-only and may not render correctly in URP: {string.Join(\", \", incompatibleShaders.OrderBy(name => name))}");
+			Debug.LogWarning($"AssetBundleUtility: Exported prefabs use shaders that look built-in-pipeline-only and may not render correctly in URP: {string.Join(", ", incompatibleShaders.OrderBy(name => name))}");
 		}
 	}
 
