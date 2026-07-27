@@ -595,6 +595,7 @@ using System;
 		assetsFromGroups = assetsFromGroups.Distinct().ToList();
 		if (assetsFromGroups.Any())
 		{
+			WarnIfExportIsNotUrpReady(itemGroups);
 			BuildBundleFromPaths(assetsFromGroups, "AssetBundle", Path.Combine(moduleFolder, "Assets"), BuildTarget.WebGL);
 		}
 
@@ -639,6 +640,74 @@ using System;
 
 		processed.Add(mesh);
 	}
+
+	private static void WarnIfExportIsNotUrpReady(IEnumerable<ItemGroup> groups)
+	{
+		if (!IsUniversalRenderPipelineProject())
+		{
+			Debug.LogWarning("AssetBundleUtility: Export is building for WebGL, but this Unity project is not currently configured to use URP. AssetBundles do not have a separate URP build target; make sure the source project and materials are already using Universal Render Pipeline assets before exporting.");
+		}
+
+		HashSet<string> incompatibleShaders = new HashSet<string>();
+		foreach (ItemGroup group in groups ?? Enumerable.Empty<ItemGroup>())
+		{
+			foreach (Item item in group.items ?? Enumerable.Empty<Item>())
+			{
+				if (item?.prefab == null)
+					continue;
+
+				foreach (Renderer renderer in item.prefab.GetComponentsInChildren<Renderer>(true))
+				{
+					if (renderer == null)
+						continue;
+
+					foreach (Material material in renderer.sharedMaterials)
+					{
+						if (material == null || material.shader == null)
+							continue;
+
+						string shaderName = material.shader.name ?? string.Empty;
+						if (LooksLikeBuiltInPipelineShader(shaderName))
+						{
+							incompatibleShaders.Add(shaderName);
+						}
+					}
+				}
+			}
+		}
+
+		if (incompatibleShaders.Count > 0)
+		{
+			Debug.LogWarning($"AssetBundleUtility: Exported prefabs use shaders that look built-in-pipeline-only and may not render correctly in URP: {string.Join(\", \", incompatibleShaders.OrderBy(name => name))}");
+		}
+	}
+
+	private static bool IsUniversalRenderPipelineProject()
+	{
+		var renderPipelineAsset = UnityEngine.Rendering.GraphicsSettings.renderPipelineAsset;
+		if (renderPipelineAsset == null)
+			return false;
+
+		string pipelineTypeName = renderPipelineAsset.GetType().FullName ?? string.Empty;
+		return pipelineTypeName.IndexOf("Universal", StringComparison.OrdinalIgnoreCase) >= 0;
+	}
+
+	private static bool LooksLikeBuiltInPipelineShader(string shaderName)
+	{
+		if (string.IsNullOrWhiteSpace(shaderName))
+			return false;
+
+		return shaderName.Equals("Standard", StringComparison.OrdinalIgnoreCase)
+			|| shaderName.StartsWith("Legacy Shaders/", StringComparison.OrdinalIgnoreCase)
+			|| shaderName.StartsWith("Mobile/", StringComparison.OrdinalIgnoreCase)
+			|| shaderName.StartsWith("Nature/", StringComparison.OrdinalIgnoreCase)
+			|| shaderName.StartsWith("Reflective/", StringComparison.OrdinalIgnoreCase)
+			|| shaderName.StartsWith("Self-Illumin/", StringComparison.OrdinalIgnoreCase)
+			|| shaderName.StartsWith("Transparent/", StringComparison.OrdinalIgnoreCase)
+			|| shaderName.StartsWith("Particles/", StringComparison.OrdinalIgnoreCase)
+			|| shaderName.StartsWith("VertexLit", StringComparison.OrdinalIgnoreCase);
+	}
+
 	public static void BuildBundleFromPaths(List<string> assetPaths, string bundleName, string outputDirectory, BuildTarget buildTarget)
 	{
 		if (assetPaths == null || assetPaths.Count == 0)

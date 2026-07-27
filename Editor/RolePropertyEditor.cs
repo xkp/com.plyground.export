@@ -10,6 +10,7 @@ public class RolePropertyEditor : EditorWindow
 	private class RoleDefinition
 	{
 		public string name = "";
+		public string behaviorUrl = "";
 		public HashSet<string> components = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 	}
 
@@ -82,7 +83,8 @@ public class RolePropertyEditor : EditorWindow
 	{
 		RoleDefinition role = new RoleDefinition
 		{
-			name = roleObject["name"]?.ToString() ?? ""
+			name = roleObject["name"]?.ToString() ?? "",
+			behaviorUrl = roleObject["behaviorUrl"]?.ToString() ?? ""
 		};
 
 		foreach (JToken componentToken in roleObject["components"] as JArray ?? new JArray())
@@ -133,6 +135,7 @@ public class RolePropertyEditor : EditorWindow
 				output.Add(new JObject
 				{
 					{ "name", role.name ?? "" },
+					{ "behaviorUrl", role.behaviorUrl ?? "" },
 					{ "components", new JArray(role.components.OrderBy(component => component, StringComparer.OrdinalIgnoreCase)) }
 				});
 			}
@@ -169,6 +172,7 @@ public class RolePropertyEditor : EditorWindow
 		if (roleFoldouts[index])
 		{
 			role.name = EditorGUILayout.TextField("Name", role.name);
+			role.behaviorUrl = EditorGUILayout.TextField("Behavior URL", role.behaviorUrl);
 
 			GUILayout.Space(6f);
 			EditorGUILayout.LabelField("Components");
