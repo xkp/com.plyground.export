@@ -905,16 +905,18 @@ public partial class ModuleExporter
 		GUILayout.Label("ASSETS", EditorStyles.boldLabel);
 		selectedItem.prefabPath = EditorGUILayout.TextField("Prefab:", selectedItem.prefabPath);
 		selectedItem.icon = IconPickerUI.DrawIconField(selectedItem.icon, CopyCustomIcon);
-		if (string.IsNullOrEmpty(selectedItem.modelPath))
+		if (selectedItem.prefab == null)
 		{
-			int selectedCategoryIndex = Array.IndexOf(allowedCustomItemKinds, NormalizeCustomItemCategory(selectedItem.category));
-			if (selectedCategoryIndex < 0)
+			int selectedIcon3dIndex = Array.IndexOf(
+				allowedCustomItemIcon3dValues,
+				NormalizeCustomItemIcon3dValue(selectedItem.modelPath));
+			if (selectedIcon3dIndex < 0)
 			{
-				selectedCategoryIndex = 0;
+				selectedIcon3dIndex = 0;
 			}
 
-			selectedCategoryIndex = EditorGUILayout.Popup("Type", selectedCategoryIndex, allowedCustomItemKinds);
-			selectedItem.category = allowedCustomItemKinds[selectedCategoryIndex];
+			selectedIcon3dIndex = EditorGUILayout.Popup("Icon 3D", selectedIcon3dIndex, allowedCustomItemIcon3dValues);
+			selectedItem.modelPath = allowedCustomItemIcon3dValues[selectedIcon3dIndex];
 		}
 
 		GUILayout.Label("PROPERTIES", EditorStyles.boldLabel);
