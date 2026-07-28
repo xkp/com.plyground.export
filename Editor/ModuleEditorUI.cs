@@ -905,6 +905,17 @@ public partial class ModuleExporter
 		GUILayout.Label("ASSETS", EditorStyles.boldLabel);
 		selectedItem.prefabPath = EditorGUILayout.TextField("Prefab:", selectedItem.prefabPath);
 		selectedItem.icon = IconPickerUI.DrawIconField(selectedItem.icon, CopyCustomIcon);
+		if (string.IsNullOrEmpty(selectedItem.modelPath))
+		{
+			int selectedCategoryIndex = Array.IndexOf(allowedCustomItemKinds, NormalizeCustomItemCategory(selectedItem.category));
+			if (selectedCategoryIndex < 0)
+			{
+				selectedCategoryIndex = 0;
+			}
+
+			selectedCategoryIndex = EditorGUILayout.Popup("Type", selectedCategoryIndex, allowedCustomItemKinds);
+			selectedItem.category = allowedCustomItemKinds[selectedCategoryIndex];
+		}
 
 		GUILayout.Label("PROPERTIES", EditorStyles.boldLabel);
 		DrawSelectedItemProperties();

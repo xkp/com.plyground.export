@@ -42,6 +42,7 @@ using System;
 
 	// Allowed types for properties.
 	private readonly string[] allowedTypes = new string[] { "string", "int", "float", "bool", "enum", "gameitem", "roles", "asset", "object" };
+	private readonly string[] allowedCustomItemKinds = new string[] { "default", "avatar", "npc" };
 	public const string PropertyAudienceUser = "user";
 	public const string PropertyAudienceSystem = "system";
 
@@ -77,6 +78,7 @@ using System;
 		public string prefabPath;
 		public string icon;    // Path to the generated thumbnail (relative to the module folder)
 		public string modelPath;
+		public string category = "default";
 		// All properties are now stored in a single dictionary.
 		// For component properties, the key is typically "ComponentName.FieldName" and its Property.component is set.
 		// For manual properties, we generate a unique key.
@@ -265,6 +267,7 @@ using System;
 					item.prefab = AssetDatabase.LoadAssetAtPath<GameObject>(item.prefabPath);
 					item.icon = exportedItem.icon;
 					item.modelPath = exportedItem.icon3d;
+					item.category = NormalizeCustomItemCategory(exportedItem.category);
 					item.pivotOffset = exportedItem.pivotOffset;
 					item.exportTranslation = exportedItem.exportTranslation;
 					item.exportRotation = exportedItem.exportRotation;
@@ -466,6 +469,7 @@ using System;
 				ei.prefab = item.prefabPath;
 				ei.icon = item.icon;
 				ei.icon3d = item.modelPath;
+				ei.category = NormalizeCustomItemCategory(item.category);
 				ei.pivotOffset = item.pivotOffset;
 				ei.exportTranslation = item.exportTranslation;
 				ei.exportRotation = item.exportRotation;
@@ -931,6 +935,17 @@ using System;
 			: PropertyAudienceUser;
 	}
 
+	protected string NormalizeCustomItemCategory(string category)
+	{
+		if (string.IsNullOrWhiteSpace(category))
+		{
+			return allowedCustomItemKinds[0];
+		}
+
+		string match = allowedCustomItemKinds.FirstOrDefault(option => string.Equals(option, category, StringComparison.OrdinalIgnoreCase));
+		return string.IsNullOrEmpty(match) ? allowedCustomItemKinds[0] : match;
+	}
+
 	[System.Serializable]
 	public class ExportedModule
 	{
@@ -1016,6 +1031,7 @@ using System;
 		newItem.prefabPath = "";
 		newItem.icon = "";
 		newItem.modelPath = "";
+		newItem.category = allowedCustomItemKinds[0];
 		newItem.properties = new List<Property>();
 		newItem.components = new List<string>();
 		newItem.pivotOffset = Vector3.zero;
