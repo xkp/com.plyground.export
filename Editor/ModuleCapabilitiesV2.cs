@@ -893,7 +893,6 @@ public partial class ModuleExporter
 			.Where(parameter => parameter != null)
 			.Select(parameter => new CapabilityPropertyEntryV2
 			{
-				export = true,
 				name = parameter.name ?? "",
 				displayName = parameter.name ?? "",
 				type = parameter.type ?? "",
