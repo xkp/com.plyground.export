@@ -963,7 +963,7 @@ using System;
 	}
 
 	[System.Serializable]
-	public class ExportedModule
+	private class ExportedModule
 	{
 		public string id;
 		public string name;
@@ -986,7 +986,7 @@ using System;
 	}
 
 	[System.Serializable]
-	public class LegacyExportedModule
+	private class LegacyExportedModule
 	{
 		public CapabilityManifest capabilities;
 	}
