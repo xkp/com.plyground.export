@@ -1280,10 +1280,23 @@ public partial class ModuleExporter
 
 	private List<string> GetAvailableCapabilityComponentNames()
 	{
+		List<string> v2ComponentNames = (capabilityComponentsV2 ?? new List<CapabilityComponentEntryV2>())
+			.Where(component => component != null)
+			.Select(GetCapabilityComponentNameV2)
+			.Where(name => !string.IsNullOrWhiteSpace(name))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+
+		if (v2ComponentNames.Count > 0)
+		{
+			return v2ComponentNames;
+		}
+
 		moduleCapabilities ??= new CapabilityManifest();
 		moduleCapabilities.unity ??= new CapabilityUnityInfo();
 		return GetSelectedCapabilityComponents()
-			.Select(component => !string.IsNullOrWhiteSpace(component.typeName) ? component.typeName : component.componentId)
+			.Select(component => !string.IsNullOrWhiteSpace(component.typeName) ? GetLeafTypeName(component.typeName) : component.componentId)
 			.Where(name => !string.IsNullOrWhiteSpace(name))
 			.Distinct(StringComparer.OrdinalIgnoreCase)
 			.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
