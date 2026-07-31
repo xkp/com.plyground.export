@@ -40,7 +40,6 @@ public partial class ModuleExporter
 	[Serializable]
 	private class CapabilityPropertyEntryV2
 	{
-		public bool export = true;
 		public string name = "";
 		public string displayName = "";
 		public string type = "";
@@ -53,7 +52,6 @@ public partial class ModuleExporter
 	[Serializable]
 	private class CapabilityMethodEntryV2
 	{
-		public bool export = true;
 		public string name = "";
 		public string displayName = "";
 		public string declaringType = "";
@@ -67,7 +65,6 @@ public partial class ModuleExporter
 	[Serializable]
 	private class CapabilityEventEntryV2
 	{
-		public bool export = true;
 		public string name = "";
 		public string displayName = "";
 		public string payloadType = "";
@@ -138,6 +135,13 @@ public partial class ModuleExporter
 		public string description = "";
 		public string defaultValue = "";
 		public CapabilityFeatureBindingV2 binding = new CapabilityFeatureBindingV2();
+	}
+
+	[Serializable]
+	private class CapabilityExportModelV2
+	{
+		public List<CapabilityComponentEntryV2> components = new List<CapabilityComponentEntryV2>();
+		public List<CapabilityFeatureEntryV2> features = new List<CapabilityFeatureEntryV2>();
 	}
 
 	private readonly string[] capabilityTabsV2 = { "Components", "Features" };
@@ -333,7 +337,6 @@ public partial class ModuleExporter
 			{
 				CapabilityPropertyEntryV2 property = entry.properties[i];
 				EditorGUILayout.BeginHorizontal();
-				property.export = EditorGUILayout.Toggle(property.export, GUILayout.Width(18f));
 				if (DrawSelectableListButton(GetCapabilityPropertyLabelV2(property), selectedCapabilityPropertyIndexV2 == i, GUILayout.Height(28f)))
 				{
 					selectedCapabilityPropertyIndexV2 = i;
@@ -375,7 +378,6 @@ public partial class ModuleExporter
 			selectedProperty.writable = EditorGUILayout.Toggle("Writable", selectedProperty.writable);
 			selectedProperty.userEditable = EditorGUILayout.Toggle("User Editable", selectedProperty.userEditable);
 			selectedProperty.defaultValue = EditorGUILayout.TextField("Default", selectedProperty.defaultValue);
-			selectedProperty.export = EditorGUILayout.Toggle("Export", selectedProperty.export);
 		}
 		EditorGUILayout.EndScrollView();
 		EditorGUILayout.EndVertical();
@@ -399,7 +401,6 @@ public partial class ModuleExporter
 			{
 				CapabilityMethodEntryV2 method = entry.methods[i];
 				EditorGUILayout.BeginHorizontal();
-				method.export = EditorGUILayout.Toggle(method.export, GUILayout.Width(18f));
 				if (DrawSelectableListButton(GetCapabilityMethodLabelV2(method), selectedCapabilityMethodIndexV2 == i, GUILayout.Height(28f)))
 				{
 					selectedCapabilityMethodIndexV2 = i;
@@ -437,7 +438,6 @@ public partial class ModuleExporter
 
 			selectedMethod.displayName = EditorGUILayout.TextField("Display Name", selectedMethod.displayName);
 			selectedMethod.description = EditorGUILayout.TextField("Description", selectedMethod.description);
-			selectedMethod.export = EditorGUILayout.Toggle("Export", selectedMethod.export);
 		}
 		EditorGUILayout.EndScrollView();
 		EditorGUILayout.EndVertical();
@@ -461,7 +461,6 @@ public partial class ModuleExporter
 			{
 				CapabilityEventEntryV2 eventInfo = entry.events[i];
 				EditorGUILayout.BeginHorizontal();
-				eventInfo.export = EditorGUILayout.Toggle(eventInfo.export, GUILayout.Width(18f));
 				if (DrawSelectableListButton(GetCapabilityEventLabelV2(eventInfo), selectedCapabilityEventIndexV2 == i, GUILayout.Height(28f)))
 				{
 					selectedCapabilityEventIndexV2 = i;
@@ -499,7 +498,6 @@ public partial class ModuleExporter
 
 			selectedEvent.displayName = EditorGUILayout.TextField("Display Name", selectedEvent.displayName);
 			selectedEvent.description = EditorGUILayout.TextField("Description", selectedEvent.description);
-			selectedEvent.export = EditorGUILayout.Toggle("Export", selectedEvent.export);
 		}
 		EditorGUILayout.EndScrollView();
 		EditorGUILayout.EndVertical();
@@ -914,7 +912,6 @@ public partial class ModuleExporter
 			.Where(method => method != null)
 			.Select(method => new CapabilityMethodEntryV2
 			{
-				export = true,
 				name = method.name ?? "",
 				displayName = method.name ?? "",
 				declaringType = method.declaringType ?? "",
@@ -936,7 +933,6 @@ public partial class ModuleExporter
 			.Where(eventInfo => eventInfo != null)
 			.Select(eventInfo => new CapabilityEventEntryV2
 			{
-				export = true,
 				name = eventInfo.name ?? "",
 				displayName = eventInfo.name ?? "",
 				payloadType = eventInfo.payloadType ?? "",
@@ -1581,5 +1577,210 @@ public partial class ModuleExporter
 		}
 
 		return value;
+	}
+
+	private CapabilityExportModelV2 BuildCapabilityExportModelV2()
+	{
+		return new CapabilityExportModelV2
+		{
+			components = CloneCapabilityComponentsV2(capabilityComponentsV2),
+			features = CloneCapabilityFeaturesV2(capabilityFeaturesV2)
+		};
+	}
+
+	private void LoadCapabilityExportModelV2(CapabilityExportModelV2 model)
+	{
+		capabilityComponentsV2 = CloneCapabilityComponentsV2(model != null ? model.components : null);
+		capabilityFeaturesV2 = CloneCapabilityFeaturesV2(model != null ? model.features : null);
+		selectedCapabilityComponentIndexV2 = capabilityComponentsV2.Count > 0 ? 0 : -1;
+		selectedCapabilityPropertyIndexV2 = -1;
+		selectedCapabilityMethodIndexV2 = -1;
+		selectedCapabilityEventIndexV2 = -1;
+		selectedCapabilityFeatureIndexV2 = capabilityFeaturesV2.Count > 0 ? 0 : -1;
+	}
+
+	private List<CapabilityComponentEntryV2> CloneCapabilityComponentsV2(List<CapabilityComponentEntryV2> source)
+	{
+		return (source ?? new List<CapabilityComponentEntryV2>())
+			.Where(entry => entry != null)
+			.Select(entry => JsonUtility.FromJson<CapabilityComponentEntryV2>(JsonUtility.ToJson(entry)) ?? new CapabilityComponentEntryV2())
+			.OrderBy(entry => entry.displayName, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	private List<CapabilityFeatureEntryV2> CloneCapabilityFeaturesV2(List<CapabilityFeatureEntryV2> source)
+	{
+		return (source ?? new List<CapabilityFeatureEntryV2>())
+			.Where(entry => entry != null)
+			.Select(entry => JsonUtility.FromJson<CapabilityFeatureEntryV2>(JsonUtility.ToJson(entry)) ?? new CapabilityFeatureEntryV2())
+			.OrderBy(entry => entry.displayName, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	private bool HasCapabilityExportModelV2(CapabilityExportModelV2 model)
+	{
+		return model != null &&
+			((model.components != null && model.components.Count > 0) ||
+			 (model.features != null && model.features.Count > 0));
+	}
+
+	private CapabilityExportModelV2 BuildCapabilityExportModelV2FromLegacy()
+	{
+		List<CapabilityComponentEntryV2> components = new List<CapabilityComponentEntryV2>();
+		foreach (UnityCapabilityComponentInfo component in moduleCapabilities != null && moduleCapabilities.unity != null
+			? moduleCapabilities.unity.components ?? new List<UnityCapabilityComponentInfo>()
+			: new List<UnityCapabilityComponentInfo>())
+		{
+			if (component == null)
+			{
+				continue;
+			}
+
+			components.Add(new CapabilityComponentEntryV2
+			{
+				id = component.componentId ?? "",
+				displayName = !string.IsNullOrWhiteSpace(component.typeName) ? GetLeafTypeName(component.typeName) : component.componentId ?? "",
+				sourcePath = "",
+				isCustom = false,
+				typeName = component.typeName ?? "",
+				baseType = component.baseType ?? "",
+				description = NormalizeImportedDescriptionV2(component.description),
+				canAdd = "No",
+				properties = BuildCapabilityPropertyEntriesV2(component.parameters),
+				methods = BuildCapabilityMethodEntriesV2(component.methods),
+				events = BuildCapabilityEventEntriesV2(component.events)
+			});
+		}
+
+		List<CapabilityFeatureEntryV2> features = new List<CapabilityFeatureEntryV2>();
+		PlyFeatureManifest manifest = featureManifest ?? new PlyFeatureManifest();
+		foreach (PlySemanticFeatureDefinition feature in manifest.features ?? new List<PlySemanticFeatureDefinition>())
+		{
+			if (feature == null || string.IsNullOrWhiteSpace(feature.id))
+			{
+				continue;
+			}
+
+			PlyFeatureImplementation implementation = (manifest.implementations ?? new List<PlyFeatureImplementation>())
+				.FirstOrDefault(entry => entry != null && string.Equals(entry.featureId, feature.id, StringComparison.OrdinalIgnoreCase));
+
+			CapabilityFeatureEntryV2 entry = new CapabilityFeatureEntryV2
+			{
+				id = feature.id ?? "",
+				displayName = string.IsNullOrWhiteSpace(feature.name) ? feature.id : feature.name,
+				description = feature.description ?? "",
+				inputs = (feature.inputs ?? new List<PlySemanticFeaturePort>())
+					.Select(port => new CapabilityFeaturePortEntryV2
+					{
+						name = port.name ?? "",
+						displayName = port.name ?? "",
+						dataType = port.dataType.ToString(),
+						description = "",
+						binding = new CapabilityFeatureBindingV2
+						{
+							componentName = GetLegacyBindingComponentNameV2(implementation, true, port.name),
+							memberName = GetLegacyBindingMemberNameV2(implementation, true, port.name)
+						}
+					})
+					.ToList(),
+				outputs = (feature.outputs ?? new List<PlySemanticFeaturePort>())
+					.Select(port => new CapabilityFeaturePortEntryV2
+					{
+						name = port.name ?? "",
+						displayName = port.name ?? "",
+						dataType = port.dataType.ToString(),
+						description = "",
+						binding = new CapabilityFeatureBindingV2
+						{
+							componentName = GetLegacyBindingComponentNameV2(implementation, false, port.name),
+							memberName = GetLegacyBindingMemberNameV2(implementation, false, port.name)
+						}
+					})
+					.ToList(),
+				parameters = (feature.parameters ?? new List<PlySemanticFeatureParameter>())
+					.Select(parameter => new CapabilityFeatureParameterEntryV2
+					{
+						name = parameter.name ?? "",
+						displayName = parameter.name ?? "",
+						type = parameter.type.ToString(),
+						description = "",
+						defaultValue = parameter.defaultValue ?? "",
+						binding = new CapabilityFeatureBindingV2
+						{
+							componentName = GetLegacyParameterBindingComponentNameV2(implementation, parameter.name),
+							memberName = GetLegacyParameterBindingMemberNameV2(implementation, parameter.name)
+						}
+					})
+					.ToList()
+			};
+
+			features.Add(entry);
+		}
+
+		return new CapabilityExportModelV2
+		{
+			components = CloneCapabilityComponentsV2(components),
+			features = CloneCapabilityFeaturesV2(features)
+		};
+	}
+
+	private string GetLegacyBindingComponentNameV2(PlyFeatureImplementation implementation, bool isInput, string portName)
+	{
+		PlyFeaturePortBinding binding = implementation == null
+			? null
+			: (isInput ? implementation.inputBindings : implementation.outputBindings)?
+				.FirstOrDefault(entry =>
+					entry != null &&
+					string.Equals(isInput ? entry.featureInput : entry.featureOutput, portName, StringComparison.OrdinalIgnoreCase));
+		return NormalizeLegacyBindingComponentNameV2(binding != null ? binding.binding : null);
+	}
+
+	private string GetLegacyBindingMemberNameV2(PlyFeatureImplementation implementation, bool isInput, string portName)
+	{
+		PlyFeaturePortBinding binding = implementation == null
+			? null
+			: (isInput ? implementation.inputBindings : implementation.outputBindings)?
+				.FirstOrDefault(entry =>
+					entry != null &&
+					string.Equals(isInput ? entry.featureInput : entry.featureOutput, portName, StringComparison.OrdinalIgnoreCase));
+		return binding != null && binding.binding != null ? binding.binding.memberName ?? "" : "";
+	}
+
+	private string GetLegacyParameterBindingComponentNameV2(PlyFeatureImplementation implementation, string parameterName)
+	{
+		PlyFeatureParameterBinding binding = implementation == null
+			? null
+			: (implementation.parameterBindings ?? new List<PlyFeatureParameterBinding>())
+				.FirstOrDefault(entry => entry != null && string.Equals(entry.featureParameter, parameterName, StringComparison.OrdinalIgnoreCase));
+		return NormalizeLegacyBindingComponentNameV2(binding != null ? binding.binding : null);
+	}
+
+	private string GetLegacyParameterBindingMemberNameV2(PlyFeatureImplementation implementation, string parameterName)
+	{
+		PlyFeatureParameterBinding binding = implementation == null
+			? null
+			: (implementation.parameterBindings ?? new List<PlyFeatureParameterBinding>())
+				.FirstOrDefault(entry => entry != null && string.Equals(entry.featureParameter, parameterName, StringComparison.OrdinalIgnoreCase));
+		return binding != null && binding.binding != null ? binding.binding.memberName ?? "" : "";
+	}
+
+	private string NormalizeLegacyBindingComponentNameV2(PlyFeatureBinding binding)
+	{
+		if (binding == null || string.IsNullOrWhiteSpace(binding.componentType))
+		{
+			return "";
+		}
+
+		string componentType = binding.componentType.Trim();
+		CapabilityComponentEntryV2 component = capabilityComponentsV2.FirstOrDefault(entry =>
+			entry != null &&
+			(string.Equals(entry.typeName, componentType, StringComparison.OrdinalIgnoreCase) ||
+			 string.Equals(entry.id, componentType, StringComparison.OrdinalIgnoreCase)));
+		if (component != null)
+		{
+			return GetCapabilityComponentNameV2(component);
+		}
+
+		return GetLeafTypeName(componentType);
 	}
 }

@@ -150,6 +150,7 @@ using System;
 		// Read the JSON file (assuming it is a valid ExportedModule JSON).
 		string json = File.ReadAllText(filePath);
 		ExportedModule mod = JsonUtility.FromJson<ExportedModule>(json);
+		LegacyExportedModule legacyMod = JsonUtility.FromJson<LegacyExportedModule>(json);
 
 		// Populate module settings.
 		moduleId = mod.id;
@@ -226,11 +227,26 @@ using System;
 			}
 		}
 
-		moduleCapabilities = CloneModuleCapabilities(mod.capabilities);
-		PopulateCapabilityModuleMetadata(moduleCapabilities);
-		NormalizeModuleCapabilities(moduleCapabilities);
-		featureManifest = LoadFeatureManifestFromCapabilities(moduleCapabilities);
-		PrepareFeatureManifestForPersistence().moduleId = moduleId ?? "";
+		if (HasCapabilityExportModelV2(mod.capabilities))
+		{
+			LoadCapabilityExportModelV2(mod.capabilities);
+			moduleCapabilities = new CapabilityManifest();
+			PopulateCapabilityModuleMetadata(moduleCapabilities);
+			NormalizeModuleCapabilities(moduleCapabilities);
+			featureManifest = new PlyFeatureManifest
+			{
+				moduleId = moduleId ?? ""
+			};
+		}
+		else
+		{
+			moduleCapabilities = CloneModuleCapabilities(legacyMod != null ? legacyMod.capabilities : mod.legacyCapabilities);
+			PopulateCapabilityModuleMetadata(moduleCapabilities);
+			NormalizeModuleCapabilities(moduleCapabilities);
+			featureManifest = LoadFeatureManifestFromCapabilities(moduleCapabilities);
+			PrepareFeatureManifestForPersistence().moduleId = moduleId ?? "";
+			LoadCapabilityExportModelV2(BuildCapabilityExportModelV2FromLegacy());
+		}
 
 		dependencies.Clear();
 		if (mod.dependencies != null)
@@ -305,7 +321,10 @@ using System;
 			PopulateCapabilityModuleMetadata(moduleCapabilities);
 			NormalizeModuleCapabilities(moduleCapabilities);
 		}
-		featureManifest = LoadFeatureManifestFromCapabilities(moduleCapabilities);
+		if (!HasCapabilityExportModelV2(mod.capabilities))
+		{
+			featureManifest = LoadFeatureManifestFromCapabilities(moduleCapabilities);
+		}
 
 
 		UpdateAssets();
@@ -443,8 +462,8 @@ using System;
 				url = tool.url
 			})
 			.ToList();
-		PrepareCapabilitiesForPersistence();
-		mod.capabilities = CloneModuleCapabilities(moduleCapabilities);
+		mod.capabilities = BuildCapabilityExportModelV2();
+		mod.legacyCapabilities = null;
 
 		mod.itemGroups = new List<ExportedGroup>();
 		foreach (var group in itemGroups)
@@ -962,6 +981,13 @@ using System;
 		public List<ExportedGroup> itemGroups;
 		public List<Property> moduleProperties;
 		public List<ModuleTool> tools;
+		public CapabilityExportModelV2 capabilities;
+		public CapabilityManifest legacyCapabilities;
+	}
+
+	[System.Serializable]
+	public class LegacyExportedModule
+	{
 		public CapabilityManifest capabilities;
 	}
 
