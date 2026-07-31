@@ -74,11 +74,58 @@ public partial class ModuleExporter
 		public bool allowedForCodegen = true;
 	}
 
+	[Serializable]
+	private class CapabilityFeatureEntryV2
+	{
+		public string id = "";
+		public string displayName = "";
+		public string description = "";
+		public List<CapabilityFeaturePortEntryV2> inputs = new List<CapabilityFeaturePortEntryV2>();
+		public List<CapabilityFeaturePortEntryV2> outputs = new List<CapabilityFeaturePortEntryV2>();
+		public List<CapabilityFeatureParameterEntryV2> parameters = new List<CapabilityFeatureParameterEntryV2>();
+	}
+
+	private enum CapabilityFeatureInspectorTabV2
+	{
+		Implementation,
+		Information
+	}
+
+	[Serializable]
+	private class CapabilityFeatureBindingV2
+	{
+		public string componentName = "";
+		public string memberName = "";
+	}
+
+	[Serializable]
+	private class CapabilityFeaturePortEntryV2
+	{
+		public string name = "";
+		public string displayName = "";
+		public string dataType = "";
+		public string description = "";
+		public CapabilityFeatureBindingV2 binding = new CapabilityFeatureBindingV2();
+	}
+
+	[Serializable]
+	private class CapabilityFeatureParameterEntryV2
+	{
+		public string name = "";
+		public string displayName = "";
+		public string type = "";
+		public string description = "";
+		public string defaultValue = "";
+		public CapabilityFeatureBindingV2 binding = new CapabilityFeatureBindingV2();
+	}
+
 	private readonly string[] capabilityTabsV2 = { "Components", "Features" };
 	private readonly string[] capabilityInspectorTabsV2 = { "Component", "Properties", "Methods", "Events" };
 	private readonly string[] capabilityCanAddOptionsV2 = { "No", "Yes", "Characters", "Game", "Nature", "Props", "Other" };
+	private readonly string[] capabilityFeatureInspectorTabsV2 = { "Implementation", "Information" };
 	private CapabilityWorkspaceTabV2 activeCapabilityTabV2;
 	private CapabilityComponentInspectorTabV2 activeCapabilityInspectorTabV2;
+	private CapabilityFeatureInspectorTabV2 activeCapabilityFeatureInspectorTabV2;
 	private Vector2 capabilitiesV2Scroll;
 	private Vector2 capabilityComponentTreeScrollV2;
 	private Vector2 capabilityComponentInspectorScrollV2;
@@ -88,11 +135,16 @@ public partial class ModuleExporter
 	private Vector2 capabilityMethodEditorScrollV2;
 	private Vector2 capabilityEventListScrollV2;
 	private Vector2 capabilityEventEditorScrollV2;
+	private Vector2 capabilityFeatureListScrollV2;
+	private Vector2 capabilityFeatureEditorScrollV2;
+	private Vector2 capabilityFeatureInformationScrollV2;
 	private List<CapabilityComponentEntryV2> capabilityComponentsV2 = new List<CapabilityComponentEntryV2>();
+	private List<CapabilityFeatureEntryV2> capabilityFeaturesV2 = new List<CapabilityFeatureEntryV2>();
 	private int selectedCapabilityComponentIndexV2 = -1;
 	private int selectedCapabilityPropertyIndexV2 = -1;
 	private int selectedCapabilityMethodIndexV2 = -1;
 	private int selectedCapabilityEventIndexV2 = -1;
+	private int selectedCapabilityFeatureIndexV2 = -1;
 
 	private void DrawCapabilitiesV2Tab()
 	{
@@ -131,6 +183,17 @@ public partial class ModuleExporter
 
 	private void DrawCapabilitiesV2FeaturesWorkspace()
 	{
+		EditorGUILayout.BeginHorizontal();
+
+		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(260f, position.width * 0.32f)), GUILayout.Height(560f));
+		DrawCapabilitiesV2FeatureListPane();
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true), GUILayout.Height(560f));
+		DrawCapabilitiesV2FeatureInspectorPane();
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.EndHorizontal();
 	}
 
 	private void DrawCapabilitiesV2ComponentsTreePane()
@@ -419,6 +482,236 @@ public partial class ModuleExporter
 		EditorGUILayout.EndHorizontal();
 	}
 
+	private void DrawCapabilitiesV2FeatureListPane()
+	{
+		EditorGUILayout.BeginHorizontal();
+		if (GUILayout.Button("Add", GUILayout.Width(90f)))
+		{
+			AddCapabilityFeatureV2();
+		}
+		EditorGUILayout.EndHorizontal();
+
+		EditorGUILayout.Space(6f);
+		capabilityFeatureListScrollV2 = EditorGUILayout.BeginScrollView(capabilityFeatureListScrollV2, GUILayout.ExpandHeight(true));
+
+		if (capabilityFeaturesV2.Count > 0)
+		{
+			selectedCapabilityFeatureIndexV2 = Mathf.Clamp(
+				selectedCapabilityFeatureIndexV2 < 0 ? 0 : selectedCapabilityFeatureIndexV2,
+				0,
+				capabilityFeaturesV2.Count - 1);
+
+			for (int i = 0; i < capabilityFeaturesV2.Count; i++)
+			{
+				CapabilityFeatureEntryV2 entry = capabilityFeaturesV2[i];
+				EditorGUILayout.BeginHorizontal();
+				if (DrawSelectableListButton(GetCapabilityFeatureLabelV2(entry), selectedCapabilityFeatureIndexV2 == i, GUILayout.Height(30f)))
+				{
+					selectedCapabilityFeatureIndexV2 = i;
+				}
+
+				if (GUILayout.Button("X", GUILayout.Width(28f), GUILayout.Height(30f)))
+				{
+					capabilityFeaturesV2.RemoveAt(i);
+					selectedCapabilityFeatureIndexV2 = Mathf.Clamp(selectedCapabilityFeatureIndexV2, 0, capabilityFeaturesV2.Count - 1);
+					if (capabilityFeaturesV2.Count == 0)
+					{
+						selectedCapabilityFeatureIndexV2 = -1;
+					}
+
+					EditorGUILayout.EndHorizontal();
+					break;
+				}
+				EditorGUILayout.EndHorizontal();
+			}
+		}
+
+		EditorGUILayout.EndScrollView();
+	}
+
+	private void DrawCapabilitiesV2FeatureInspectorPane()
+	{
+		CapabilityFeatureEntryV2 entry = GetSelectedCapabilityFeatureV2();
+		activeCapabilityFeatureInspectorTabV2 = (CapabilityFeatureInspectorTabV2)GUILayout.Toolbar((int)activeCapabilityFeatureInspectorTabV2, capabilityFeatureInspectorTabsV2);
+		EditorGUILayout.Space(6f);
+		if (entry == null)
+		{
+			return;
+		}
+
+		switch (activeCapabilityFeatureInspectorTabV2)
+		{
+			case CapabilityFeatureInspectorTabV2.Implementation:
+				DrawCapabilityFeatureImplementationInspectorV2(entry);
+				break;
+			case CapabilityFeatureInspectorTabV2.Information:
+				DrawCapabilityFeatureInformationInspectorV2(entry);
+				break;
+		}
+	}
+
+	private void DrawCapabilityFeatureImplementationInspectorV2(CapabilityFeatureEntryV2 entry)
+	{
+		capabilityFeatureEditorScrollV2 = EditorGUILayout.BeginScrollView(capabilityFeatureEditorScrollV2, GUILayout.ExpandHeight(true));
+		DrawCapabilityFeatureBindingsSectionV2("Inputs", entry.inputs, CapabilityFeatureBindingTargetV2.Input);
+		EditorGUILayout.Space(8f);
+		DrawCapabilityFeatureBindingsSectionV2("Outputs", entry.outputs, CapabilityFeatureBindingTargetV2.Output);
+		EditorGUILayout.Space(8f);
+		DrawCapabilityFeatureParameterBindingsSectionV2(entry.parameters);
+		EditorGUILayout.EndScrollView();
+	}
+
+	private void DrawCapabilityFeatureInformationInspectorV2(CapabilityFeatureEntryV2 entry)
+	{
+		capabilityFeatureInformationScrollV2 = EditorGUILayout.BeginScrollView(capabilityFeatureInformationScrollV2, GUILayout.ExpandHeight(true));
+		using (new EditorGUI.DisabledScope(true))
+		{
+			EditorGUILayout.TextField("Feature Id", entry.id);
+		}
+
+		entry.displayName = EditorGUILayout.TextField("Display Name", entry.displayName);
+		entry.description = EditorGUILayout.TextField("Description", entry.description);
+		EditorGUILayout.Space(8f);
+		DrawCapabilityFeaturePortInfoSectionV2("Inputs", entry.inputs);
+		EditorGUILayout.Space(8f);
+		DrawCapabilityFeaturePortInfoSectionV2("Outputs", entry.outputs);
+		EditorGUILayout.Space(8f);
+		DrawCapabilityFeatureParameterInfoSectionV2(entry.parameters);
+		EditorGUILayout.EndScrollView();
+	}
+
+	private enum CapabilityFeatureBindingTargetV2
+	{
+		Input,
+		Output
+	}
+
+	private void DrawCapabilityFeatureBindingsSectionV2(string label, List<CapabilityFeaturePortEntryV2> ports, CapabilityFeatureBindingTargetV2 target)
+	{
+		GUILayout.Label(label, EditorStyles.boldLabel);
+		foreach (CapabilityFeaturePortEntryV2 port in ports ?? new List<CapabilityFeaturePortEntryV2>())
+		{
+			port.binding ??= new CapabilityFeatureBindingV2();
+			List<string> componentOptions = GetCapabilityBindingComponentOptionsV2(target);
+			List<string> memberOptions = GetCapabilityBindingMemberOptionsV2(port.binding.componentName, target);
+
+			EditorGUILayout.BeginVertical("helpbox");
+			EditorGUILayout.BeginHorizontal();
+			GUILayout.Label(GetCapabilityFeaturePortLabelV2(port), GUILayout.Width(160f));
+			if (!string.IsNullOrWhiteSpace(port.dataType))
+			{
+				GUILayout.Label(port.dataType, GUILayout.Width(90f));
+			}
+			port.binding.componentName = DrawCapabilityBindingPopupV2(port.binding.componentName, componentOptions, 200f);
+			port.binding.memberName = DrawCapabilityBindingPopupV2(port.binding.memberName, memberOptions, 220f);
+			EditorGUILayout.EndHorizontal();
+			EditorGUILayout.EndVertical();
+		}
+	}
+
+	private void DrawCapabilityFeatureParameterBindingsSectionV2(List<CapabilityFeatureParameterEntryV2> parameters)
+	{
+		GUILayout.Label("Parameters", EditorStyles.boldLabel);
+		foreach (CapabilityFeatureParameterEntryV2 parameter in parameters ?? new List<CapabilityFeatureParameterEntryV2>())
+		{
+			parameter.binding ??= new CapabilityFeatureBindingV2();
+			List<string> componentOptions = GetCapabilityBindingComponentOptionsV2(CapabilityFeatureBindingTargetV2.Input);
+			List<string> memberOptions = GetCapabilityParameterBindingMemberOptionsV2(parameter.binding.componentName);
+
+			EditorGUILayout.BeginVertical("helpbox");
+			EditorGUILayout.BeginHorizontal();
+			GUILayout.Label(GetCapabilityFeatureParameterLabelV2(parameter), GUILayout.Width(160f));
+			if (!string.IsNullOrWhiteSpace(parameter.type))
+			{
+				GUILayout.Label(parameter.type, GUILayout.Width(90f));
+			}
+			parameter.binding.componentName = DrawCapabilityBindingPopupV2(parameter.binding.componentName, componentOptions, 200f);
+			parameter.binding.memberName = DrawCapabilityBindingPopupV2(parameter.binding.memberName, memberOptions, 220f);
+			EditorGUILayout.EndHorizontal();
+			EditorGUILayout.EndVertical();
+		}
+	}
+
+	private void DrawCapabilityFeaturePortInfoSectionV2(string label, List<CapabilityFeaturePortEntryV2> ports)
+	{
+		GUILayout.Label(label, EditorStyles.boldLabel);
+		if (GUILayout.Button("Add " + label.Substring(0, label.Length - 1), GUILayout.Width(110f)))
+		{
+			ports.Add(new CapabilityFeaturePortEntryV2
+			{
+				name = "new_" + label.Substring(0, label.Length - 1).ToLowerInvariant(),
+				displayName = "New " + label.Substring(0, label.Length - 1),
+				dataType = ""
+			});
+		}
+
+		for (int i = 0; i < ports.Count; i++)
+		{
+			CapabilityFeaturePortEntryV2 port = ports[i];
+			EditorGUILayout.BeginVertical("helpbox");
+			EditorGUILayout.BeginHorizontal();
+			GUILayout.Label(GetCapabilityFeaturePortLabelV2(port), EditorStyles.boldLabel);
+			GUILayout.FlexibleSpace();
+			if (GUILayout.Button("X", GUILayout.Width(28f)))
+			{
+				ports.RemoveAt(i);
+				EditorGUILayout.EndHorizontal();
+				EditorGUILayout.EndVertical();
+				return;
+			}
+			EditorGUILayout.EndHorizontal();
+			using (new EditorGUI.DisabledScope(true))
+			{
+				EditorGUILayout.TextField("Port Name", port.name);
+			}
+			port.displayName = EditorGUILayout.TextField("Display Name", port.displayName);
+			port.dataType = EditorGUILayout.TextField("Data Type", port.dataType);
+			port.description = EditorGUILayout.TextField("Description", port.description);
+			EditorGUILayout.EndVertical();
+		}
+	}
+
+	private void DrawCapabilityFeatureParameterInfoSectionV2(List<CapabilityFeatureParameterEntryV2> parameters)
+	{
+		GUILayout.Label("Parameters", EditorStyles.boldLabel);
+		if (GUILayout.Button("Add Parameter", GUILayout.Width(110f)))
+		{
+			parameters.Add(new CapabilityFeatureParameterEntryV2
+			{
+				name = "new_parameter",
+				displayName = "New Parameter",
+				type = "",
+				defaultValue = ""
+			});
+		}
+
+		for (int i = 0; i < parameters.Count; i++)
+		{
+			CapabilityFeatureParameterEntryV2 parameter = parameters[i];
+			EditorGUILayout.BeginVertical("helpbox");
+			EditorGUILayout.BeginHorizontal();
+			GUILayout.Label(GetCapabilityFeatureParameterLabelV2(parameter), EditorStyles.boldLabel);
+			GUILayout.FlexibleSpace();
+			if (GUILayout.Button("X", GUILayout.Width(28f)))
+			{
+				parameters.RemoveAt(i);
+				EditorGUILayout.EndHorizontal();
+				EditorGUILayout.EndVertical();
+				return;
+			}
+			EditorGUILayout.EndHorizontal();
+			using (new EditorGUI.DisabledScope(true))
+			{
+				EditorGUILayout.TextField("Parameter Name", parameter.name);
+			}
+			parameter.displayName = EditorGUILayout.TextField("Display Name", parameter.displayName);
+			parameter.type = EditorGUILayout.TextField("Type", parameter.type);
+			parameter.description = EditorGUILayout.TextField("Description", parameter.description);
+			parameter.defaultValue = EditorGUILayout.TextField("Default", parameter.defaultValue);
+			EditorGUILayout.EndVertical();
+		}
+	}
+
 	private CapabilityComponentEntryV2 GetSelectedCapabilityComponentV2()
 	{
 		if (selectedCapabilityComponentIndexV2 < 0 || selectedCapabilityComponentIndexV2 >= capabilityComponentsV2.Count)
@@ -427,6 +720,16 @@ public partial class ModuleExporter
 		}
 
 		return capabilityComponentsV2[selectedCapabilityComponentIndexV2];
+	}
+
+	private CapabilityFeatureEntryV2 GetSelectedCapabilityFeatureV2()
+	{
+		if (selectedCapabilityFeatureIndexV2 < 0 || selectedCapabilityFeatureIndexV2 >= capabilityFeaturesV2.Count)
+		{
+			return null;
+		}
+
+		return capabilityFeaturesV2[selectedCapabilityFeatureIndexV2];
 	}
 
 	private void OpenCapabilitiesV2SourceSelector()
@@ -609,6 +912,66 @@ public partial class ModuleExporter
 		return entry.displayName ?? "";
 	}
 
+	private string GetCapabilityFeatureLabelV2(CapabilityFeatureEntryV2 entry)
+	{
+		if (entry == null)
+		{
+			return "Feature";
+		}
+
+		if (!string.IsNullOrWhiteSpace(entry.displayName))
+		{
+			return entry.displayName;
+		}
+
+		if (!string.IsNullOrWhiteSpace(entry.id))
+		{
+			return entry.id;
+		}
+
+		return "Feature";
+	}
+
+	private string GetCapabilityFeaturePortLabelV2(CapabilityFeaturePortEntryV2 port)
+	{
+		if (port == null)
+		{
+			return "Port";
+		}
+
+		if (!string.IsNullOrWhiteSpace(port.displayName))
+		{
+			return port.displayName;
+		}
+
+		if (!string.IsNullOrWhiteSpace(port.name))
+		{
+			return port.name;
+		}
+
+		return "Port";
+	}
+
+	private string GetCapabilityFeatureParameterLabelV2(CapabilityFeatureParameterEntryV2 parameter)
+	{
+		if (parameter == null)
+		{
+			return "Parameter";
+		}
+
+		if (!string.IsNullOrWhiteSpace(parameter.displayName))
+		{
+			return parameter.displayName;
+		}
+
+		if (!string.IsNullOrWhiteSpace(parameter.name))
+		{
+			return parameter.name;
+		}
+
+		return "Parameter";
+	}
+
 	private string GetCapabilityPropertyLabelV2(CapabilityPropertyEntryV2 property)
 	{
 		if (property == null)
@@ -686,6 +1049,132 @@ public partial class ModuleExporter
 		selectedCapabilityComponentIndexV2 = capabilityComponentsV2.FindIndex(component =>
 			component != null &&
 			string.Equals(component.id, entry.id, StringComparison.OrdinalIgnoreCase));
+	}
+
+	private void AddCapabilityFeatureV2()
+	{
+		int suffix = capabilityFeaturesV2.Count + 1;
+		string featureId;
+		do
+		{
+			featureId = "feature_" + suffix;
+			suffix++;
+		}
+		while (capabilityFeaturesV2.Any(feature =>
+			feature != null &&
+			string.Equals(feature.id, featureId, StringComparison.OrdinalIgnoreCase)));
+
+		CapabilityFeatureEntryV2 entry = new CapabilityFeatureEntryV2
+		{
+			id = featureId,
+			displayName = "New Feature",
+			description = "",
+			inputs = new List<CapabilityFeaturePortEntryV2>(),
+			outputs = new List<CapabilityFeaturePortEntryV2>(),
+			parameters = new List<CapabilityFeatureParameterEntryV2>()
+		};
+
+		capabilityFeaturesV2.Add(entry);
+		capabilityFeaturesV2 = capabilityFeaturesV2
+			.OrderBy(feature => feature.displayName, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		selectedCapabilityFeatureIndexV2 = capabilityFeaturesV2.FindIndex(feature =>
+			feature != null &&
+			string.Equals(feature.id, entry.id, StringComparison.OrdinalIgnoreCase));
+	}
+
+	private string DrawCapabilityBindingPopupV2(string currentValue, List<string> options, float width)
+	{
+		List<string> labels = new List<string> { "<select>" };
+		labels.AddRange(options ?? new List<string>());
+		int selectedIndex = 0;
+		if (!string.IsNullOrWhiteSpace(currentValue) && options != null)
+		{
+			int foundIndex = options.FindIndex(option => string.Equals(option, currentValue, StringComparison.OrdinalIgnoreCase));
+			selectedIndex = foundIndex >= 0 ? foundIndex + 1 : 0;
+		}
+
+		int newIndex = EditorGUILayout.Popup(selectedIndex, labels.ToArray(), GUILayout.Width(width));
+		return newIndex <= 0 || options == null ? "" : options[newIndex - 1];
+	}
+
+	private List<string> GetCapabilityBindingComponentOptionsV2(CapabilityFeatureBindingTargetV2 target)
+	{
+		switch (target)
+		{
+			case CapabilityFeatureBindingTargetV2.Output:
+				return capabilityComponentsV2
+					.Where(component => component != null && (component.events?.Count ?? 0) > 0)
+					.Select(GetCapabilityComponentNameV2)
+					.Where(name => !string.IsNullOrWhiteSpace(name))
+					.Distinct(StringComparer.OrdinalIgnoreCase)
+					.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+					.ToList();
+			default:
+				return capabilityComponentsV2
+					.Where(component => component != null && ((component.methods?.Count ?? 0) > 0 || (component.properties?.Count ?? 0) > 0))
+					.Select(GetCapabilityComponentNameV2)
+					.Where(name => !string.IsNullOrWhiteSpace(name))
+					.Distinct(StringComparer.OrdinalIgnoreCase)
+					.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+					.ToList();
+		}
+	}
+
+	private List<string> GetCapabilityBindingMemberOptionsV2(string componentName, CapabilityFeatureBindingTargetV2 target)
+	{
+		CapabilityComponentEntryV2 component = FindCapabilityComponentByNameV2(componentName);
+		if (component == null)
+		{
+			return new List<string>();
+		}
+
+		switch (target)
+		{
+			case CapabilityFeatureBindingTargetV2.Output:
+				return (component.events ?? new List<CapabilityEventEntryV2>())
+					.Where(eventInfo => eventInfo != null)
+					.Select(eventInfo => eventInfo.name)
+					.Where(name => !string.IsNullOrWhiteSpace(name))
+					.Distinct(StringComparer.OrdinalIgnoreCase)
+					.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+					.ToList();
+			default:
+				return (component.methods ?? new List<CapabilityMethodEntryV2>())
+					.Where(method => method != null)
+					.Select(method => method.name)
+					.Concat((component.properties ?? new List<CapabilityPropertyEntryV2>())
+						.Where(property => property != null)
+						.Select(property => property.name))
+					.Where(name => !string.IsNullOrWhiteSpace(name))
+					.Distinct(StringComparer.OrdinalIgnoreCase)
+					.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+					.ToList();
+		}
+	}
+
+	private List<string> GetCapabilityParameterBindingMemberOptionsV2(string componentName)
+	{
+		CapabilityComponentEntryV2 component = FindCapabilityComponentByNameV2(componentName);
+		if (component == null)
+		{
+			return new List<string>();
+		}
+
+		return (component.properties ?? new List<CapabilityPropertyEntryV2>())
+			.Where(property => property != null)
+			.Select(property => property.name)
+			.Where(name => !string.IsNullOrWhiteSpace(name))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	private CapabilityComponentEntryV2 FindCapabilityComponentByNameV2(string componentName)
+	{
+		return capabilityComponentsV2.FirstOrDefault(component =>
+			component != null &&
+			string.Equals(GetCapabilityComponentNameV2(component), componentName, StringComparison.OrdinalIgnoreCase));
 	}
 
 	private string DrawCapabilityCanAddPopupV2(string currentValue)
