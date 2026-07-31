@@ -13,10 +13,11 @@ public partial class ModuleExporter
 		Files,
 		Items,
 		Capabilities,
+		CapabilitiesV2,
 		Export
 	}
 
-	private readonly string[] topTabs = { "Overview", "Files", "Items", "Capabilities", "Export" };
+	private readonly string[] topTabs = { "Overview", "Files", "Items", "Capabilities", "Caps V2", "Export" };
 	private enum CapabilityWorkspaceTab
 	{
 		Components,
@@ -79,6 +80,9 @@ public partial class ModuleExporter
 				break;
 			case ModuleEditorTab.Capabilities:
 				DrawCapabilitiesTab();
+				break;
+			case ModuleEditorTab.CapabilitiesV2:
+				DrawCapabilitiesV2Tab();
 				break;
 		}
 
