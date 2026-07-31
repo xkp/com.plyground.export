@@ -240,7 +240,7 @@ using System;
 		}
 		else
 		{
-			moduleCapabilities = CloneModuleCapabilities(legacyMod != null ? legacyMod.capabilities : mod.legacyCapabilities);
+			moduleCapabilities = CloneModuleCapabilities(legacyMod != null ? legacyMod.capabilities : null);
 			PopulateCapabilityModuleMetadata(moduleCapabilities);
 			NormalizeModuleCapabilities(moduleCapabilities);
 			featureManifest = LoadFeatureManifestFromCapabilities(moduleCapabilities);
@@ -463,8 +463,6 @@ using System;
 			})
 			.ToList();
 		mod.capabilities = BuildCapabilityExportModelV2();
-		mod.legacyCapabilities = null;
-
 		mod.itemGroups = new List<ExportedGroup>();
 		foreach (var group in itemGroups)
 		{
@@ -982,7 +980,6 @@ using System;
 		public List<Property> moduleProperties;
 		public List<ModuleTool> tools;
 		public CapabilityExportModelV2 capabilities;
-		public CapabilityManifest legacyCapabilities;
 	}
 
 	[System.Serializable]

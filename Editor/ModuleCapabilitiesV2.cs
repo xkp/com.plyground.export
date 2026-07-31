@@ -141,7 +141,30 @@ public partial class ModuleExporter
 	private class CapabilityExportModelV2
 	{
 		public List<CapabilityComponentEntryV2> components = new List<CapabilityComponentEntryV2>();
-		public List<CapabilityFeatureEntryV2> features = new List<CapabilityFeatureEntryV2>();
+		public List<CapabilityFeatureImplementationEntryV2> implementations = new List<CapabilityFeatureImplementationEntryV2>();
+	}
+
+	[Serializable]
+	private class CapabilityFeatureImplementationEntryV2
+	{
+		public string id = "";
+		public List<CapabilityFeaturePortBindingEntryV2> inputs = new List<CapabilityFeaturePortBindingEntryV2>();
+		public List<CapabilityFeaturePortBindingEntryV2> outputs = new List<CapabilityFeaturePortBindingEntryV2>();
+		public List<CapabilityFeatureParameterBindingEntryV2> parameters = new List<CapabilityFeatureParameterBindingEntryV2>();
+	}
+
+	[Serializable]
+	private class CapabilityFeaturePortBindingEntryV2
+	{
+		public string name = "";
+		public CapabilityFeatureBindingV2 binding = new CapabilityFeatureBindingV2();
+	}
+
+	[Serializable]
+	private class CapabilityFeatureParameterBindingEntryV2
+	{
+		public string name = "";
+		public CapabilityFeatureBindingV2 binding = new CapabilityFeatureBindingV2();
 	}
 
 	private readonly string[] capabilityTabsV2 = { "Components", "Features" };
@@ -1583,14 +1606,14 @@ public partial class ModuleExporter
 		return new CapabilityExportModelV2
 		{
 			components = CloneCapabilityComponentsV2(capabilityComponentsV2),
-			features = CloneCapabilityFeaturesV2(capabilityFeaturesV2)
+			implementations = BuildCapabilityFeatureImplementationsV2(capabilityFeaturesV2)
 		};
 	}
 
 	private void LoadCapabilityExportModelV2(CapabilityExportModelV2 model)
 	{
 		capabilityComponentsV2 = CloneCapabilityComponentsV2(model != null ? model.components : null);
-		capabilityFeaturesV2 = CloneCapabilityFeaturesV2(model != null ? model.features : null);
+		capabilityFeaturesV2 = BuildCapabilityFeaturesFromImplementationsV2(model != null ? model.implementations : null);
 		selectedCapabilityComponentIndexV2 = capabilityComponentsV2.Count > 0 ? 0 : -1;
 		selectedCapabilityPropertyIndexV2 = -1;
 		selectedCapabilityMethodIndexV2 = -1;
@@ -1620,7 +1643,7 @@ public partial class ModuleExporter
 	{
 		return model != null &&
 			((model.components != null && model.components.Count > 0) ||
-			 (model.features != null && model.features.Count > 0));
+			 (model.implementations != null && model.implementations.Count > 0));
 	}
 
 	private CapabilityExportModelV2 BuildCapabilityExportModelV2FromLegacy()
@@ -1653,15 +1676,19 @@ public partial class ModuleExporter
 
 		List<CapabilityFeatureEntryV2> features = new List<CapabilityFeatureEntryV2>();
 		PlyFeatureManifest manifest = featureManifest ?? new PlyFeatureManifest();
-		foreach (PlySemanticFeatureDefinition feature in manifest.features ?? new List<PlySemanticFeatureDefinition>())
+		foreach (PlyFeatureImplementation implementation in manifest.implementations ?? new List<PlyFeatureImplementation>())
 		{
-			if (feature == null || string.IsNullOrWhiteSpace(feature.id))
+			if (implementation == null || string.IsNullOrWhiteSpace(implementation.featureId))
 			{
 				continue;
 			}
 
-			PlyFeatureImplementation implementation = (manifest.implementations ?? new List<PlyFeatureImplementation>())
-				.FirstOrDefault(entry => entry != null && string.Equals(entry.featureId, feature.id, StringComparison.OrdinalIgnoreCase));
+			PlySemanticFeatureDefinition feature = (manifest.features ?? new List<PlySemanticFeatureDefinition>())
+				.FirstOrDefault(entry => entry != null && string.Equals(entry.id, implementation.featureId, StringComparison.OrdinalIgnoreCase));
+			if (feature == null)
+			{
+				continue;
+			}
 
 			CapabilityFeatureEntryV2 entry = new CapabilityFeatureEntryV2
 			{
@@ -1719,8 +1746,147 @@ public partial class ModuleExporter
 		return new CapabilityExportModelV2
 		{
 			components = CloneCapabilityComponentsV2(components),
-			features = CloneCapabilityFeaturesV2(features)
+			implementations = BuildCapabilityFeatureImplementationsV2(features)
 		};
+	}
+
+	private List<CapabilityFeatureImplementationEntryV2> BuildCapabilityFeatureImplementationsV2(List<CapabilityFeatureEntryV2> source)
+	{
+		return (source ?? new List<CapabilityFeatureEntryV2>())
+			.Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.id))
+			.Where(HasAnyFeatureBindingsV2)
+			.Select(entry => new CapabilityFeatureImplementationEntryV2
+			{
+				id = entry.id ?? "",
+				inputs = (entry.inputs ?? new List<CapabilityFeaturePortEntryV2>())
+					.Where(port => port != null && !string.IsNullOrWhiteSpace(port.name))
+					.Select(port => new CapabilityFeaturePortBindingEntryV2
+					{
+						name = port.name ?? "",
+						binding = CloneCapabilityBindingV2(port.binding)
+					})
+					.ToList(),
+				outputs = (entry.outputs ?? new List<CapabilityFeaturePortEntryV2>())
+					.Where(port => port != null && !string.IsNullOrWhiteSpace(port.name))
+					.Select(port => new CapabilityFeaturePortBindingEntryV2
+					{
+						name = port.name ?? "",
+						binding = CloneCapabilityBindingV2(port.binding)
+					})
+					.ToList(),
+				parameters = (entry.parameters ?? new List<CapabilityFeatureParameterEntryV2>())
+					.Where(parameter => parameter != null && !string.IsNullOrWhiteSpace(parameter.name))
+					.Select(parameter => new CapabilityFeatureParameterBindingEntryV2
+					{
+						name = parameter.name ?? "",
+						binding = CloneCapabilityBindingV2(parameter.binding)
+					})
+					.ToList()
+			})
+			.OrderBy(entry => entry.id, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	private bool HasAnyFeatureBindingsV2(CapabilityFeatureEntryV2 entry)
+	{
+		if (entry == null)
+		{
+			return false;
+		}
+
+		return (entry.inputs ?? new List<CapabilityFeaturePortEntryV2>())
+				.Any(port => port != null && HasBindingV2(port.binding)) ||
+			(entry.outputs ?? new List<CapabilityFeaturePortEntryV2>())
+				.Any(port => port != null && HasBindingV2(port.binding)) ||
+			(entry.parameters ?? new List<CapabilityFeatureParameterEntryV2>())
+				.Any(parameter => parameter != null && HasBindingV2(parameter.binding));
+	}
+
+	private bool HasBindingV2(CapabilityFeatureBindingV2 binding)
+	{
+		return binding != null &&
+			(!string.IsNullOrWhiteSpace(binding.componentName) || !string.IsNullOrWhiteSpace(binding.memberName));
+	}
+
+	private List<CapabilityFeatureEntryV2> BuildCapabilityFeaturesFromImplementationsV2(List<CapabilityFeatureImplementationEntryV2> implementations)
+	{
+		List<CapabilityFeatureCatalogEntryV2> catalog = GetCapabilityFeatureCatalogV2();
+		List<CapabilityFeatureEntryV2> results = new List<CapabilityFeatureEntryV2>();
+		foreach (CapabilityFeatureImplementationEntryV2 implementation in implementations ?? new List<CapabilityFeatureImplementationEntryV2>())
+		{
+			if (implementation == null || string.IsNullOrWhiteSpace(implementation.id))
+			{
+				continue;
+			}
+
+			CapabilityFeatureCatalogEntryV2 catalogFeature = catalog.FirstOrDefault(feature =>
+				feature != null &&
+				string.Equals(feature.id, implementation.id, StringComparison.OrdinalIgnoreCase));
+			if (catalogFeature == null)
+			{
+				continue;
+			}
+
+			CapabilityFeatureEntryV2 entry = new CapabilityFeatureEntryV2
+			{
+				id = catalogFeature.id ?? "",
+				displayName = string.IsNullOrWhiteSpace(catalogFeature.name) ? catalogFeature.id : catalogFeature.name,
+				description = catalogFeature.description ?? "",
+				inputs = BuildCapabilityFeaturePortsV2(catalogFeature.inputs),
+				outputs = BuildCapabilityFeaturePortsV2(catalogFeature.outputs),
+				parameters = BuildCapabilityFeatureParametersV2(catalogFeature.parameters)
+			};
+
+			ApplyFeatureBindingsV2(entry.inputs, implementation.inputs);
+			ApplyFeatureBindingsV2(entry.outputs, implementation.outputs);
+			ApplyFeatureParameterBindingsV2(entry.parameters, implementation.parameters);
+			results.Add(entry);
+		}
+
+		return CloneCapabilityFeaturesV2(results);
+	}
+
+	private void ApplyFeatureBindingsV2(List<CapabilityFeaturePortEntryV2> ports, List<CapabilityFeaturePortBindingEntryV2> bindings)
+	{
+		foreach (CapabilityFeaturePortEntryV2 port in ports ?? new List<CapabilityFeaturePortEntryV2>())
+		{
+			if (port == null || string.IsNullOrWhiteSpace(port.name))
+			{
+				continue;
+			}
+
+			CapabilityFeaturePortBindingEntryV2 binding = (bindings ?? new List<CapabilityFeaturePortBindingEntryV2>())
+				.FirstOrDefault(entry => entry != null && string.Equals(entry.name, port.name, StringComparison.OrdinalIgnoreCase));
+			if (binding != null)
+			{
+				port.binding = CloneCapabilityBindingV2(binding.binding);
+			}
+		}
+	}
+
+	private void ApplyFeatureParameterBindingsV2(List<CapabilityFeatureParameterEntryV2> parameters, List<CapabilityFeatureParameterBindingEntryV2> bindings)
+	{
+		foreach (CapabilityFeatureParameterEntryV2 parameter in parameters ?? new List<CapabilityFeatureParameterEntryV2>())
+		{
+			if (parameter == null || string.IsNullOrWhiteSpace(parameter.name))
+			{
+				continue;
+			}
+
+			CapabilityFeatureParameterBindingEntryV2 binding = (bindings ?? new List<CapabilityFeatureParameterBindingEntryV2>())
+				.FirstOrDefault(entry => entry != null && string.Equals(entry.name, parameter.name, StringComparison.OrdinalIgnoreCase));
+			if (binding != null)
+			{
+				parameter.binding = CloneCapabilityBindingV2(binding.binding);
+			}
+		}
+	}
+
+	private CapabilityFeatureBindingV2 CloneCapabilityBindingV2(CapabilityFeatureBindingV2 source)
+	{
+		return source == null
+			? new CapabilityFeatureBindingV2()
+			: JsonUtility.FromJson<CapabilityFeatureBindingV2>(JsonUtility.ToJson(source)) ?? new CapabilityFeatureBindingV2();
 	}
 
 	private string GetLegacyBindingComponentNameV2(PlyFeatureImplementation implementation, bool isInput, string portName)
