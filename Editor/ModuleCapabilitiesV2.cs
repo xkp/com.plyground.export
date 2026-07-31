@@ -58,6 +58,8 @@ public partial class ModuleExporter
 		public string displayName = "";
 		public string declaringType = "";
 		public string returnType = "";
+		public int parameterCount;
+		public string primaryParameterType = "";
 		public string description = "";
 		public bool isStatic;
 	}
@@ -143,6 +145,8 @@ public partial class ModuleExporter
 	private readonly string[] capabilityCanAddOptionsV2 = { "No", "Yes", "Characters", "Game", "Nature", "Props", "Other" };
 	private readonly string[] capabilityFeatureInspectorTabsV2 = { "Implementation", "Information" };
 	private const string CapabilityFeatureCatalogAssetPathV2 = "Editor/FeatureCatalog/default-feature-catalog-v2.json";
+	private const string CapabilityFeatureCatalogPackageAssetPathV2 = "Packages/com.plyground.export/Editor/FeatureCatalog/default-feature-catalog-v2.json";
+	private const string CapabilityFeatureCatalogFileNameV2 = "default-feature-catalog-v2";
 	private CapabilityWorkspaceTabV2 activeCapabilityTabV2;
 	private CapabilityComponentInspectorTabV2 activeCapabilityInspectorTabV2;
 	private CapabilityFeatureInspectorTabV2 activeCapabilityFeatureInspectorTabV2;
@@ -220,14 +224,14 @@ public partial class ModuleExporter
 	private void DrawCapabilitiesV2ComponentsTreePane()
 	{
 		EditorGUILayout.BeginHorizontal();
-		if (GUILayout.Button("Add From Source", GUILayout.Width(130f)))
+		if (GUILayout.Button("Add From Source", GUILayout.ExpandWidth(true)))
 		{
 			OpenCapabilitiesV2SourceSelector();
 		}
 
-		if (GUILayout.Button("Add Custom", GUILayout.Width(110f)))
+		if (GUILayout.Button("Add From Project", GUILayout.ExpandWidth(true)))
 		{
-			AddCustomCapabilityComponentV2();
+			OpenCapabilitiesV2ProjectSelector();
 		}
 		EditorGUILayout.EndHorizontal();
 
@@ -610,21 +614,24 @@ public partial class ModuleExporter
 	private void DrawCapabilityFeatureBindingsSectionV2(string label, List<CapabilityFeaturePortEntryV2> ports, CapabilityFeatureBindingTargetV2 target)
 	{
 		GUILayout.Label(label, EditorStyles.boldLabel);
-		foreach (CapabilityFeaturePortEntryV2 port in ports ?? new List<CapabilityFeaturePortEntryV2>())
+		foreach (CapabilityFeaturePortEntryV2 port in (ports ?? new List<CapabilityFeaturePortEntryV2>())
+			.Where(port => port != null && !string.IsNullOrWhiteSpace(port.name)))
 		{
 			port.binding ??= new CapabilityFeatureBindingV2();
-			List<string> componentOptions = GetCapabilityBindingComponentOptionsV2(target);
-			List<string> memberOptions = GetCapabilityBindingMemberOptionsV2(port.binding.componentName, target);
+			List<string> componentOptions = GetCapabilityBindingComponentOptionsV2(port, target);
 
 			EditorGUILayout.BeginVertical("helpbox");
 			EditorGUILayout.BeginHorizontal();
-			GUILayout.Label(GetCapabilityFeaturePortLabelV2(port), GUILayout.Width(160f));
-			if (!string.IsNullOrWhiteSpace(port.dataType))
+			GUILayout.Label(GetCapabilityFeaturePortLabelV2(port), GUILayout.Width(180f));
+			string nextComponentName = DrawCapabilityBindingPopupV2(port.binding.componentName, componentOptions, 200f);
+			if (!string.Equals(nextComponentName, port.binding.componentName, StringComparison.OrdinalIgnoreCase))
 			{
-				GUILayout.Label(port.dataType, GUILayout.Width(90f));
+				port.binding.componentName = nextComponentName;
+				port.binding.memberName = "";
 			}
-			port.binding.componentName = DrawCapabilityBindingPopupV2(port.binding.componentName, componentOptions, 200f);
-			port.binding.memberName = DrawCapabilityBindingPopupV2(port.binding.memberName, memberOptions, 220f);
+
+			List<string> memberOptions = GetCapabilityBindingMemberOptionsV2(port, port.binding.componentName, target);
+			port.binding.memberName = DrawCapabilityBindingPopupV2(port.binding.memberName, memberOptions, 260f);
 			EditorGUILayout.EndHorizontal();
 			EditorGUILayout.EndVertical();
 		}
@@ -633,21 +640,24 @@ public partial class ModuleExporter
 	private void DrawCapabilityFeatureParameterBindingsSectionV2(List<CapabilityFeatureParameterEntryV2> parameters)
 	{
 		GUILayout.Label("Parameters", EditorStyles.boldLabel);
-		foreach (CapabilityFeatureParameterEntryV2 parameter in parameters ?? new List<CapabilityFeatureParameterEntryV2>())
+		foreach (CapabilityFeatureParameterEntryV2 parameter in (parameters ?? new List<CapabilityFeatureParameterEntryV2>())
+			.Where(parameter => parameter != null && !string.IsNullOrWhiteSpace(parameter.name)))
 		{
 			parameter.binding ??= new CapabilityFeatureBindingV2();
-			List<string> componentOptions = GetCapabilityBindingComponentOptionsV2(CapabilityFeatureBindingTargetV2.Input);
-			List<string> memberOptions = GetCapabilityParameterBindingMemberOptionsV2(parameter.binding.componentName);
+			List<string> componentOptions = GetCapabilityBindingComponentOptionsV2(parameter);
 
 			EditorGUILayout.BeginVertical("helpbox");
 			EditorGUILayout.BeginHorizontal();
-			GUILayout.Label(GetCapabilityFeatureParameterLabelV2(parameter), GUILayout.Width(160f));
-			if (!string.IsNullOrWhiteSpace(parameter.type))
+			GUILayout.Label(GetCapabilityFeatureParameterLabelV2(parameter), GUILayout.Width(180f));
+			string nextComponentName = DrawCapabilityBindingPopupV2(parameter.binding.componentName, componentOptions, 200f);
+			if (!string.Equals(nextComponentName, parameter.binding.componentName, StringComparison.OrdinalIgnoreCase))
 			{
-				GUILayout.Label(parameter.type, GUILayout.Width(90f));
+				parameter.binding.componentName = nextComponentName;
+				parameter.binding.memberName = "";
 			}
-			parameter.binding.componentName = DrawCapabilityBindingPopupV2(parameter.binding.componentName, componentOptions, 200f);
-			parameter.binding.memberName = DrawCapabilityBindingPopupV2(parameter.binding.memberName, memberOptions, 220f);
+
+			List<string> memberOptions = GetCapabilityParameterBindingMemberOptionsV2(parameter, parameter.binding.componentName);
+			parameter.binding.memberName = DrawCapabilityBindingPopupV2(parameter.binding.memberName, memberOptions, 260f);
 			EditorGUILayout.EndHorizontal();
 			EditorGUILayout.EndVertical();
 		}
@@ -753,7 +763,7 @@ public partial class ModuleExporter
 		return capabilityFeaturesV2[selectedCapabilityFeatureIndexV2];
 	}
 
-	private void OpenCapabilitiesV2SourceSelector()
+	private void OpenCapabilitiesV2ProjectSelector()
 	{
 		List<string> existingSelection = capabilityComponentsV2
 			.Where(entry => entry != null && !entry.isCustom && !string.IsNullOrWhiteSpace(entry.sourcePath))
@@ -761,9 +771,31 @@ public partial class ModuleExporter
 			.Distinct(StringComparer.OrdinalIgnoreCase)
 			.OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
 			.ToList();
-		List<string> selectedScripts = new List<string>(existingSelection);
-		CSharpScriptSelectorWindow.OpenWindow(selectedScripts);
-		ProcessSelectedCapabilitySourceFilesV2(selectedScripts);
+		CapabilitySourcePickerWindowV2.Open(existingSelection, ProcessSelectedCapabilitySourceFilesV2);
+	}
+
+	private void OpenCapabilitiesV2SourceSelector()
+	{
+		string assetsRoot = Application.dataPath;
+		string selectedFile = EditorUtility.OpenFilePanel("Select C# Script", assetsRoot, "cs");
+		if (string.IsNullOrWhiteSpace(selectedFile))
+		{
+			return;
+		}
+
+		if (!IsProjectSourceFileV2(selectedFile))
+		{
+			EditorUtility.DisplayDialog("Invalid Script", "Please choose a .cs file from inside this Unity project.", "OK");
+			return;
+		}
+
+		string assetPath = AbsolutePathToAssetPathV2(selectedFile);
+		if (string.IsNullOrWhiteSpace(assetPath))
+		{
+			return;
+		}
+
+		AddCapabilitySourceFileV2(assetPath);
 	}
 
 	private void ProcessSelectedCapabilitySourceFilesV2(List<string> selectedScripts)
@@ -787,6 +819,23 @@ public partial class ModuleExporter
 			.OrderBy(entry => entry.displayName, StringComparer.OrdinalIgnoreCase)
 			.ToList();
 		selectedCapabilityComponentIndexV2 = capabilityComponentsV2.Count > 0 ? 0 : -1;
+	}
+
+	private void AddCapabilitySourceFileV2(string assetPath)
+	{
+		if (string.IsNullOrWhiteSpace(assetPath))
+		{
+			return;
+		}
+
+		List<string> selectedScripts = capabilityComponentsV2
+			.Where(entry => entry != null && !entry.isCustom && !string.IsNullOrWhiteSpace(entry.sourcePath))
+			.Select(entry => entry.sourcePath)
+			.Concat(new[] { assetPath })
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		ProcessSelectedCapabilitySourceFilesV2(selectedScripts);
 	}
 
 	private CapabilityComponentEntryV2 BuildCapabilityComponentEntryFromSourceV2(string sourcePath)
@@ -868,6 +917,10 @@ public partial class ModuleExporter
 				displayName = method.name ?? "",
 				declaringType = method.declaringType ?? "",
 				returnType = method.returnType ?? "",
+				parameterCount = method.parameters != null ? method.parameters.Count : 0,
+				primaryParameterType = method.parameters != null && method.parameters.Count == 1 && method.parameters[0] != null
+					? method.parameters[0].type ?? ""
+					: "",
 				description = NormalizeImportedDescriptionV2(method.description),
 				isStatic = method.isStatic
 			})
@@ -1101,6 +1154,12 @@ public partial class ModuleExporter
 	private void ShowCapabilityFeatureCatalogMenuV2()
 	{
 		List<CapabilityFeatureCatalogEntryV2> catalog = GetCapabilityFeatureCatalogV2();
+		if (catalog.Count == 0)
+		{
+			EditorUtility.DisplayDialog("Feature Catalog", "No features were loaded from the V2 feature catalog.", "OK");
+			return;
+		}
+
 		List<CapabilityFeatureCatalogEntryV2> addableFeatures = catalog
 			.Where(feature => feature != null && !string.IsNullOrWhiteSpace(feature.id))
 			.Where(feature => !capabilityFeaturesV2.Any(existing =>
@@ -1110,6 +1169,7 @@ public partial class ModuleExporter
 			.ToList();
 		if (addableFeatures.Count == 0)
 		{
+			EditorUtility.DisplayDialog("Feature Catalog", "All catalog features have already been added.", "OK");
 			return;
 		}
 
@@ -1130,18 +1190,75 @@ public partial class ModuleExporter
 			return capabilityFeatureCatalogV2;
 		}
 
-		TextAsset asset = AssetDatabase.LoadAssetAtPath<TextAsset>(CapabilityFeatureCatalogAssetPathV2);
-		if (asset == null || string.IsNullOrWhiteSpace(asset.text))
+		string json = LoadCapabilityFeatureCatalogJsonV2();
+		if (string.IsNullOrWhiteSpace(json))
 		{
 			capabilityFeatureCatalogV2 = new List<CapabilityFeatureCatalogEntryV2>();
 			return capabilityFeatureCatalogV2;
 		}
 
-		CapabilityFeatureCatalogFileV2 catalog = JsonUtility.FromJson<CapabilityFeatureCatalogFileV2>(asset.text);
+		CapabilityFeatureCatalogFileV2 catalog = JsonUtility.FromJson<CapabilityFeatureCatalogFileV2>(json);
 		capabilityFeatureCatalogV2 = catalog != null && catalog.features != null
 			? catalog.features
 			: new List<CapabilityFeatureCatalogEntryV2>();
 		return capabilityFeatureCatalogV2;
+	}
+
+	private string LoadCapabilityFeatureCatalogJsonV2()
+	{
+		TextAsset asset = LoadCapabilityFeatureCatalogAssetV2();
+		if (asset != null && !string.IsNullOrWhiteSpace(asset.text))
+		{
+			return asset.text;
+		}
+
+		string localFilePath = Path.Combine(Directory.GetCurrentDirectory(), CapabilityFeatureCatalogAssetPathV2.Replace('/', Path.DirectorySeparatorChar));
+		if (File.Exists(localFilePath))
+		{
+			return File.ReadAllText(localFilePath);
+		}
+
+		string packageFilePath = Path.Combine(Directory.GetCurrentDirectory(), CapabilityFeatureCatalogPackageAssetPathV2.Replace('/', Path.DirectorySeparatorChar));
+		if (File.Exists(packageFilePath))
+		{
+			return File.ReadAllText(packageFilePath);
+		}
+
+		return "";
+	}
+
+	private TextAsset LoadCapabilityFeatureCatalogAssetV2()
+	{
+		TextAsset asset = AssetDatabase.LoadAssetAtPath<TextAsset>(CapabilityFeatureCatalogAssetPathV2);
+		if (asset != null)
+		{
+			return asset;
+		}
+
+		asset = AssetDatabase.LoadAssetAtPath<TextAsset>(CapabilityFeatureCatalogPackageAssetPathV2);
+		if (asset != null)
+		{
+			return asset;
+		}
+
+		string[] guids = AssetDatabase.FindAssets(CapabilityFeatureCatalogFileNameV2 + " t:TextAsset");
+		foreach (string guid in guids)
+		{
+			string assetPath = AssetDatabase.GUIDToAssetPath(guid);
+			if (string.IsNullOrWhiteSpace(assetPath) ||
+				!assetPath.EndsWith("default-feature-catalog-v2.json", StringComparison.OrdinalIgnoreCase))
+			{
+				continue;
+			}
+
+			TextAsset found = AssetDatabase.LoadAssetAtPath<TextAsset>(assetPath);
+			if (found != null)
+			{
+				return found;
+			}
+		}
+
+		return null;
 	}
 
 	private List<CapabilityFeaturePortEntryV2> BuildCapabilityFeaturePortsV2(List<string> names)
@@ -1188,13 +1305,13 @@ public partial class ModuleExporter
 		return newIndex <= 0 || options == null ? "" : options[newIndex - 1];
 	}
 
-	private List<string> GetCapabilityBindingComponentOptionsV2(CapabilityFeatureBindingTargetV2 target)
+	private List<string> GetCapabilityBindingComponentOptionsV2(CapabilityFeaturePortEntryV2 port, CapabilityFeatureBindingTargetV2 target)
 	{
 		switch (target)
 		{
 			case CapabilityFeatureBindingTargetV2.Output:
 				return capabilityComponentsV2
-					.Where(component => component != null && (component.events?.Count ?? 0) > 0)
+					.Where(component => component != null && GetCompatibleEventEntriesV2(component, port).Count > 0)
 					.Select(GetCapabilityComponentNameV2)
 					.Where(name => !string.IsNullOrWhiteSpace(name))
 					.Distinct(StringComparer.OrdinalIgnoreCase)
@@ -1202,7 +1319,7 @@ public partial class ModuleExporter
 					.ToList();
 			default:
 				return capabilityComponentsV2
-					.Where(component => component != null && ((component.methods?.Count ?? 0) > 0 || (component.properties?.Count ?? 0) > 0))
+					.Where(component => component != null && GetCompatibleInputMemberNamesV2(component, port).Count > 0)
 					.Select(GetCapabilityComponentNameV2)
 					.Where(name => !string.IsNullOrWhiteSpace(name))
 					.Distinct(StringComparer.OrdinalIgnoreCase)
@@ -1211,7 +1328,18 @@ public partial class ModuleExporter
 		}
 	}
 
-	private List<string> GetCapabilityBindingMemberOptionsV2(string componentName, CapabilityFeatureBindingTargetV2 target)
+	private List<string> GetCapabilityBindingComponentOptionsV2(CapabilityFeatureParameterEntryV2 parameter)
+	{
+		return capabilityComponentsV2
+			.Where(component => component != null && GetCompatibleParameterPropertiesV2(component, parameter).Count > 0)
+			.Select(GetCapabilityComponentNameV2)
+			.Where(name => !string.IsNullOrWhiteSpace(name))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	private List<string> GetCapabilityBindingMemberOptionsV2(CapabilityFeaturePortEntryV2 port, string componentName, CapabilityFeatureBindingTargetV2 target)
 	{
 		CapabilityComponentEntryV2 component = FindCapabilityComponentByNameV2(componentName);
 		if (component == null)
@@ -1222,20 +1350,14 @@ public partial class ModuleExporter
 		switch (target)
 		{
 			case CapabilityFeatureBindingTargetV2.Output:
-				return (component.events ?? new List<CapabilityEventEntryV2>())
-					.Where(eventInfo => eventInfo != null)
+				return GetCompatibleEventEntriesV2(component, port)
 					.Select(eventInfo => eventInfo.name)
 					.Where(name => !string.IsNullOrWhiteSpace(name))
 					.Distinct(StringComparer.OrdinalIgnoreCase)
 					.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
 					.ToList();
 			default:
-				return (component.methods ?? new List<CapabilityMethodEntryV2>())
-					.Where(method => method != null)
-					.Select(method => method.name)
-					.Concat((component.properties ?? new List<CapabilityPropertyEntryV2>())
-						.Where(property => property != null)
-						.Select(property => property.name))
+				return GetCompatibleInputMemberNamesV2(component, port)
 					.Where(name => !string.IsNullOrWhiteSpace(name))
 					.Distinct(StringComparer.OrdinalIgnoreCase)
 					.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
@@ -1243,7 +1365,7 @@ public partial class ModuleExporter
 		}
 	}
 
-	private List<string> GetCapabilityParameterBindingMemberOptionsV2(string componentName)
+	private List<string> GetCapabilityParameterBindingMemberOptionsV2(CapabilityFeatureParameterEntryV2 parameter, string componentName)
 	{
 		CapabilityComponentEntryV2 component = FindCapabilityComponentByNameV2(componentName);
 		if (component == null)
@@ -1251,13 +1373,137 @@ public partial class ModuleExporter
 			return new List<string>();
 		}
 
-		return (component.properties ?? new List<CapabilityPropertyEntryV2>())
-			.Where(property => property != null)
+		return GetCompatibleParameterPropertiesV2(component, parameter)
 			.Select(property => property.name)
 			.Where(name => !string.IsNullOrWhiteSpace(name))
 			.Distinct(StringComparer.OrdinalIgnoreCase)
 			.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
 			.ToList();
+	}
+
+	private List<string> GetCompatibleInputMemberNamesV2(CapabilityComponentEntryV2 component, CapabilityFeaturePortEntryV2 port)
+	{
+		List<string> results = new List<string>();
+		foreach (CapabilityMethodEntryV2 method in component.methods ?? new List<CapabilityMethodEntryV2>())
+		{
+			if (method != null && IsCompatibleInputMethodV2(method, port))
+			{
+				results.Add(method.name);
+			}
+		}
+
+		return results;
+	}
+
+	private List<CapabilityEventEntryV2> GetCompatibleEventEntriesV2(CapabilityComponentEntryV2 component, CapabilityFeaturePortEntryV2 port)
+	{
+		return (component.events ?? new List<CapabilityEventEntryV2>())
+			.Where(eventInfo => eventInfo != null && IsCompatibleOutputEventV2(eventInfo, port))
+			.ToList();
+	}
+
+	private List<CapabilityPropertyEntryV2> GetCompatibleParameterPropertiesV2(CapabilityComponentEntryV2 component, CapabilityFeatureParameterEntryV2 parameter)
+	{
+		return (component.properties ?? new List<CapabilityPropertyEntryV2>())
+			.Where(property => property != null && IsCompatibleParameterPropertyV2(property, parameter))
+			.ToList();
+	}
+
+	private bool IsCompatibleInputMethodV2(CapabilityMethodEntryV2 method, CapabilityFeaturePortEntryV2 port)
+	{
+		if (method == null || string.IsNullOrWhiteSpace(method.name))
+		{
+			return false;
+		}
+
+		string expectedType = NormalizeCapabilityTypeNameV2(port != null ? port.dataType : "");
+		if (string.IsNullOrWhiteSpace(expectedType))
+		{
+			return method.parameterCount <= 1;
+		}
+
+		if (IsVoidTypeV2(expectedType))
+		{
+			return method.parameterCount == 0;
+		}
+
+		return method.parameterCount == 1 && AreCapabilityTypesCompatibleV2(expectedType, method.primaryParameterType);
+	}
+
+	private bool IsCompatibleOutputEventV2(CapabilityEventEntryV2 eventInfo, CapabilityFeaturePortEntryV2 port)
+	{
+		if (eventInfo == null || string.IsNullOrWhiteSpace(eventInfo.name))
+		{
+			return false;
+		}
+
+		string expectedType = NormalizeCapabilityTypeNameV2(port != null ? port.dataType : "");
+		return string.IsNullOrWhiteSpace(expectedType) || AreCapabilityTypesCompatibleV2(expectedType, eventInfo.payloadType);
+	}
+
+	private bool IsCompatibleParameterPropertyV2(CapabilityPropertyEntryV2 property, CapabilityFeatureParameterEntryV2 parameter)
+	{
+		if (property == null || string.IsNullOrWhiteSpace(property.name))
+		{
+			return false;
+		}
+
+		string expectedType = NormalizeCapabilityTypeNameV2(parameter != null ? parameter.type : "");
+		return string.IsNullOrWhiteSpace(expectedType) || AreCapabilityTypesCompatibleV2(expectedType, property.type);
+	}
+
+	private bool AreCapabilityTypesCompatibleV2(string expectedType, string actualType)
+	{
+		string normalizedExpected = NormalizeCapabilityTypeNameV2(expectedType);
+		string normalizedActual = NormalizeCapabilityTypeNameV2(actualType);
+		if (string.IsNullOrWhiteSpace(normalizedExpected) || string.IsNullOrWhiteSpace(normalizedActual))
+		{
+			return true;
+		}
+
+		if (string.Equals(normalizedExpected, normalizedActual, StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+
+		if ((normalizedExpected == "int" || normalizedExpected == "float") &&
+			(normalizedActual == "int" || normalizedActual == "float"))
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	private string NormalizeCapabilityTypeNameV2(string typeName)
+	{
+		if (string.IsNullOrWhiteSpace(typeName))
+		{
+			return "";
+		}
+
+		string value = typeName.Trim();
+		switch (value.ToLowerInvariant())
+		{
+			case "system.single":
+				return "float";
+			case "system.int32":
+				return "int";
+			case "system.boolean":
+				return "bool";
+			case "system.string":
+				return "string";
+			case "void":
+			case "system.void":
+				return "void";
+			default:
+				return value;
+		}
+	}
+
+	private bool IsVoidTypeV2(string typeName)
+	{
+		return string.Equals(NormalizeCapabilityTypeNameV2(typeName), "void", StringComparison.OrdinalIgnoreCase);
 	}
 
 	private CapabilityComponentEntryV2 FindCapabilityComponentByNameV2(string componentName)
@@ -1277,6 +1523,39 @@ public partial class ModuleExporter
 
 		selectedIndex = EditorGUILayout.Popup("Can Add", selectedIndex, capabilityCanAddOptionsV2);
 		return capabilityCanAddOptionsV2[Mathf.Clamp(selectedIndex, 0, capabilityCanAddOptionsV2.Length - 1)];
+	}
+
+	private bool IsProjectSourceFileV2(string absolutePath)
+	{
+		if (string.IsNullOrWhiteSpace(absolutePath) || !absolutePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+		{
+			return false;
+		}
+
+		string normalizedAssetsRoot = Path.GetFullPath(Application.dataPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+		string normalizedSelectedPath = Path.GetFullPath(absolutePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+		return normalizedSelectedPath.StartsWith(normalizedAssetsRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(normalizedSelectedPath, normalizedAssetsRoot, StringComparison.OrdinalIgnoreCase);
+	}
+
+	private string AbsolutePathToAssetPathV2(string absolutePath)
+	{
+		if (string.IsNullOrWhiteSpace(absolutePath))
+		{
+			return "";
+		}
+
+		string normalizedAssetsRoot = Path.GetFullPath(Application.dataPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+		string normalizedSelectedPath = Path.GetFullPath(absolutePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+		if (!normalizedSelectedPath.StartsWith(normalizedAssetsRoot, StringComparison.OrdinalIgnoreCase))
+		{
+			return "";
+		}
+
+		string relativePath = normalizedSelectedPath.Substring(normalizedAssetsRoot.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+		return string.IsNullOrWhiteSpace(relativePath)
+			? "Assets"
+			: "Assets/" + relativePath.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/');
 	}
 
 	private string NormalizeImportedDescriptionV2(string description)
