@@ -42,12 +42,12 @@ public partial class ModuleExporter
 	{
 		public bool export = true;
 		public string name = "";
+		public string displayName = "";
 		public string type = "";
 		public string description = "";
 		public bool writable;
 		public bool userEditable = true;
 		public string defaultValue = "";
-		public string featureId = "";
 	}
 
 	[Serializable]
@@ -55,11 +55,11 @@ public partial class ModuleExporter
 	{
 		public bool export = true;
 		public string name = "";
+		public string displayName = "";
 		public string declaringType = "";
 		public string returnType = "";
 		public string description = "";
 		public bool isStatic;
-		public bool allowedForCodegen = true;
 	}
 
 	[Serializable]
@@ -67,6 +67,7 @@ public partial class ModuleExporter
 	{
 		public bool export = true;
 		public string name = "";
+		public string displayName = "";
 		public string payloadType = "";
 		public string declaringType = "";
 		public string description = "";
@@ -81,8 +82,17 @@ public partial class ModuleExporter
 	private Vector2 capabilitiesV2Scroll;
 	private Vector2 capabilityComponentTreeScrollV2;
 	private Vector2 capabilityComponentInspectorScrollV2;
+	private Vector2 capabilityPropertyListScrollV2;
+	private Vector2 capabilityPropertyEditorScrollV2;
+	private Vector2 capabilityMethodListScrollV2;
+	private Vector2 capabilityMethodEditorScrollV2;
+	private Vector2 capabilityEventListScrollV2;
+	private Vector2 capabilityEventEditorScrollV2;
 	private List<CapabilityComponentEntryV2> capabilityComponentsV2 = new List<CapabilityComponentEntryV2>();
 	private int selectedCapabilityComponentIndexV2 = -1;
+	private int selectedCapabilityPropertyIndexV2 = -1;
+	private int selectedCapabilityMethodIndexV2 = -1;
+	private int selectedCapabilityEventIndexV2 = -1;
 
 	private void DrawCapabilitiesV2Tab()
 	{
@@ -154,6 +164,9 @@ public partial class ModuleExporter
 				if (DrawSelectableListButton(GetCapabilityComponentLabelV2(entry), selectedCapabilityComponentIndexV2 == i, GUILayout.Height(30f)))
 				{
 					selectedCapabilityComponentIndexV2 = i;
+					selectedCapabilityPropertyIndexV2 = -1;
+					selectedCapabilityMethodIndexV2 = -1;
+					selectedCapabilityEventIndexV2 = -1;
 				}
 
 				if (GUILayout.Button("X", GUILayout.Width(28f), GUILayout.Height(30f)))
@@ -212,91 +225,198 @@ public partial class ModuleExporter
 		}
 
 		entry.displayName = EditorGUILayout.TextField("Display Name", entry.displayName);
+		entry.description = EditorGUILayout.TextField("Description", entry.description);
 		entry.canAdd = DrawCapabilityCanAddPopupV2(entry.canAdd);
 	}
 
 	private void DrawCapabilityPropertyInspectorV2(CapabilityComponentEntryV2 entry)
 	{
-		for (int i = 0; i < entry.properties.Count; i++)
+		EditorGUILayout.BeginHorizontal();
+
+		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(240f, position.width * 0.28f)), GUILayout.ExpandHeight(true));
+		GUILayout.Label("Properties", EditorStyles.boldLabel);
+		capabilityPropertyListScrollV2 = EditorGUILayout.BeginScrollView(capabilityPropertyListScrollV2, GUILayout.ExpandHeight(true));
+		if (entry.properties.Count > 0)
 		{
-			CapabilityPropertyEntryV2 property = entry.properties[i];
-			EditorGUILayout.BeginVertical("helpbox");
 			EditorGUILayout.BeginHorizontal();
-			property.export = EditorGUILayout.Toggle(property.export, GUILayout.Width(18f));
-			GUILayout.Label(string.IsNullOrWhiteSpace(property.name) ? "Property" : property.name, EditorStyles.boldLabel);
-			GUILayout.FlexibleSpace();
-			if (GUILayout.Button("X", GUILayout.Width(28f)))
-			{
-				entry.properties.RemoveAt(i);
-				EditorGUILayout.EndHorizontal();
-				EditorGUILayout.EndVertical();
-				return;
-			}
+			selectedCapabilityPropertyIndexV2 = Mathf.Clamp(selectedCapabilityPropertyIndexV2 < 0 ? 0 : selectedCapabilityPropertyIndexV2, 0, entry.properties.Count - 1);
 			EditorGUILayout.EndHorizontal();
-			property.name = EditorGUILayout.TextField("Name", property.name);
-			property.type = EditorGUILayout.TextField("Type", property.type);
-			property.description = EditorGUILayout.TextField("Description", property.description);
-			property.writable = EditorGUILayout.Toggle("Writable", property.writable);
-			property.userEditable = EditorGUILayout.Toggle("User Editable", property.userEditable);
-			property.defaultValue = EditorGUILayout.TextField("Default", property.defaultValue);
-			property.featureId = EditorGUILayout.TextField("Feature Id", property.featureId);
-			EditorGUILayout.EndVertical();
+			for (int i = 0; i < entry.properties.Count; i++)
+			{
+				CapabilityPropertyEntryV2 property = entry.properties[i];
+				EditorGUILayout.BeginHorizontal();
+				property.export = EditorGUILayout.Toggle(property.export, GUILayout.Width(18f));
+				if (DrawSelectableListButton(GetCapabilityPropertyLabelV2(property), selectedCapabilityPropertyIndexV2 == i, GUILayout.Height(28f)))
+				{
+					selectedCapabilityPropertyIndexV2 = i;
+				}
+
+				if (GUILayout.Button("X", GUILayout.Width(28f), GUILayout.Height(28f)))
+				{
+					entry.properties.RemoveAt(i);
+					selectedCapabilityPropertyIndexV2 = Mathf.Clamp(selectedCapabilityPropertyIndexV2, 0, entry.properties.Count - 1);
+					if (entry.properties.Count == 0)
+					{
+						selectedCapabilityPropertyIndexV2 = -1;
+					}
+
+					EditorGUILayout.EndHorizontal();
+					break;
+				}
+				EditorGUILayout.EndHorizontal();
+			}
 		}
+		EditorGUILayout.EndScrollView();
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+		capabilityPropertyEditorScrollV2 = EditorGUILayout.BeginScrollView(capabilityPropertyEditorScrollV2, GUILayout.ExpandHeight(true));
+		CapabilityPropertyEntryV2 selectedProperty = selectedCapabilityPropertyIndexV2 >= 0 && selectedCapabilityPropertyIndexV2 < entry.properties.Count
+			? entry.properties[selectedCapabilityPropertyIndexV2]
+			: null;
+		if (selectedProperty != null)
+		{
+			using (new EditorGUI.DisabledScope(true))
+			{
+				EditorGUILayout.TextField("Property Name", selectedProperty.name);
+			}
+
+			selectedProperty.displayName = EditorGUILayout.TextField("Display Name", selectedProperty.displayName);
+			selectedProperty.type = EditorGUILayout.TextField("Type", selectedProperty.type);
+			selectedProperty.description = EditorGUILayout.TextField("Description", selectedProperty.description);
+			selectedProperty.writable = EditorGUILayout.Toggle("Writable", selectedProperty.writable);
+			selectedProperty.userEditable = EditorGUILayout.Toggle("User Editable", selectedProperty.userEditable);
+			selectedProperty.defaultValue = EditorGUILayout.TextField("Default", selectedProperty.defaultValue);
+			selectedProperty.export = EditorGUILayout.Toggle("Export", selectedProperty.export);
+		}
+		EditorGUILayout.EndScrollView();
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.EndHorizontal();
 	}
 
 	private void DrawCapabilityMethodInspectorV2(CapabilityComponentEntryV2 entry)
 	{
-		for (int i = 0; i < entry.methods.Count; i++)
+		EditorGUILayout.BeginHorizontal();
+
+		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(240f, position.width * 0.28f)), GUILayout.ExpandHeight(true));
+		GUILayout.Label("Methods", EditorStyles.boldLabel);
+		capabilityMethodListScrollV2 = EditorGUILayout.BeginScrollView(capabilityMethodListScrollV2, GUILayout.ExpandHeight(true));
+		if (entry.methods.Count > 0)
 		{
-			CapabilityMethodEntryV2 method = entry.methods[i];
-			EditorGUILayout.BeginVertical("helpbox");
 			EditorGUILayout.BeginHorizontal();
-			method.export = EditorGUILayout.Toggle(method.export, GUILayout.Width(18f));
-			GUILayout.Label(string.IsNullOrWhiteSpace(method.name) ? "Method" : method.name, EditorStyles.boldLabel);
-			GUILayout.FlexibleSpace();
-			if (GUILayout.Button("X", GUILayout.Width(28f)))
-			{
-				entry.methods.RemoveAt(i);
-				EditorGUILayout.EndHorizontal();
-				EditorGUILayout.EndVertical();
-				return;
-			}
+			selectedCapabilityMethodIndexV2 = Mathf.Clamp(selectedCapabilityMethodIndexV2 < 0 ? 0 : selectedCapabilityMethodIndexV2, 0, entry.methods.Count - 1);
 			EditorGUILayout.EndHorizontal();
-			method.name = EditorGUILayout.TextField("Name", method.name);
-			method.declaringType = EditorGUILayout.TextField("Declaring Type", method.declaringType);
-			method.returnType = EditorGUILayout.TextField("Return Type", method.returnType);
-			method.description = EditorGUILayout.TextField("Description", method.description);
-			method.isStatic = EditorGUILayout.Toggle("Static", method.isStatic);
-			method.allowedForCodegen = EditorGUILayout.Toggle("Codegen", method.allowedForCodegen);
-			EditorGUILayout.EndVertical();
+			for (int i = 0; i < entry.methods.Count; i++)
+			{
+				CapabilityMethodEntryV2 method = entry.methods[i];
+				EditorGUILayout.BeginHorizontal();
+				method.export = EditorGUILayout.Toggle(method.export, GUILayout.Width(18f));
+				if (DrawSelectableListButton(GetCapabilityMethodLabelV2(method), selectedCapabilityMethodIndexV2 == i, GUILayout.Height(28f)))
+				{
+					selectedCapabilityMethodIndexV2 = i;
+				}
+
+				if (GUILayout.Button("X", GUILayout.Width(28f), GUILayout.Height(28f)))
+				{
+					entry.methods.RemoveAt(i);
+					selectedCapabilityMethodIndexV2 = Mathf.Clamp(selectedCapabilityMethodIndexV2, 0, entry.methods.Count - 1);
+					if (entry.methods.Count == 0)
+					{
+						selectedCapabilityMethodIndexV2 = -1;
+					}
+
+					EditorGUILayout.EndHorizontal();
+					break;
+				}
+				EditorGUILayout.EndHorizontal();
+			}
 		}
+		EditorGUILayout.EndScrollView();
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+		capabilityMethodEditorScrollV2 = EditorGUILayout.BeginScrollView(capabilityMethodEditorScrollV2, GUILayout.ExpandHeight(true));
+		CapabilityMethodEntryV2 selectedMethod = selectedCapabilityMethodIndexV2 >= 0 && selectedCapabilityMethodIndexV2 < entry.methods.Count
+			? entry.methods[selectedCapabilityMethodIndexV2]
+			: null;
+		if (selectedMethod != null)
+		{
+			using (new EditorGUI.DisabledScope(true))
+			{
+				EditorGUILayout.TextField("Method Name", selectedMethod.name);
+			}
+
+			selectedMethod.displayName = EditorGUILayout.TextField("Display Name", selectedMethod.displayName);
+			selectedMethod.description = EditorGUILayout.TextField("Description", selectedMethod.description);
+			selectedMethod.export = EditorGUILayout.Toggle("Export", selectedMethod.export);
+		}
+		EditorGUILayout.EndScrollView();
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.EndHorizontal();
 	}
 
 	private void DrawCapabilityEventInspectorV2(CapabilityComponentEntryV2 entry)
 	{
-		for (int i = 0; i < entry.events.Count; i++)
+		EditorGUILayout.BeginHorizontal();
+
+		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(240f, position.width * 0.28f)), GUILayout.ExpandHeight(true));
+		GUILayout.Label("Events", EditorStyles.boldLabel);
+		capabilityEventListScrollV2 = EditorGUILayout.BeginScrollView(capabilityEventListScrollV2, GUILayout.ExpandHeight(true));
+		if (entry.events.Count > 0)
 		{
-			CapabilityEventEntryV2 eventInfo = entry.events[i];
-			EditorGUILayout.BeginVertical("helpbox");
 			EditorGUILayout.BeginHorizontal();
-			eventInfo.export = EditorGUILayout.Toggle(eventInfo.export, GUILayout.Width(18f));
-			GUILayout.Label(string.IsNullOrWhiteSpace(eventInfo.name) ? "Event" : eventInfo.name, EditorStyles.boldLabel);
-			GUILayout.FlexibleSpace();
-			if (GUILayout.Button("X", GUILayout.Width(28f)))
-			{
-				entry.events.RemoveAt(i);
-				EditorGUILayout.EndHorizontal();
-				EditorGUILayout.EndVertical();
-				return;
-			}
+			selectedCapabilityEventIndexV2 = Mathf.Clamp(selectedCapabilityEventIndexV2 < 0 ? 0 : selectedCapabilityEventIndexV2, 0, entry.events.Count - 1);
 			EditorGUILayout.EndHorizontal();
-			eventInfo.name = EditorGUILayout.TextField("Name", eventInfo.name);
-			eventInfo.payloadType = EditorGUILayout.TextField("Payload Type", eventInfo.payloadType);
-			eventInfo.declaringType = EditorGUILayout.TextField("Declaring Type", eventInfo.declaringType);
-			eventInfo.description = EditorGUILayout.TextField("Description", eventInfo.description);
-			eventInfo.allowedForCodegen = EditorGUILayout.Toggle("Codegen", eventInfo.allowedForCodegen);
-			EditorGUILayout.EndVertical();
+			for (int i = 0; i < entry.events.Count; i++)
+			{
+				CapabilityEventEntryV2 eventInfo = entry.events[i];
+				EditorGUILayout.BeginHorizontal();
+				eventInfo.export = EditorGUILayout.Toggle(eventInfo.export, GUILayout.Width(18f));
+				if (DrawSelectableListButton(GetCapabilityEventLabelV2(eventInfo), selectedCapabilityEventIndexV2 == i, GUILayout.Height(28f)))
+				{
+					selectedCapabilityEventIndexV2 = i;
+				}
+
+				if (GUILayout.Button("X", GUILayout.Width(28f), GUILayout.Height(28f)))
+				{
+					entry.events.RemoveAt(i);
+					selectedCapabilityEventIndexV2 = Mathf.Clamp(selectedCapabilityEventIndexV2, 0, entry.events.Count - 1);
+					if (entry.events.Count == 0)
+					{
+						selectedCapabilityEventIndexV2 = -1;
+					}
+
+					EditorGUILayout.EndHorizontal();
+					break;
+				}
+				EditorGUILayout.EndHorizontal();
+			}
 		}
+		EditorGUILayout.EndScrollView();
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+		capabilityEventEditorScrollV2 = EditorGUILayout.BeginScrollView(capabilityEventEditorScrollV2, GUILayout.ExpandHeight(true));
+		CapabilityEventEntryV2 selectedEvent = selectedCapabilityEventIndexV2 >= 0 && selectedCapabilityEventIndexV2 < entry.events.Count
+			? entry.events[selectedCapabilityEventIndexV2]
+			: null;
+		if (selectedEvent != null)
+		{
+			using (new EditorGUI.DisabledScope(true))
+			{
+				EditorGUILayout.TextField("Event Name", selectedEvent.name);
+			}
+
+			selectedEvent.displayName = EditorGUILayout.TextField("Display Name", selectedEvent.displayName);
+			selectedEvent.description = EditorGUILayout.TextField("Description", selectedEvent.description);
+			selectedEvent.export = EditorGUILayout.Toggle("Export", selectedEvent.export);
+		}
+		EditorGUILayout.EndScrollView();
+		EditorGUILayout.EndVertical();
+
+		EditorGUILayout.EndHorizontal();
 	}
 
 	private CapabilityComponentEntryV2 GetSelectedCapabilityComponentV2()
@@ -371,7 +491,7 @@ public partial class ModuleExporter
 			isCustom = false,
 			typeName = componentInfo.typeName ?? "",
 			baseType = componentInfo.baseType ?? "",
-			description = componentInfo.description ?? "",
+			description = NormalizeImportedDescriptionV2(componentInfo.description),
 			canAdd = "No",
 			properties = BuildCapabilityPropertyEntriesV2(componentInfo.parameters),
 			methods = BuildCapabilityMethodEntriesV2(componentInfo.methods),
@@ -402,12 +522,12 @@ public partial class ModuleExporter
 			{
 				export = true,
 				name = parameter.name ?? "",
+				displayName = parameter.name ?? "",
 				type = parameter.type ?? "",
-				description = parameter.description ?? "",
+				description = NormalizeImportedDescriptionV2(parameter.description),
 				writable = parameter.required,
 				userEditable = parameter.userEditable,
-				defaultValue = parameter.@default ?? "",
-				featureId = parameter.featureId ?? ""
+				defaultValue = parameter.@default ?? ""
 			})
 			.OrderBy(parameter => parameter.name, StringComparer.OrdinalIgnoreCase)
 			.ToList();
@@ -421,11 +541,11 @@ public partial class ModuleExporter
 			{
 				export = true,
 				name = method.name ?? "",
+				displayName = method.name ?? "",
 				declaringType = method.declaringType ?? "",
 				returnType = method.returnType ?? "",
-				description = method.description ?? "",
-				isStatic = method.isStatic,
-				allowedForCodegen = method.allowedForCodegen
+				description = NormalizeImportedDescriptionV2(method.description),
+				isStatic = method.isStatic
 			})
 			.OrderBy(method => method.name, StringComparer.OrdinalIgnoreCase)
 			.ToList();
@@ -439,9 +559,10 @@ public partial class ModuleExporter
 			{
 				export = true,
 				name = eventInfo.name ?? "",
+				displayName = eventInfo.name ?? "",
 				payloadType = eventInfo.payloadType ?? "",
 				declaringType = eventInfo.declaringType ?? "",
-				description = eventInfo.description ?? "",
+				description = NormalizeImportedDescriptionV2(eventInfo.description),
 				allowedForCodegen = eventInfo.allowedForCodegen
 			})
 			.OrderBy(eventInfo => eventInfo.name, StringComparer.OrdinalIgnoreCase)
@@ -488,6 +609,66 @@ public partial class ModuleExporter
 		return entry.displayName ?? "";
 	}
 
+	private string GetCapabilityPropertyLabelV2(CapabilityPropertyEntryV2 property)
+	{
+		if (property == null)
+		{
+			return "Property";
+		}
+
+		if (!string.IsNullOrWhiteSpace(property.displayName))
+		{
+			return property.displayName;
+		}
+
+		if (!string.IsNullOrWhiteSpace(property.name))
+		{
+			return property.name;
+		}
+
+		return "Property";
+	}
+
+	private string GetCapabilityMethodLabelV2(CapabilityMethodEntryV2 method)
+	{
+		if (method == null)
+		{
+			return "Method";
+		}
+
+		if (!string.IsNullOrWhiteSpace(method.displayName))
+		{
+			return method.displayName;
+		}
+
+		if (!string.IsNullOrWhiteSpace(method.name))
+		{
+			return method.name;
+		}
+
+		return "Method";
+	}
+
+	private string GetCapabilityEventLabelV2(CapabilityEventEntryV2 eventInfo)
+	{
+		if (eventInfo == null)
+		{
+			return "Event";
+		}
+
+		if (!string.IsNullOrWhiteSpace(eventInfo.displayName))
+		{
+			return eventInfo.displayName;
+		}
+
+		if (!string.IsNullOrWhiteSpace(eventInfo.name))
+		{
+			return eventInfo.name;
+		}
+
+		return "Event";
+	}
+
 	private void AddCustomCapabilityComponentV2()
 	{
 		CapabilityComponentEntryV2 entry = new CapabilityComponentEntryV2
@@ -517,5 +698,28 @@ public partial class ModuleExporter
 
 		selectedIndex = EditorGUILayout.Popup("Can Add", selectedIndex, capabilityCanAddOptionsV2);
 		return capabilityCanAddOptionsV2[Mathf.Clamp(selectedIndex, 0, capabilityCanAddOptionsV2.Length - 1)];
+	}
+
+	private string NormalizeImportedDescriptionV2(string description)
+	{
+		if (string.IsNullOrWhiteSpace(description))
+		{
+			return "";
+		}
+
+		string value = description.Trim();
+		if (string.Equals(value, "Serialized field", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(value, "Public property", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(value, "Public method", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(value, "Event field", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(value, "Inspector input field", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(value, "User script type", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(value, "Component inferred from Assets/ script", StringComparison.OrdinalIgnoreCase) ||
+			value.StartsWith("Reflected from ", StringComparison.OrdinalIgnoreCase))
+		{
+			return "";
+		}
+
+		return value;
 	}
 }
