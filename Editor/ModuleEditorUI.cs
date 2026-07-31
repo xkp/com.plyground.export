@@ -395,6 +395,11 @@ public partial class ModuleExporter
 					prop.type = "roles";
 					typeIndex = System.Array.IndexOf(allowedTypes, prop.type);
 				}
+				else if (string.Equals(prop.type, "avatars", StringComparison.OrdinalIgnoreCase))
+				{
+					prop.type = "avatar";
+					typeIndex = System.Array.IndexOf(allowedTypes, prop.type);
+				}
 				else
 				{
 					typeIndex = 0;
@@ -992,6 +997,11 @@ public partial class ModuleExporter
 					entry.prop.type = "roles";
 					typeIndex = System.Array.IndexOf(allowedTypes, entry.prop.type);
 				}
+				else if (string.Equals(entry.prop.type, "avatars", StringComparison.OrdinalIgnoreCase))
+				{
+					entry.prop.type = "avatar";
+					typeIndex = System.Array.IndexOf(allowedTypes, entry.prop.type);
+				}
 				else
 				{
 					typeIndex = 0;
@@ -1034,6 +1044,12 @@ public partial class ModuleExporter
 					prop.data = RolePropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentNames());
 				}
 				break;
+			case "avatar":
+				if (GUILayout.Button(GetAvatarButtonLabel(prop.data)))
+				{
+					prop.data = AvatarPropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentNames());
+				}
+				break;
 			case "enum":
 				if (GUILayout.Button(string.IsNullOrEmpty(prop.data) ? "Edit..." : prop.data))
 				{
@@ -1064,6 +1080,12 @@ public partial class ModuleExporter
 				if (GUILayout.Button(GetRolesButtonLabel(prop.data), GUILayout.Width(width)))
 				{
 					prop.data = RolePropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentNames());
+				}
+				break;
+			case "avatar":
+				if (GUILayout.Button(GetAvatarButtonLabel(prop.data), GUILayout.Width(width)))
+				{
+					prop.data = AvatarPropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentNames());
 				}
 				break;
 			case "enum":
@@ -1271,6 +1293,12 @@ public partial class ModuleExporter
 	{
 		int count = RolePropertyEditor.GetRoleCount(json);
 		return count <= 0 ? "Edit Roles..." : $"Edit Roles... ({count})";
+	}
+
+	private string GetAvatarButtonLabel(string json)
+	{
+		int count = AvatarPropertyEditor.GetComponentCount(json);
+		return count <= 0 ? "Edit Avatar..." : $"Edit Avatar... ({count})";
 	}
 
 	private void DrawCapabilitiesFeaturesWorkspace()
