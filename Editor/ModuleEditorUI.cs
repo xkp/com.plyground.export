@@ -1281,7 +1281,8 @@ public partial class ModuleExporter
 	private List<string> GetAvailableCapabilityComponentNames()
 	{
 		moduleCapabilities ??= new CapabilityManifest();
-		return (moduleCapabilities.unity.components ?? new List<UnityCapabilityComponentInfo>())
+		moduleCapabilities.unity ??= new CapabilityUnityInfo();
+		return GetSelectedCapabilityComponents()
 			.Select(component => !string.IsNullOrWhiteSpace(component.typeName) ? component.typeName : component.componentId)
 			.Where(name => !string.IsNullOrWhiteSpace(name))
 			.Distinct(StringComparer.OrdinalIgnoreCase)
