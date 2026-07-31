@@ -17,7 +17,7 @@ public class CSharpScriptSelectorWindow : EditorWindow
 		window.titleContent = new GUIContent("Select C# Scripts");
 		window.minSize = new Vector2(420, 620);
 		window.externalSelection = selectedScripts;
-		window.ShowModalUtility();
+		window.ShowModal();
 	}
 
 	private void OnEnable()

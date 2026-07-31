@@ -771,7 +771,9 @@ public partial class ModuleExporter
 			.Distinct(StringComparer.OrdinalIgnoreCase)
 			.OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
 			.ToList();
-		CapabilitySourcePickerWindowV2.Open(existingSelection, ProcessSelectedCapabilitySourceFilesV2);
+		List<string> selectedScripts = new List<string>(existingSelection);
+		CSharpScriptSelectorWindow.OpenWindow(selectedScripts);
+		ProcessSelectedCapabilitySourceFilesV2(selectedScripts);
 	}
 
 	private void OpenCapabilitiesV2SourceSelector()
