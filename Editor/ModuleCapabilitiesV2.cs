@@ -85,6 +85,25 @@ public partial class ModuleExporter
 		public List<CapabilityFeatureParameterEntryV2> parameters = new List<CapabilityFeatureParameterEntryV2>();
 	}
 
+	[Serializable]
+	private class CapabilityFeatureCatalogFileV2
+	{
+		public string version = "";
+		public string model = "";
+		public List<CapabilityFeatureCatalogEntryV2> features = new List<CapabilityFeatureCatalogEntryV2>();
+	}
+
+	[Serializable]
+	private class CapabilityFeatureCatalogEntryV2
+	{
+		public string id = "";
+		public string name = "";
+		public string description = "";
+		public List<string> parameters = new List<string>();
+		public List<string> inputs = new List<string>();
+		public List<string> outputs = new List<string>();
+	}
+
 	private enum CapabilityFeatureInspectorTabV2
 	{
 		Implementation,
@@ -123,6 +142,7 @@ public partial class ModuleExporter
 	private readonly string[] capabilityInspectorTabsV2 = { "Component", "Properties", "Methods", "Events" };
 	private readonly string[] capabilityCanAddOptionsV2 = { "No", "Yes", "Characters", "Game", "Nature", "Props", "Other" };
 	private readonly string[] capabilityFeatureInspectorTabsV2 = { "Implementation", "Information" };
+	private const string CapabilityFeatureCatalogAssetPathV2 = "Editor/FeatureCatalog/default-feature-catalog-v2.json";
 	private CapabilityWorkspaceTabV2 activeCapabilityTabV2;
 	private CapabilityComponentInspectorTabV2 activeCapabilityInspectorTabV2;
 	private CapabilityFeatureInspectorTabV2 activeCapabilityFeatureInspectorTabV2;
@@ -140,6 +160,7 @@ public partial class ModuleExporter
 	private Vector2 capabilityFeatureInformationScrollV2;
 	private List<CapabilityComponentEntryV2> capabilityComponentsV2 = new List<CapabilityComponentEntryV2>();
 	private List<CapabilityFeatureEntryV2> capabilityFeaturesV2 = new List<CapabilityFeatureEntryV2>();
+	private List<CapabilityFeatureCatalogEntryV2> capabilityFeatureCatalogV2;
 	private int selectedCapabilityComponentIndexV2 = -1;
 	private int selectedCapabilityPropertyIndexV2 = -1;
 	private int selectedCapabilityMethodIndexV2 = -1;
@@ -487,7 +508,7 @@ public partial class ModuleExporter
 		EditorGUILayout.BeginHorizontal();
 		if (GUILayout.Button("Add", GUILayout.Width(90f)))
 		{
-			AddCapabilityFeatureV2();
+			ShowCapabilityFeatureCatalogMenuV2();
 		}
 		EditorGUILayout.EndHorizontal();
 
@@ -1051,27 +1072,21 @@ public partial class ModuleExporter
 			string.Equals(component.id, entry.id, StringComparison.OrdinalIgnoreCase));
 	}
 
-	private void AddCapabilityFeatureV2()
+	private void AddCapabilityFeatureV2(CapabilityFeatureCatalogEntryV2 sourceFeature)
 	{
-		int suffix = capabilityFeaturesV2.Count + 1;
-		string featureId;
-		do
+		if (sourceFeature == null || string.IsNullOrWhiteSpace(sourceFeature.id))
 		{
-			featureId = "feature_" + suffix;
-			suffix++;
+			return;
 		}
-		while (capabilityFeaturesV2.Any(feature =>
-			feature != null &&
-			string.Equals(feature.id, featureId, StringComparison.OrdinalIgnoreCase)));
 
 		CapabilityFeatureEntryV2 entry = new CapabilityFeatureEntryV2
 		{
-			id = featureId,
-			displayName = "New Feature",
-			description = "",
-			inputs = new List<CapabilityFeaturePortEntryV2>(),
-			outputs = new List<CapabilityFeaturePortEntryV2>(),
-			parameters = new List<CapabilityFeatureParameterEntryV2>()
+			id = sourceFeature.id ?? "",
+			displayName = string.IsNullOrWhiteSpace(sourceFeature.name) ? sourceFeature.id : sourceFeature.name,
+			description = sourceFeature.description ?? "",
+			inputs = BuildCapabilityFeaturePortsV2(sourceFeature.inputs),
+			outputs = BuildCapabilityFeaturePortsV2(sourceFeature.outputs),
+			parameters = BuildCapabilityFeatureParametersV2(sourceFeature.parameters)
 		};
 
 		capabilityFeaturesV2.Add(entry);
@@ -1081,6 +1096,81 @@ public partial class ModuleExporter
 		selectedCapabilityFeatureIndexV2 = capabilityFeaturesV2.FindIndex(feature =>
 			feature != null &&
 			string.Equals(feature.id, entry.id, StringComparison.OrdinalIgnoreCase));
+	}
+
+	private void ShowCapabilityFeatureCatalogMenuV2()
+	{
+		List<CapabilityFeatureCatalogEntryV2> catalog = GetCapabilityFeatureCatalogV2();
+		List<CapabilityFeatureCatalogEntryV2> addableFeatures = catalog
+			.Where(feature => feature != null && !string.IsNullOrWhiteSpace(feature.id))
+			.Where(feature => !capabilityFeaturesV2.Any(existing =>
+				existing != null &&
+				string.Equals(existing.id, feature.id, StringComparison.OrdinalIgnoreCase)))
+			.OrderBy(feature => string.IsNullOrWhiteSpace(feature.name) ? feature.id : feature.name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		if (addableFeatures.Count == 0)
+		{
+			return;
+		}
+
+		GenericMenu menu = new GenericMenu();
+		foreach (CapabilityFeatureCatalogEntryV2 feature in addableFeatures)
+		{
+			string label = string.IsNullOrWhiteSpace(feature.name) ? feature.id : feature.name;
+			menu.AddItem(new GUIContent(label), false, () => AddCapabilityFeatureV2(feature));
+		}
+
+		menu.ShowAsContext();
+	}
+
+	private List<CapabilityFeatureCatalogEntryV2> GetCapabilityFeatureCatalogV2()
+	{
+		if (capabilityFeatureCatalogV2 != null)
+		{
+			return capabilityFeatureCatalogV2;
+		}
+
+		TextAsset asset = AssetDatabase.LoadAssetAtPath<TextAsset>(CapabilityFeatureCatalogAssetPathV2);
+		if (asset == null || string.IsNullOrWhiteSpace(asset.text))
+		{
+			capabilityFeatureCatalogV2 = new List<CapabilityFeatureCatalogEntryV2>();
+			return capabilityFeatureCatalogV2;
+		}
+
+		CapabilityFeatureCatalogFileV2 catalog = JsonUtility.FromJson<CapabilityFeatureCatalogFileV2>(asset.text);
+		capabilityFeatureCatalogV2 = catalog != null && catalog.features != null
+			? catalog.features
+			: new List<CapabilityFeatureCatalogEntryV2>();
+		return capabilityFeatureCatalogV2;
+	}
+
+	private List<CapabilityFeaturePortEntryV2> BuildCapabilityFeaturePortsV2(List<string> names)
+	{
+		return (names ?? new List<string>())
+			.Where(name => !string.IsNullOrWhiteSpace(name))
+			.Select(name => new CapabilityFeaturePortEntryV2
+			{
+				name = name,
+				displayName = name,
+				dataType = "",
+				description = ""
+			})
+			.ToList();
+	}
+
+	private List<CapabilityFeatureParameterEntryV2> BuildCapabilityFeatureParametersV2(List<string> names)
+	{
+		return (names ?? new List<string>())
+			.Where(name => !string.IsNullOrWhiteSpace(name))
+			.Select(name => new CapabilityFeatureParameterEntryV2
+			{
+				name = name,
+				displayName = name,
+				type = "",
+				description = "",
+				defaultValue = ""
+			})
+			.ToList();
 	}
 
 	private string DrawCapabilityBindingPopupV2(string currentValue, List<string> options, float width)

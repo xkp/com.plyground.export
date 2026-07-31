@@ -1,0 +1,650 @@
+{
+  "version": "1.0",
+  "model": "semantic_feature_families",
+  "features": [
+    {
+      "id": "vision_sensor",
+      "name": "Vision Sensor",
+      "description": "Detects visual awareness of a target using one or more sensing styles such as line of sight, cone vision, or radius checks.",
+      "intentExamples": [
+        "enemy can see the player",
+        "guard field of view",
+        "vision cone"
+      ],
+      "parameters": [
+        "sensorMode",
+        "sourceRole",
+        "targetRole",
+        "range",
+        "fieldOfViewDegrees"
+      ],
+      "inputs": [
+        "enable",
+        "disable"
+      ],
+      "outputs": [
+        "targetSeen",
+        "targetLost",
+        "visibilityChanged"
+      ]
+    },
+    {
+      "id": "hearing_sensor",
+      "name": "Hearing Sensor",
+      "description": "Detects audible activity from a target or source within a configured hearing range.",
+      "intentExamples": [
+        "enemy hears the player",
+        "guard hears a noise",
+        "sound detection"
+      ],
+      "parameters": [
+        "sourceRole",
+        "targetRole",
+        "hearingRange",
+        "loudnessThreshold"
+      ],
+      "inputs": [
+        "enable",
+        "disable"
+      ],
+      "outputs": [
+        "soundHeard",
+        "soundLost",
+        "hearingChanged"
+      ]
+    },
+    {
+      "id": "interaction",
+      "name": "Interaction",
+      "description": "Represents an interaction between an actor and a target object, actor, or system.",
+      "intentExamples": [
+        "interact with a lever",
+        "use the terminal",
+        "talk to an object"
+      ],
+      "parameters": [
+        "actorRole",
+        "targetRole",
+        "interactionName"
+      ],
+      "inputs": [
+        "interact"
+      ],
+      "outputs": [
+        "interacted"
+      ]
+    },
+    {
+      "id": "health",
+      "name": "Health",
+      "description": "Tracks current and maximum health, including damage, healing, depletion, and death-related semantics.",
+      "intentExamples": [
+        "enemy loses health",
+        "heal the player",
+        "die when health reaches zero"
+      ],
+      "parameters": [
+        "maxHealth",
+        "currentHealth",
+        "startsAtMax"
+      ],
+      "inputs": [
+        "applyDamage",
+        "applyHealing",
+        "setHealth"
+      ],
+      "outputs": [
+        "healthChanged",
+        "depleted",
+        "death"
+      ]
+    },
+    {
+      "id": "weapon_fire",
+      "name": "Weapon Fire",
+      "description": "Handles weapon firing intent and any related fire event or spawn request.",
+      "intentExamples": [
+        "fire the weapon",
+        "shoot",
+        "weapon attack"
+      ],
+      "parameters": [
+        "fireMode",
+        "projectileType",
+        "fireRate"
+      ],
+      "inputs": [
+        "fire"
+      ],
+      "outputs": [
+        "fired",
+        "projectileSpawnRequested"
+      ]
+    },
+    {
+      "id": "projectile_spawner",
+      "name": "Projectile Spawner",
+      "description": "Spawns configured projectiles or similar transient attack objects.",
+      "intentExamples": [
+        "spawn a projectile",
+        "launch a bullet",
+        "shoot a missile"
+      ],
+      "parameters": [
+        "projectilePrefab",
+        "spawnPointRole",
+        "launchSpeed"
+      ],
+      "inputs": [
+        "spawnProjectile"
+      ],
+      "outputs": [
+        "projectileSpawned"
+      ]
+    },
+    {
+      "id": "pickup",
+      "name": "Pickup",
+      "description": "Represents collection of a world item by a player or actor.",
+      "intentExamples": [
+        "pick up a gem",
+        "collect a coin",
+        "grab an item"
+      ],
+      "parameters": [
+        "pickupType",
+        "collectorRole",
+        "value"
+      ],
+      "inputs": [
+        "collect"
+      ],
+      "outputs": [
+        "collected"
+      ]
+    },
+    {
+      "id": "inventory",
+      "name": "Inventory",
+      "description": "Stores collected or owned items for an actor.",
+      "intentExamples": [
+        "inventory stores keys",
+        "add item to inventory",
+        "remove item from bag"
+      ],
+      "parameters": [
+        "capacity",
+        "ownerRole"
+      ],
+      "inputs": [
+        "addItem",
+        "removeItem",
+        "clear"
+      ],
+      "outputs": [
+        "inventoryChanged"
+      ]
+    },
+    {
+      "id": "ammo",
+      "name": "Ammo",
+      "description": "Tracks ammunition state and consumption for a weapon or actor.",
+      "intentExamples": [
+        "consume ammo",
+        "reload bullets",
+        "out of ammo"
+      ],
+      "parameters": [
+        "maxAmmo",
+        "currentAmmo"
+      ],
+      "inputs": [
+        "consumeAmmo",
+        "addAmmo",
+        "setAmmo"
+      ],
+      "outputs": [
+        "ammoChanged",
+        "empty"
+      ]
+    },
+    {
+      "id": "currency",
+      "name": "Currency",
+      "description": "Tracks a collectible or spendable currency value.",
+      "intentExamples": [
+        "collect coins",
+        "add money",
+        "spend gems"
+      ],
+      "parameters": [
+        "currencyType",
+        "currentAmount"
+      ],
+      "inputs": [
+        "addCurrency",
+        "removeCurrency",
+        "setCurrency"
+      ],
+      "outputs": [
+        "currencyChanged"
+      ]
+    },
+    {
+      "id": "quest_state",
+      "name": "Quest State",
+      "description": "Tracks the state and progress of a quest or objective chain.",
+      "intentExamples": [
+        "quest progresses",
+        "objective completed",
+        "quest fails"
+      ],
+      "parameters": [
+        "questId",
+        "state",
+        "progress"
+      ],
+      "inputs": [
+        "setState",
+        "advanceProgress",
+        "completeQuest",
+        "failQuest"
+      ],
+      "outputs": [
+        "questUpdated",
+        "questCompleted",
+        "questFailed"
+      ]
+    },
+    {
+      "id": "dialog",
+      "name": "Dialog",
+      "description": "Represents a dialogue or conversation sequence between actors.",
+      "intentExamples": [
+        "talk to npc",
+        "start conversation",
+        "show dialogue"
+      ],
+      "parameters": [
+        "speakerRole",
+        "listenerRole",
+        "conversationId"
+      ],
+      "inputs": [
+        "startDialog",
+        "advanceDialog",
+        "endDialog"
+      ],
+      "outputs": [
+        "dialogStarted",
+        "dialogAdvanced",
+        "dialogFinished"
+      ]
+    },
+    {
+      "id": "checkpoint",
+      "name": "Checkpoint",
+      "description": "Marks a save, respawn, or progress checkpoint in the world.",
+      "intentExamples": [
+        "activate checkpoint",
+        "save progress point",
+        "respawn checkpoint"
+      ],
+      "parameters": [
+        "checkpointId",
+        "respawnEnabled"
+      ],
+      "inputs": [
+        "activateCheckpoint"
+      ],
+      "outputs": [
+        "checkpointActivated"
+      ]
+    },
+    {
+      "id": "spawner",
+      "name": "Spawner",
+      "description": "Creates entities, waves, or objects according to configured spawn rules.",
+      "intentExamples": [
+        "spawn enemies",
+        "enemy wave spawner",
+        "spawn pickups"
+      ],
+      "parameters": [
+        "spawnType",
+        "spawnCount",
+        "spawnDelay",
+        "spawnTargetRole"
+      ],
+      "inputs": [
+        "spawn",
+        "stopSpawning",
+        "clearSpawned"
+      ],
+      "outputs": [
+        "spawned",
+        "waveCompleted"
+      ]
+    },
+    {
+      "id": "score",
+      "name": "Score",
+      "description": "Tracks player, team, or game score values.",
+      "intentExamples": [
+        "add score",
+        "increase points",
+        "update scoreboard"
+      ],
+      "parameters": [
+        "ownerRole",
+        "initialScore"
+      ],
+      "inputs": [
+        "addScore",
+        "setScore",
+        "resetScore"
+      ],
+      "outputs": [
+        "scoreChanged"
+      ]
+    },
+    {
+      "id": "enemy",
+      "name": "Enemy",
+      "description": "Represents enemy behavior semantics such as aggression, alertness, searching, and engagement.",
+      "intentExamples": [
+        "enemy becomes alerted",
+        "enemy searches last known position",
+        "enemy aggro"
+      ],
+      "parameters": [
+        "detectionStyle",
+        "aggressionRange",
+        "searchDuration",
+        "patrolEnabled"
+      ],
+      "inputs": [
+        "setAlerted",
+        "setAggro",
+        "search",
+        "resetEnemyState"
+      ],
+      "outputs": [
+        "alerted",
+        "aggroChanged",
+        "searchStarted",
+        "searchCompleted"
+      ]
+    },
+    {
+      "id": "vehicle_control",
+      "name": "Vehicle Control",
+      "description": "Handles movement and control semantics for a vehicle.",
+      "intentExamples": [
+        "drive the vehicle",
+        "vehicle accelerates",
+        "steer a car"
+      ],
+      "parameters": [
+        "vehicleType",
+        "maxSpeed",
+        "turnRate"
+      ],
+      "inputs": [
+        "accelerate",
+        "brake",
+        "steer",
+        "setThrottle"
+      ],
+      "outputs": [
+        "vehicleStateChanged"
+      ]
+    },
+    {
+      "id": "move_to_target",
+      "name": "Move To Target",
+      "description": "Moves an actor or object toward a target location or target actor.",
+      "intentExamples": [
+        "move to the player",
+        "go to a point",
+        "approach the target"
+      ],
+      "parameters": [
+        "targetRole",
+        "stoppingDistance",
+        "moveSpeed"
+      ],
+      "inputs": [
+        "moveToTarget",
+        "stopMoving"
+      ],
+      "outputs": [
+        "destinationReached",
+        "movementStopped"
+      ]
+    },
+    {
+      "id": "hide_behavior",
+      "name": "Hide Behavior",
+      "description": "Moves or switches an actor into a hidden or concealed state.",
+      "intentExamples": [
+        "hide from the player",
+        "go into hiding",
+        "become concealed"
+      ],
+      "parameters": [
+        "hideMode",
+        "hideTargetRole",
+        "hideDuration"
+      ],
+      "inputs": [
+        "hide",
+        "unhide"
+      ],
+      "outputs": [
+        "hidden",
+        "revealed"
+      ]
+    },
+    {
+      "id": "talk_to_npc",
+      "name": "Talk To NPC",
+      "description": "Executes an explicit talk interaction with an NPC target.",
+      "intentExamples": [
+        "talk to npc",
+        "speak with villager",
+        "start npc conversation"
+      ],
+      "parameters": [
+        "npcRole",
+        "conversationId"
+      ],
+      "inputs": [
+        "talk"
+      ],
+      "outputs": [
+        "conversationFinished"
+      ]
+    },
+    {
+      "id": "attack_target",
+      "name": "Attack Target",
+      "description": "Represents an attack action against a target actor or object.",
+      "intentExamples": [
+        "attack the player",
+        "enemy attacks target",
+        "melee attack"
+      ],
+      "parameters": [
+        "attackType",
+        "targetRole",
+        "attackRange",
+        "attackRate"
+      ],
+      "inputs": [
+        "attack"
+      ],
+      "outputs": [
+        "attackCompleted",
+        "attackFailed"
+      ]
+    },
+    {
+      "id": "play_animation",
+      "name": "Play Animation",
+      "description": "Plays a named animation on an actor or object.",
+      "intentExamples": [
+        "play attack animation",
+        "run animation",
+        "trigger idle animation"
+      ],
+      "parameters": [
+        "animationName",
+        "loop",
+        "layer"
+      ],
+      "inputs": [
+        "playAnimation",
+        "stopAnimation"
+      ],
+      "outputs": [
+        "animationFinished"
+      ]
+    },
+    {
+      "id": "patrol",
+      "name": "Patrol",
+      "description": "Patrols through a configured route or set of points.",
+      "intentExamples": [
+        "enemy patrols",
+        "guard walks route",
+        "move between patrol points"
+      ],
+      "parameters": [
+        "patrolRoute",
+        "loopRoute",
+        "patrolSpeed"
+      ],
+      "inputs": [
+        "startPatrol",
+        "stopPatrol"
+      ],
+      "outputs": [
+        "patrolStarted",
+        "patrolCompleted"
+      ]
+    },
+    {
+      "id": "flee",
+      "name": "Flee",
+      "description": "Moves an actor away from a threat source.",
+      "intentExamples": [
+        "run away from the player",
+        "flee danger",
+        "escape from enemy"
+      ],
+      "parameters": [
+        "threatRole",
+        "safeDistance",
+        "fleeSpeed"
+      ],
+      "inputs": [
+        "flee"
+      ],
+      "outputs": [
+        "fleeStarted",
+        "fleeCompleted"
+      ]
+    },
+    {
+      "id": "search_area",
+      "name": "Search Area",
+      "description": "Searches an area, target zone, or last known position until completion or interruption.",
+      "intentExamples": [
+        "search the room",
+        "look for the player",
+        "investigate last known position"
+      ],
+      "parameters": [
+        "searchRadius",
+        "searchDuration",
+        "searchTargetRole"
+      ],
+      "inputs": [
+        "startSearch",
+        "stopSearch"
+      ],
+      "outputs": [
+        "searchStarted",
+        "searchCompleted"
+      ]
+    },
+    {
+      "id": "open_behavior",
+      "name": "Open Behavior",
+      "description": "Opens a door, gate, chest, or other interactable object.",
+      "intentExamples": [
+        "open the door",
+        "unlock and open chest",
+        "gate opens"
+      ],
+      "parameters": [
+        "targetRole",
+        "requiresKey",
+        "openMode"
+      ],
+      "inputs": [
+        "open",
+        "close"
+      ],
+      "outputs": [
+        "opened",
+        "closed"
+      ]
+    },
+    {
+      "id": "inventory_has_item",
+      "name": "Inventory Has Item",
+      "description": "Checks whether an inventory contains a named item.",
+      "intentExamples": [
+        "if the player has a key",
+        "inventory contains gem",
+        "check for item in bag"
+      ],
+      "parameters": [
+        "itemName",
+        "ownerRole"
+      ],
+      "inputs": [
+        "checkHasItem"
+      ],
+      "outputs": [
+        "hasItem",
+        "missingItem"
+      ]
+    },
+    {
+      "id": "sound_event",
+      "name": "Sound Event",
+      "description": "Triggers a sound cue or audio event.",
+      "intentExamples": [
+        "play a sound",
+        "play pickup audio",
+        "trigger music cue"
+      ],
+      "parameters": [
+        "soundId",
+        "volume",
+        "loop"
+      ],
+      "inputs": [
+        "playSound",
+        "stopSound"
+      ],
+      "outputs": [
+        "soundPlayed",
+        "soundStopped"
+      ]
+    }
+  ]
+}
