@@ -379,7 +379,6 @@ public partial class ModuleExporter
 			return;
 		}
 
-		_modulePropertiesScroll = EditorGUILayout.BeginScrollView(_modulePropertiesScroll, GUILayout.Height(110f));
 		for (int i = 0; i < moduleProperties.Count; i++)
 		{
 			Property prop = moduleProperties[i];
@@ -426,7 +425,6 @@ public partial class ModuleExporter
 
 			EditorGUILayout.EndHorizontal();
 		}
-		EditorGUILayout.EndScrollView();
 		EditorGUILayout.EndVertical();
 	}
 
@@ -1041,13 +1039,13 @@ public partial class ModuleExporter
 			case "roles":
 				if (GUILayout.Button(GetRolesButtonLabel(prop.data)))
 				{
-					prop.data = RolePropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentNames());
+					prop.data = RolePropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentQualifiedNames());
 				}
 				break;
 			case "avatar":
 				if (GUILayout.Button(GetAvatarButtonLabel(prop.data)))
 				{
-					prop.data = AvatarPropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentNames());
+					prop.data = AvatarPropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentQualifiedNames());
 				}
 				break;
 			case "enum":
@@ -1079,13 +1077,13 @@ public partial class ModuleExporter
 			case "roles":
 				if (GUILayout.Button(GetRolesButtonLabel(prop.data), GUILayout.Width(width)))
 				{
-					prop.data = RolePropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentNames());
+					prop.data = RolePropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentQualifiedNames());
 				}
 				break;
 			case "avatar":
 				if (GUILayout.Button(GetAvatarButtonLabel(prop.data), GUILayout.Width(width)))
 				{
-					prop.data = AvatarPropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentNames());
+					prop.data = AvatarPropertyEditor.OpenWindow(prop.data, GetAvailableCapabilityComponentQualifiedNames());
 				}
 				break;
 			case "enum":
@@ -1297,6 +1295,31 @@ public partial class ModuleExporter
 		moduleCapabilities.unity ??= new CapabilityUnityInfo();
 		return GetSelectedCapabilityComponents()
 			.Select(component => !string.IsNullOrWhiteSpace(component.typeName) ? GetLeafTypeName(component.typeName) : component.componentId)
+			.Where(name => !string.IsNullOrWhiteSpace(name))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	private List<string> GetAvailableCapabilityComponentQualifiedNames()
+	{
+		List<string> v2QualifiedNames = (capabilityComponentsV2 ?? new List<CapabilityComponentEntryV2>())
+			.Where(component => component != null)
+			.Select(component => !string.IsNullOrWhiteSpace(component.typeName) ? component.typeName : component.id)
+			.Where(name => !string.IsNullOrWhiteSpace(name))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+
+		if (v2QualifiedNames.Count > 0)
+		{
+			return v2QualifiedNames;
+		}
+
+		moduleCapabilities ??= new CapabilityManifest();
+		moduleCapabilities.unity ??= new CapabilityUnityInfo();
+		return GetSelectedCapabilityComponents()
+			.Select(component => !string.IsNullOrWhiteSpace(component.typeName) ? component.typeName : component.componentId)
 			.Where(name => !string.IsNullOrWhiteSpace(name))
 			.Distinct(StringComparer.OrdinalIgnoreCase)
 			.OrderBy(name => name, StringComparer.OrdinalIgnoreCase)

@@ -85,29 +85,31 @@ public class AvatarPropertyEditor : EditorWindow
 		GUILayout.Space(8f);
 		EditorGUILayout.LabelField("Avatar Components", EditorStyles.boldLabel);
 		GUILayout.Space(8f);
-
+		componentsScroll = EditorGUILayout.BeginScrollView(componentsScroll, GUILayout.ExpandHeight(true), GUILayout.MinHeight(220f));
 		if (availableComponents.Count == 0)
 		{
 			EditorGUILayout.HelpBox("No capability components are available yet. Add components in the Caps tab first.", MessageType.Info);
 		}
 		else
 		{
-			componentsScroll = EditorGUILayout.BeginScrollView(componentsScroll, GUILayout.ExpandHeight(true), GUILayout.MinHeight(220f));
 			foreach (string componentName in availableComponents)
 			{
-				bool selected = selectedComponents.Contains(componentName);
-				bool nextSelected = EditorGUILayout.ToggleLeft(componentName, selected);
+				string displayName = GetComponentDisplayName(componentName);
+				bool selected = selectedComponents.Contains(componentName) || selectedComponents.Contains(displayName);
+				bool nextSelected = EditorGUILayout.ToggleLeft(displayName, selected);
 				if (nextSelected)
 				{
 					selectedComponents.Add(componentName);
+					selectedComponents.Remove(displayName);
 				}
 				else
 				{
 					selectedComponents.Remove(componentName);
+					selectedComponents.Remove(displayName);
 				}
 			}
-			EditorGUILayout.EndScrollView();
 		}
+		EditorGUILayout.EndScrollView();
 
 		GUILayout.FlexibleSpace();
 		GUILayout.Space(16f);
@@ -122,5 +124,18 @@ public class AvatarPropertyEditor : EditorWindow
 		}
 
 		EditorGUILayout.EndVertical();
+	}
+
+	private static string GetComponentDisplayName(string componentName)
+	{
+		if (string.IsNullOrWhiteSpace(componentName))
+		{
+			return "";
+		}
+
+		int lastDot = componentName.LastIndexOf('.');
+		return lastDot >= 0 && lastDot < componentName.Length - 1
+			? componentName.Substring(lastDot + 1)
+			: componentName;
 	}
 }

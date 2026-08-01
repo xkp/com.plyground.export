@@ -190,20 +190,36 @@ public class RolePropertyEditor : EditorWindow
 			{
 				foreach (string componentName in availableComponents)
 				{
-					bool selected = role.components.Contains(componentName);
-					bool nextSelected = EditorGUILayout.ToggleLeft(componentName, selected);
+					string displayName = GetComponentDisplayName(componentName);
+					bool selected = role.components.Contains(componentName) || role.components.Contains(displayName);
+					bool nextSelected = EditorGUILayout.ToggleLeft(displayName, selected);
 					if (nextSelected)
 					{
 						role.components.Add(componentName);
+						role.components.Remove(displayName);
 					}
 					else
 					{
 						role.components.Remove(componentName);
+						role.components.Remove(displayName);
 					}
 				}
 			}
 		}
 
 		EditorGUILayout.EndVertical();
+	}
+
+	private static string GetComponentDisplayName(string componentName)
+	{
+		if (string.IsNullOrWhiteSpace(componentName))
+		{
+			return "";
+		}
+
+		int lastDot = componentName.LastIndexOf('.');
+		return lastDot >= 0 && lastDot < componentName.Length - 1
+			? componentName.Substring(lastDot + 1)
+			: componentName;
 	}
 }

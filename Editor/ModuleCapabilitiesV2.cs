@@ -43,6 +43,7 @@ public partial class ModuleExporter
 		public string name = "";
 		public string displayName = "";
 		public string type = "";
+		public List<string> enumValues = new List<string>();
 		public string description = "";
 		public bool writable;
 		public bool userEditable = true;
@@ -397,6 +398,7 @@ public partial class ModuleExporter
 
 			selectedProperty.displayName = EditorGUILayout.TextField("Display Name", selectedProperty.displayName);
 			selectedProperty.type = EditorGUILayout.TextField("Type", selectedProperty.type);
+			DrawStringListEditor("Enum Values", selectedProperty.enumValues);
 			selectedProperty.description = EditorGUILayout.TextField("Description", selectedProperty.description);
 			selectedProperty.writable = EditorGUILayout.Toggle("Writable", selectedProperty.writable);
 			selectedProperty.userEditable = EditorGUILayout.Toggle("User Editable", selectedProperty.userEditable);
@@ -794,7 +796,13 @@ public partial class ModuleExporter
 			.ToList();
 		List<string> selectedScripts = new List<string>(existingSelection);
 		CSharpScriptSelectorWindow.OpenWindow(selectedScripts);
-		ProcessSelectedCapabilitySourceFilesV2(selectedScripts);
+		List<string> mergedSelection = existingSelection
+			.Concat(selectedScripts ?? new List<string>())
+			.Where(path => !string.IsNullOrWhiteSpace(path))
+			.Distinct(StringComparer.OrdinalIgnoreCase)
+			.OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		ProcessSelectedCapabilitySourceFilesV2(mergedSelection);
 	}
 
 	private void OpenCapabilitiesV2SourceSelector()
@@ -919,6 +927,11 @@ public partial class ModuleExporter
 				name = parameter.name ?? "",
 				displayName = parameter.name ?? "",
 				type = parameter.type ?? "",
+				enumValues = (parameter.enumValues ?? new List<string>())
+					.Where(value => !string.IsNullOrWhiteSpace(value))
+					.Distinct(StringComparer.OrdinalIgnoreCase)
+					.OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+					.ToList(),
 				description = NormalizeImportedDescriptionV2(parameter.description),
 				writable = parameter.required,
 				userEditable = parameter.userEditable,
