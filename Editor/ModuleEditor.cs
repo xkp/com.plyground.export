@@ -83,6 +83,7 @@ using System;
 		// For manual properties, we generate a unique key.
 		public List<Property> properties = new List<Property>();
 		public List<string> components = new List<string>();
+		public PrefabNodeSnapshot prefabStructure;
 
 		public Vector3 pivotOffset = Vector3.zero;
 		public Vector3 exportTranslation = Vector3.zero;
@@ -105,6 +106,13 @@ using System;
 	{
 		public string id;
 		public string url;
+	}
+
+	[System.Serializable]
+	public class PrefabNodeSnapshot
+	{
+		public string name = "";
+		public List<PrefabNodeSnapshot> children = new List<PrefabNodeSnapshot>();
 	}
 
 	[System.Serializable]
@@ -282,6 +290,7 @@ using System;
 					item.prefab = AssetDatabase.LoadAssetAtPath<GameObject>(item.prefabPath);
 					item.icon = exportedItem.icon;
 					item.modelPath = exportedItem.icon3d;
+					item.prefabStructure = ClonePrefabNodeSnapshot(exportedItem.prefabStructure);
 					item.pivotOffset = exportedItem.pivotOffset;
 					item.exportTranslation = exportedItem.exportTranslation;
 					item.exportRotation = exportedItem.exportRotation;
@@ -308,6 +317,10 @@ using System;
 					if ((item.components == null || item.components.Count == 0) && item.prefab != null)
 					{
 						item.components = InferItemComponents(item);
+					}
+					if (item.prefabStructure == null && item.prefab != null)
+					{
+						item.prefabStructure = BuildPrefabStructureIfNested(item.prefab);
 					}
 					group.items.Add(item);
 				}
@@ -484,6 +497,9 @@ using System;
 				ei.prefab = item.prefabPath;
 				ei.icon = item.icon;
 				ei.icon3d = item.modelPath;
+				ei.prefabStructure = item.prefab != null
+					? BuildPrefabStructureIfNested(item.prefab)
+					: ClonePrefabNodeSnapshot(item.prefabStructure);
 				ei.pivotOffset = item.pivotOffset;
 				ei.exportTranslation = item.exportTranslation;
 				ei.exportRotation = item.exportRotation;
@@ -527,6 +543,11 @@ using System;
 		//AskForExportFolder();
 		string moduleFolder = GetModuleFolder();
 		Directory.CreateDirectory(moduleFolder);
+		ClearModuleExportFolder(moduleFolder, new[]
+		{
+			Path.Combine("Assets", "Thumbnails"),
+			Path.Combine("Assets", "Models")
+		});
 
 /*		//Copy custom assets into 
 		DirectoryCopy(GetAssetModuleFolder(), moduleFolder, true);
@@ -627,6 +648,101 @@ using System;
 		Debug.Log("Created zip file: " + zipFilePath);
 
 		EditorUtility.RevealInFinder(zipFilePath);
+	}
+
+	private void ClearModuleExportFolder(string moduleFolder, IEnumerable<string> preservedRelativeDirectories)
+	{
+		if (string.IsNullOrWhiteSpace(moduleFolder) || !Directory.Exists(moduleFolder))
+		{
+			return;
+		}
+
+		string normalizedModuleFolder = Path.GetFullPath(moduleFolder)
+			.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+		string normalizedExportPath = Path.GetFullPath(GetModuleFolder())
+			.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+		if (!string.Equals(normalizedModuleFolder, normalizedExportPath, StringComparison.OrdinalIgnoreCase))
+		{
+			Debug.LogWarning("Skipped export folder cleanup because the resolved module path did not match the active export target.");
+			return;
+		}
+
+		HashSet<string> preservedDirectories = new HashSet<string>(
+			(preservedRelativeDirectories ?? Enumerable.Empty<string>())
+				.Where(path => !string.IsNullOrWhiteSpace(path))
+				.Select(NormalizeExportRelativePath),
+			StringComparer.OrdinalIgnoreCase);
+
+		ClearDirectoryContents(moduleFolder, normalizedModuleFolder, preservedDirectories);
+	}
+
+	private void ClearDirectoryContents(string currentDirectory, string moduleFolder, HashSet<string> preservedDirectories)
+	{
+		foreach (string filePath in Directory.GetFiles(currentDirectory))
+		{
+			string relativePath = GetExportRelativePath(moduleFolder, filePath);
+			if (IsPreservedExportPath(relativePath, preservedDirectories))
+			{
+				continue;
+			}
+
+			File.Delete(filePath);
+		}
+
+		foreach (string directoryPath in Directory.GetDirectories(currentDirectory))
+		{
+			string relativePath = GetExportRelativePath(moduleFolder, directoryPath);
+			if (IsPreservedExportPath(relativePath, preservedDirectories))
+			{
+				ClearDirectoryContents(directoryPath, moduleFolder, preservedDirectories);
+				continue;
+			}
+
+			Directory.Delete(directoryPath, true);
+		}
+	}
+
+	private bool IsPreservedExportPath(string relativePath, HashSet<string> preservedDirectories)
+	{
+		string normalized = NormalizeExportRelativePath(relativePath);
+		if (string.IsNullOrWhiteSpace(normalized))
+		{
+			return false;
+		}
+
+		foreach (string preservedDirectory in preservedDirectories ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase))
+		{
+			if (string.Equals(normalized, preservedDirectory, StringComparison.OrdinalIgnoreCase) ||
+				normalized.StartsWith(preservedDirectory + "/", StringComparison.OrdinalIgnoreCase))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private string GetExportRelativePath(string rootDirectory, string fullPath)
+	{
+		string normalizedRoot = Path.GetFullPath(rootDirectory)
+			.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+		string normalizedPath = Path.GetFullPath(fullPath)
+			.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+		if (!normalizedPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase))
+		{
+			return string.Empty;
+		}
+
+		string relativePath = normalizedPath.Substring(normalizedRoot.Length)
+			.TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+		return NormalizeExportRelativePath(relativePath);
+	}
+
+	private string NormalizeExportRelativePath(string relativePath)
+	{
+		return string.IsNullOrWhiteSpace(relativePath)
+			? string.Empty
+			: relativePath.Replace(Path.DirectorySeparatorChar, '/').Replace(Path.AltDirectorySeparatorChar, '/').Trim('/');
 	}
 
 	private static void MakeMeshRW(Mesh mesh, HashSet<Mesh> processed)
@@ -1025,6 +1141,7 @@ using System;
 		public string prefab;
 		public string icon;
 		public string icon3d;
+		public PrefabNodeSnapshot prefabStructure;
 		public List<ExportedProperty> properties;
 		public List<string> components;
 		public Vector3 pivotOffset = Vector3.zero;
@@ -1053,6 +1170,7 @@ using System;
 		newItem.modelPath = allowedCustomItemIcon3dValues[0];
 		newItem.properties = new List<Property>();
 		newItem.components = new List<string>();
+		newItem.prefabStructure = null;
 		newItem.pivotOffset = Vector3.zero;
 		newItem.exportTranslation = Vector3.zero;
 		newItem.exportRotation = Vector3.zero;
@@ -1110,6 +1228,7 @@ using System;
 			prefabPath = assetPath,
 			properties = new List<Property>(),
 			components = InferItemComponents(prefab),
+			prefabStructure = BuildPrefabStructureIfNested(prefab),
 			pivotOffset = Vector3.zero,
 			exportTranslation = Vector3.zero,
 			exportRotation = Vector3.zero,
@@ -1127,6 +1246,8 @@ using System;
 			{
 				if (item.prefab != null)
 				{
+					item.prefabStructure = BuildPrefabStructureIfNested(item.prefab);
+
 					if (string.IsNullOrEmpty(item.icon) || !File.Exists(Path.Combine(modulePath, item.icon)))
 					{
 						GenerateThumbnail(item);
@@ -1151,6 +1272,8 @@ using System;
 			{
 				if (item.prefab != null)
 				{
+					item.prefabStructure = BuildPrefabStructureIfNested(item.prefab);
+
 					if (string.IsNullOrEmpty(item.icon) || !File.Exists(Path.Combine(modulePath, item.icon)))
 					{
 						GenerateThumbnail(item);
@@ -1163,6 +1286,58 @@ using System;
 				}
 			}
 		}
+	}
+
+	private PrefabNodeSnapshot BuildPrefabNodeSnapshot(Transform node, string parentPath)
+	{
+		if (node == null)
+		{
+			return null;
+		}
+
+		PrefabNodeSnapshot snapshot = new PrefabNodeSnapshot
+		{
+			name = node.name ?? "",
+			children = new List<PrefabNodeSnapshot>()
+		};
+
+		for (int childIndex = 0; childIndex < node.childCount; childIndex++)
+		{
+			PrefabNodeSnapshot childSnapshot = BuildPrefabNodeSnapshot(node.GetChild(childIndex), string.Empty);
+			if (childSnapshot != null)
+			{
+				snapshot.children.Add(childSnapshot);
+			}
+		}
+
+		return snapshot;
+	}
+
+	private PrefabNodeSnapshot BuildPrefabStructureIfNested(GameObject prefab)
+	{
+		if (prefab == null || prefab.transform == null || prefab.transform.childCount == 0)
+		{
+			return null;
+		}
+
+		return BuildPrefabNodeSnapshot(prefab.transform, string.Empty);
+	}
+
+	private PrefabNodeSnapshot ClonePrefabNodeSnapshot(PrefabNodeSnapshot source)
+	{
+		if (source == null)
+		{
+			return null;
+		}
+
+		return new PrefabNodeSnapshot
+		{
+			name = source.name ?? "",
+			children = (source.children ?? new List<PrefabNodeSnapshot>())
+				.Select(ClonePrefabNodeSnapshot)
+				.Where(child => child != null)
+				.ToList()
+		};
 	}
 
 	private void GenerateExportThumbnail(Item item)
