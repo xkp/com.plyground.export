@@ -48,6 +48,7 @@ public partial class ModuleExporter
 		public bool writable;
 		public bool userEditable = true;
 		public string defaultValue = "";
+		public List<CapabilityPropertyEntryV2> children = new List<CapabilityPropertyEntryV2>();
 	}
 
 	[Serializable]
@@ -72,6 +73,12 @@ public partial class ModuleExporter
 		public string declaringType = "";
 		public string description = "";
 		public bool allowedForCodegen = true;
+	}
+
+	private class CapabilityPropertyTreeEntryV2
+	{
+		public CapabilityPropertyEntryV2 property;
+		public int depth;
 	}
 
 	[Serializable]
@@ -348,29 +355,33 @@ public partial class ModuleExporter
 	private void DrawCapabilityPropertyInspectorV2(CapabilityComponentEntryV2 entry)
 	{
 		EditorGUILayout.BeginHorizontal();
+		List<CapabilityPropertyTreeEntryV2> propertyEntries = BuildCapabilityPropertyTreeEntriesV2(entry.properties);
 
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(240f, position.width * 0.28f)), GUILayout.ExpandHeight(true));
 		GUILayout.Label("Properties", EditorStyles.boldLabel);
 		capabilityPropertyListScrollV2 = EditorGUILayout.BeginScrollView(capabilityPropertyListScrollV2, GUILayout.ExpandHeight(true));
-		if (entry.properties.Count > 0)
+		if (propertyEntries.Count > 0)
 		{
 			EditorGUILayout.BeginHorizontal();
-			selectedCapabilityPropertyIndexV2 = Mathf.Clamp(selectedCapabilityPropertyIndexV2 < 0 ? 0 : selectedCapabilityPropertyIndexV2, 0, entry.properties.Count - 1);
+			selectedCapabilityPropertyIndexV2 = Mathf.Clamp(selectedCapabilityPropertyIndexV2 < 0 ? 0 : selectedCapabilityPropertyIndexV2, 0, propertyEntries.Count - 1);
 			EditorGUILayout.EndHorizontal();
-			for (int i = 0; i < entry.properties.Count; i++)
+			for (int i = 0; i < propertyEntries.Count; i++)
 			{
-				CapabilityPropertyEntryV2 property = entry.properties[i];
+				CapabilityPropertyTreeEntryV2 treeEntry = propertyEntries[i];
+				CapabilityPropertyEntryV2 property = treeEntry.property;
 				EditorGUILayout.BeginHorizontal();
-				if (DrawSelectableListButton(GetCapabilityPropertyLabelV2(property), selectedCapabilityPropertyIndexV2 == i, GUILayout.Height(28f)))
+				string label = new string(' ', treeEntry.depth * 2) + GetCapabilityPropertyLabelV2(property);
+				if (DrawSelectableListButton(label, selectedCapabilityPropertyIndexV2 == i, GUILayout.Height(28f)))
 				{
 					selectedCapabilityPropertyIndexV2 = i;
 				}
 
 				if (GUILayout.Button("X", GUILayout.Width(28f), GUILayout.Height(28f)))
 				{
-					entry.properties.RemoveAt(i);
-					selectedCapabilityPropertyIndexV2 = Mathf.Clamp(selectedCapabilityPropertyIndexV2, 0, entry.properties.Count - 1);
-					if (entry.properties.Count == 0)
+					RemoveCapabilityPropertyEntryV2(entry.properties, property);
+					propertyEntries = BuildCapabilityPropertyTreeEntriesV2(entry.properties);
+					selectedCapabilityPropertyIndexV2 = Mathf.Clamp(selectedCapabilityPropertyIndexV2, 0, propertyEntries.Count - 1);
+					if (propertyEntries.Count == 0)
 					{
 						selectedCapabilityPropertyIndexV2 = -1;
 					}
@@ -386,8 +397,8 @@ public partial class ModuleExporter
 
 		EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
 		capabilityPropertyEditorScrollV2 = EditorGUILayout.BeginScrollView(capabilityPropertyEditorScrollV2, GUILayout.ExpandHeight(true));
-		CapabilityPropertyEntryV2 selectedProperty = selectedCapabilityPropertyIndexV2 >= 0 && selectedCapabilityPropertyIndexV2 < entry.properties.Count
-			? entry.properties[selectedCapabilityPropertyIndexV2]
+		CapabilityPropertyEntryV2 selectedProperty = selectedCapabilityPropertyIndexV2 >= 0 && selectedCapabilityPropertyIndexV2 < propertyEntries.Count
+			? propertyEntries[selectedCapabilityPropertyIndexV2].property
 			: null;
 		if (selectedProperty != null)
 		{
@@ -403,11 +414,64 @@ public partial class ModuleExporter
 			selectedProperty.writable = EditorGUILayout.Toggle("Writable", selectedProperty.writable);
 			selectedProperty.userEditable = EditorGUILayout.Toggle("User Editable", selectedProperty.userEditable);
 			selectedProperty.defaultValue = EditorGUILayout.TextField("Default", selectedProperty.defaultValue);
+			if (selectedProperty.children != null && selectedProperty.children.Count > 0)
+			{
+				EditorGUILayout.LabelField("Nested Properties", selectedProperty.children.Count.ToString());
+			}
 		}
 		EditorGUILayout.EndScrollView();
 		EditorGUILayout.EndVertical();
 
 		EditorGUILayout.EndHorizontal();
+	}
+
+	private List<CapabilityPropertyTreeEntryV2> BuildCapabilityPropertyTreeEntriesV2(List<CapabilityPropertyEntryV2> properties)
+	{
+		List<CapabilityPropertyTreeEntryV2> entries = new List<CapabilityPropertyTreeEntryV2>();
+		AppendCapabilityPropertyTreeEntriesV2(entries, properties, 0);
+		return entries;
+	}
+
+	private void AppendCapabilityPropertyTreeEntriesV2(List<CapabilityPropertyTreeEntryV2> entries, List<CapabilityPropertyEntryV2> properties, int depth)
+	{
+		foreach (CapabilityPropertyEntryV2 property in properties ?? new List<CapabilityPropertyEntryV2>())
+		{
+			if (property == null)
+			{
+				continue;
+			}
+
+			entries.Add(new CapabilityPropertyTreeEntryV2
+			{
+				property = property,
+				depth = depth
+			});
+
+			AppendCapabilityPropertyTreeEntriesV2(entries, property.children, depth + 1);
+		}
+	}
+
+	private bool RemoveCapabilityPropertyEntryV2(List<CapabilityPropertyEntryV2> properties, CapabilityPropertyEntryV2 target)
+	{
+		if (properties == null || target == null)
+		{
+			return false;
+		}
+
+		if (properties.Remove(target))
+		{
+			return true;
+		}
+
+		foreach (CapabilityPropertyEntryV2 property in properties)
+		{
+			if (property != null && RemoveCapabilityPropertyEntryV2(property.children, target))
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private void DrawCapabilityMethodInspectorV2(CapabilityComponentEntryV2 entry)
@@ -1026,23 +1090,33 @@ public partial class ModuleExporter
 	{
 		return (parameters ?? new List<CapabilityParameterInfo>())
 			.Where(parameter => parameter != null)
-			.Select(parameter => new CapabilityPropertyEntryV2
-			{
-				name = parameter.name ?? "",
-				displayName = parameter.name ?? "",
-				type = parameter.type ?? "",
-				enumValues = (parameter.enumValues ?? new List<string>())
-					.Where(value => !string.IsNullOrWhiteSpace(value))
-					.Distinct(StringComparer.OrdinalIgnoreCase)
-					.OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
-					.ToList(),
-				description = NormalizeImportedDescriptionV2(parameter.description),
-				writable = parameter.required,
-				userEditable = parameter.userEditable,
-				defaultValue = parameter.@default ?? ""
-			})
+			.Select(BuildCapabilityPropertyEntryV2)
 			.OrderBy(parameter => parameter.name, StringComparer.OrdinalIgnoreCase)
 			.ToList();
+	}
+
+	private CapabilityPropertyEntryV2 BuildCapabilityPropertyEntryV2(CapabilityParameterInfo parameter)
+	{
+		return new CapabilityPropertyEntryV2
+		{
+			name = parameter.name ?? "",
+			displayName = parameter.name ?? "",
+			type = parameter.type ?? "",
+			enumValues = (parameter.enumValues ?? new List<string>())
+				.Where(value => !string.IsNullOrWhiteSpace(value))
+				.Distinct(StringComparer.OrdinalIgnoreCase)
+				.OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+				.ToList(),
+			description = NormalizeImportedDescriptionV2(parameter.description),
+			writable = parameter.required,
+			userEditable = parameter.userEditable,
+			defaultValue = parameter.@default ?? "",
+			children = (parameter.children ?? new List<CapabilityParameterInfo>())
+				.Where(child => child != null)
+				.Select(BuildCapabilityPropertyEntryV2)
+				.OrderBy(child => child.name, StringComparer.OrdinalIgnoreCase)
+				.ToList()
+		};
 	}
 
 	private List<CapabilityMethodEntryV2> BuildCapabilityMethodEntriesV2(List<CapabilityMethodInfo> methods)
