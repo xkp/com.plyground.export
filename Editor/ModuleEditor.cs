@@ -99,6 +99,7 @@ using System;
 		public string data;
 		public string value;
 		public string audience;
+		public List<Property> children = new List<Property>();
 	}
 
 	[System.Serializable]
@@ -308,7 +309,9 @@ using System;
 								name = ep.name,
 								type = ep.type,
 								data = ep.data,
-								audience = NormalizePropertyAudience(ep.audience)
+								value = ep.value,
+								audience = NormalizePropertyAudience(ep.audience),
+								children = CloneImportedProperties(ep.children)
 							});
 						}
 					}
@@ -1054,8 +1057,50 @@ using System;
 		ep.name = prop.name;
 		ep.type = prop.type;
 		ep.data = prop.data;
+		ep.value = prop.value;
 		ep.audience = NormalizePropertyAudience(prop.audience);
+		ep.children = CopyProperties(prop.children);
 		return ep;
+	}
+
+	private List<Property> CloneImportedProperties(List<ExportedProperty> properties)
+	{
+		List<Property> cloned = new List<Property>();
+		foreach (ExportedProperty property in properties ?? new List<ExportedProperty>())
+		{
+			if (property == null)
+			{
+				continue;
+			}
+
+			cloned.Add(new Property
+			{
+				name = property.name,
+				type = property.type,
+				data = property.data,
+				value = property.value,
+				audience = NormalizePropertyAudience(property.audience),
+				children = CloneImportedProperties(property.children)
+			});
+		}
+
+		return cloned;
+	}
+
+	private List<ExportedProperty> CopyProperties(List<Property> properties)
+	{
+		List<ExportedProperty> exported = new List<ExportedProperty>();
+		foreach (Property property in properties ?? new List<Property>())
+		{
+			if (property == null)
+			{
+				continue;
+			}
+
+			exported.Add(CopyProperty(property));
+		}
+
+		return exported;
 	}
 
 	protected string NormalizePropertyAudience(string audience)
@@ -1156,7 +1201,9 @@ using System;
 		public string name;
 		public string type;
 		public string data;
+		public string value;
 		public string audience;
+		public List<ExportedProperty> children = new List<ExportedProperty>();
 	}
 
 	private void CreateCustomItem(ItemGroup group)
@@ -2173,10 +2220,13 @@ public class ComponentPropertiesPopup : EditorWindow
 {
 	private ModuleExporter.Item selectedItem;
 	private Vector2 scrollPos;
-	// A list of available fields to add. Each entry contains the component, its field, and a key string.
-	private List<(MonoBehaviour comp, FieldInfo field, string key)> availableFields = new List<(MonoBehaviour, FieldInfo, string)>();
-	// Allowed types.
-	private readonly string[] allowedTypes = new string[] { "string", "int", "float", "bool", "object" };
+	private List<ComponentPropertyCandidate> availableProperties = new List<ComponentPropertyCandidate>();
+
+	private class ComponentPropertyCandidate
+	{
+		public string key;
+		public ModuleExporter.Property property;
+	}
 
 	public static void ShowPopup(ModuleExporter.Item item)
 	{
@@ -2190,40 +2240,249 @@ public class ComponentPropertiesPopup : EditorWindow
 
 	private void PopulateAvailableFields()
 	{
-		availableFields.Clear();
+		availableProperties.Clear();
 		if (selectedItem.prefab == null)
+		{
 			return;
+		}
 
 		MonoBehaviour[] comps = selectedItem.prefab.GetComponents<MonoBehaviour>();
-		foreach (var comp in comps)
+		foreach (MonoBehaviour comp in comps)
 		{
-			if (comp == null) continue;
-			FieldInfo[] allFields = comp.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public);
-			foreach (var field in allFields)
+			if (comp == null)
 			{
-				// Skip Unity internal fields.
-				if (field.DeclaringType == typeof(MonoBehaviour) ||
-					(field.DeclaringType.Namespace != null && field.DeclaringType.Namespace.StartsWith("UnityEngine")))
-					continue;
-				// Only allow simple types.
-				if (!IsSimpleType(field.FieldType))
-					continue;
-				string key = comp.GetType().Name + "." + field.Name;
-				if (selectedItem.properties == null || !selectedItem.properties.Any(p => p.name == key))
+				continue;
+			}
+
+			Type componentType = comp.GetType();
+			foreach (MemberInfo member in GetSerializableMembers(componentType))
+			{
+				ModuleExporter.Property property = BuildPropertyTree(comp, member, componentType.Name + "." + member.Name, new HashSet<Type>());
+				if (property == null || ContainsPropertyPath(selectedItem.properties, property.name))
 				{
-					availableFields.Add((comp, field, key));
+					continue;
 				}
+
+				availableProperties.Add(new ComponentPropertyCandidate
+				{
+					key = property.name,
+					property = property
+				});
 			}
 		}
 	}
 
-	private bool IsSimpleType(System.Type type)
+	private IEnumerable<MemberInfo> GetSerializableMembers(Type type)
 	{
+		const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public;
+
+		foreach (FieldInfo field in type.GetFields(flags))
+		{
+			if (!IsEligibleField(field))
+			{
+				continue;
+			}
+
+			yield return field;
+		}
+
+		foreach (PropertyInfo property in type.GetProperties(flags))
+		{
+			if (!IsEligibleProperty(property))
+			{
+				continue;
+			}
+
+			yield return property;
+		}
+	}
+
+	private bool IsEligibleField(FieldInfo field)
+	{
+		if (field == null || field.IsStatic || field.IsNotSerialized)
+		{
+			return false;
+		}
+
+		if (field.DeclaringType == typeof(MonoBehaviour))
+		{
+			return false;
+		}
+
+		string namespaceName = field.DeclaringType != null ? field.DeclaringType.Namespace : null;
+		if (!string.IsNullOrWhiteSpace(namespaceName) && namespaceName.StartsWith("UnityEngine", StringComparison.Ordinal))
+		{
+			return false;
+		}
+
+		return IsSupportedMemberType(field.FieldType);
+	}
+
+	private bool IsEligibleProperty(PropertyInfo property)
+	{
+		if (property == null || !property.CanRead || !property.CanWrite || property.GetIndexParameters().Length > 0)
+		{
+			return false;
+		}
+
+		MethodInfo getter = property.GetGetMethod();
+		MethodInfo setter = property.GetSetMethod();
+		if (getter == null || setter == null || getter.IsStatic || setter.IsStatic)
+		{
+			return false;
+		}
+
+		string namespaceName = property.DeclaringType != null ? property.DeclaringType.Namespace : null;
+		if (!string.IsNullOrWhiteSpace(namespaceName) && namespaceName.StartsWith("UnityEngine", StringComparison.Ordinal))
+		{
+			return false;
+		}
+
+		return IsSupportedMemberType(property.PropertyType);
+	}
+
+	private ModuleExporter.Property BuildPropertyTree(object owner, MemberInfo member, string path, HashSet<Type> typeStack)
+	{
+		Type memberType = GetMemberType(member);
+		if (memberType == null)
+		{
+			return null;
+		}
+
+		ModuleExporter.Property property = new ModuleExporter.Property
+		{
+			name = path,
+			type = ModuleExporter.TranslateType(memberType),
+			audience = ModuleExporter.PropertyAudienceUser,
+			children = new List<ModuleExporter.Property>()
+		};
+
+		if (IsSimpleType(memberType))
+		{
+			object rawValue = GetMemberValue(owner, member);
+			property.value = rawValue != null ? rawValue.ToString() : "";
+			return property;
+		}
+
+		if (!IsComplexSerializableType(memberType) || typeStack.Contains(memberType))
+		{
+			return null;
+		}
+
+		typeStack.Add(memberType);
+		object childOwner = GetMemberValue(owner, member);
+		foreach (MemberInfo childMember in GetSerializableMembers(memberType))
+		{
+			ModuleExporter.Property childProperty = BuildPropertyTree(childOwner, childMember, path + "." + childMember.Name, typeStack);
+			if (childProperty != null)
+			{
+				property.children.Add(childProperty);
+			}
+		}
+		typeStack.Remove(memberType);
+
+		return property.children.Count > 0 ? property : null;
+	}
+
+	private static Type GetMemberType(MemberInfo member)
+	{
+		if (member is FieldInfo field)
+		{
+			return field.FieldType;
+		}
+
+		if (member is PropertyInfo property)
+		{
+			return property.PropertyType;
+		}
+
+		return null;
+	}
+
+	private static object GetMemberValue(object owner, MemberInfo member)
+	{
+		if (owner == null || member == null)
+		{
+			return null;
+		}
+
+		try
+		{
+			if (member is FieldInfo field)
+			{
+				return field.GetValue(owner);
+			}
+
+			if (member is PropertyInfo property)
+			{
+				return property.GetValue(owner, null);
+			}
+		}
+		catch
+		{
+		}
+
+		return null;
+	}
+
+	private bool IsSupportedMemberType(Type type)
+	{
+		return IsSimpleType(type) || IsComplexSerializableType(type);
+	}
+
+	private bool IsSimpleType(Type type)
+	{
+		if (type == null)
+		{
+			return false;
+		}
+
 		if (type.IsPrimitive || type == typeof(string) || type.IsEnum)
+		{
 			return true;
-		if (type == typeof(Vector2) || type == typeof(Vector3) ||
-			type == typeof(Vector4) || type == typeof(Color))
-			return true;
+		}
+
+		return type == typeof(Vector2) ||
+			type == typeof(Vector3) ||
+			type == typeof(Vector4) ||
+			type == typeof(Color);
+	}
+
+	private bool IsComplexSerializableType(Type type)
+	{
+		if (type == null || type.IsArray || typeof(System.Collections.IEnumerable).IsAssignableFrom(type) && type != typeof(string))
+		{
+			return false;
+		}
+
+		if (typeof(UnityEngine.Object).IsAssignableFrom(type))
+		{
+			return false;
+		}
+
+		return type.IsSerializable || type.IsDefined(typeof(SerializableAttribute), true);
+	}
+
+	private bool ContainsPropertyPath(List<ModuleExporter.Property> properties, string path)
+	{
+		foreach (ModuleExporter.Property property in properties ?? new List<ModuleExporter.Property>())
+		{
+			if (property == null)
+			{
+				continue;
+			}
+
+			if (string.Equals(property.name, path, StringComparison.Ordinal))
+			{
+				return true;
+			}
+
+			if (ContainsPropertyPath(property.children, path))
+			{
+				return true;
+			}
+		}
+
 		return false;
 	}
 
@@ -2241,27 +2500,22 @@ public class ComponentPropertiesPopup : EditorWindow
 
 		GUILayout.Label("Available Component Properties", EditorStyles.boldLabel);
 		scrollPos = EditorGUILayout.BeginScrollView(scrollPos);
-		if (availableFields.Count == 0)
+		if (availableProperties.Count == 0)
 		{
 			EditorGUILayout.HelpBox("No available properties to add.", MessageType.Info);
 		}
 		else
 		{
-			foreach (var entry in availableFields)
+			foreach (ComponentPropertyCandidate entry in availableProperties)
 			{
 				if (GUILayout.Button(entry.key))
 				{
-					object defaultVal = entry.field.GetValue(entry.comp);
 					if (selectedItem.properties == null)
-						selectedItem.properties = new List<ModuleExporter.Property>();
-
-					selectedItem.properties.Add(new ModuleExporter.Property
 					{
-						name = entry.field.Name,
-						type = ModuleExporter.TranslateType(entry.field.FieldType),
-						data = entry.comp.GetType().Name,
-						audience = ModuleExporter.PropertyAudienceUser,
-					});
+						selectedItem.properties = new List<ModuleExporter.Property>();
+					}
+
+					selectedItem.properties.Add(entry.property);
 
 					PopulateAvailableFields();
 					Close();

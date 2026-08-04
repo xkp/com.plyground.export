@@ -950,71 +950,110 @@ public partial class ModuleExporter
 
 	private void DrawSelectedItemProperties()
 	{
-		List<(Property prop, string key)> unifiedProps = new List<(Property, string)>();
-		if (selectedItem.properties != null)
+		if (selectedItem.properties == null || selectedItem.properties.Count == 0)
 		{
-			foreach (Property property in selectedItem.properties)
-			{
-				unifiedProps.Add((property, property.name));
-			}
+			return;
 		}
 
-		foreach ((Property prop, string key) entry in unifiedProps)
+		for (int i = 0; i < selectedItem.properties.Count; i++)
 		{
-			if (!propertyFoldouts.ContainsKey(entry.key))
+			if (DrawPropertyTreeNode(selectedItem.properties, selectedItem.properties[i], i, 0, selectedItem.properties[i].name))
 			{
-				propertyFoldouts[entry.key] = true;
+				break;
 			}
+		}
+	}
 
-			string header = $"{entry.prop.name} ({entry.prop.type})";
-			EditorGUILayout.BeginHorizontal();
-			propertyFoldouts[entry.key] = EditorGUILayout.Foldout(propertyFoldouts[entry.key], header, true);
-			if (GUILayout.Button("Remove", GUILayout.Width(70f)))
-			{
-				Property prop = selectedItem.properties.FirstOrDefault(p => p.name == entry.key);
-				if (prop != null)
-				{
-					selectedItem.properties.Remove(prop);
-				}
-			}
+	private bool DrawPropertyTreeNode(List<Property> siblings, Property property, int index, int depth, string key)
+	{
+		if (property == null)
+		{
+			return false;
+		}
+
+		if (!propertyFoldouts.ContainsKey(key))
+		{
+			propertyFoldouts[key] = true;
+		}
+
+		string header = $"{GetPropertyDisplayName(property.name)} ({property.type})";
+		EditorGUILayout.BeginHorizontal();
+		GUILayout.Space(depth * 16f);
+		propertyFoldouts[key] = EditorGUILayout.Foldout(propertyFoldouts[key], header, true);
+		if (GUILayout.Button("Remove", GUILayout.Width(70f)))
+		{
+			siblings.RemoveAt(index);
 			EditorGUILayout.EndHorizontal();
-
-			if (!propertyFoldouts[entry.key])
-			{
-				continue;
-			}
-
-			EditorGUILayout.BeginVertical("box");
-			entry.prop.name = EditorGUILayout.TextField("Name", entry.prop.name);
-
-			int typeIndex = System.Array.IndexOf(allowedTypes, entry.prop.type);
-			if (typeIndex < 0)
-			{
-				if (string.Equals(entry.prop.type, "role", StringComparison.OrdinalIgnoreCase))
-				{
-					entry.prop.type = "roles";
-					typeIndex = System.Array.IndexOf(allowedTypes, entry.prop.type);
-				}
-				else if (string.Equals(entry.prop.type, "avatars", StringComparison.OrdinalIgnoreCase))
-				{
-					entry.prop.type = "avatar";
-					typeIndex = System.Array.IndexOf(allowedTypes, entry.prop.type);
-				}
-				else
-				{
-					typeIndex = 0;
-					entry.prop.type = allowedTypes[0];
-				}
-			}
-
-			typeIndex = EditorGUILayout.Popup("Type", typeIndex, allowedTypes);
-			entry.prop.type = allowedTypes[typeIndex];
-			entry.prop.audience = EditorGUILayout.Toggle("System", IsSystemProperty(entry.prop))
-				? PropertyAudienceSystem
-				: PropertyAudienceUser;
-			DrawExpandedPropertyValue(entry.prop);
-			EditorGUILayout.EndVertical();
+			return true;
 		}
+		EditorGUILayout.EndHorizontal();
+
+		if (!propertyFoldouts[key])
+		{
+			return false;
+		}
+
+		EditorGUILayout.BeginVertical("box");
+		property.name = EditorGUILayout.TextField("Name", property.name);
+
+		int typeIndex = System.Array.IndexOf(allowedTypes, property.type);
+		if (typeIndex < 0)
+		{
+			if (string.Equals(property.type, "role", StringComparison.OrdinalIgnoreCase))
+			{
+				property.type = "roles";
+				typeIndex = System.Array.IndexOf(allowedTypes, property.type);
+			}
+			else if (string.Equals(property.type, "avatars", StringComparison.OrdinalIgnoreCase))
+			{
+				property.type = "avatar";
+				typeIndex = System.Array.IndexOf(allowedTypes, property.type);
+			}
+			else
+			{
+				typeIndex = 0;
+				property.type = allowedTypes[0];
+			}
+		}
+
+		typeIndex = EditorGUILayout.Popup("Type", typeIndex, allowedTypes);
+		property.type = allowedTypes[typeIndex];
+		property.audience = EditorGUILayout.Toggle("System", IsSystemProperty(property))
+			? PropertyAudienceSystem
+			: PropertyAudienceUser;
+
+		if (property.children != null && property.children.Count > 0)
+		{
+			EditorGUILayout.LabelField("Children", property.children.Count.ToString());
+			for (int childIndex = 0; childIndex < property.children.Count; childIndex++)
+			{
+				string childKey = key + "." + childIndex + ":" + property.children[childIndex].name;
+				if (DrawPropertyTreeNode(property.children, property.children[childIndex], childIndex, depth + 1, childKey))
+				{
+					break;
+				}
+			}
+		}
+		else
+		{
+			DrawExpandedPropertyValue(property);
+		}
+
+		EditorGUILayout.EndVertical();
+		return false;
+	}
+
+	private string GetPropertyDisplayName(string propertyPath)
+	{
+		if (string.IsNullOrWhiteSpace(propertyPath))
+		{
+			return "New Property";
+		}
+
+		int separatorIndex = propertyPath.LastIndexOf('.');
+		return separatorIndex >= 0 && separatorIndex < propertyPath.Length - 1
+			? propertyPath.Substring(separatorIndex + 1)
+			: propertyPath;
 	}
 
 	private bool IsSystemProperty(Property prop)
