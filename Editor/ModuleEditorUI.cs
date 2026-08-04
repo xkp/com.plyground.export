@@ -1432,7 +1432,8 @@ public partial class ModuleExporter
 		selectedComponent.requiredComponents ??= new List<string>();
 		selectedComponent.optionalComponents ??= new List<string>();
 		selectedComponent.tags ??= new List<string>();
-		selectedComponentArtifactIndex = Mathf.Clamp(selectedComponentArtifactIndex, -1, Mathf.Max(-1, selectedComponent.parameters.Count - 1));
+		List<CapabilityParameterTreeEntry> parameterEntries = BuildCapabilityParameterTreeEntries(selectedComponent.parameters);
+		selectedComponentArtifactIndex = Mathf.Clamp(selectedComponentArtifactIndex, -1, Mathf.Max(-1, parameterEntries.Count - 1));
 
 		EditorGUILayout.BeginHorizontal();
 
@@ -1462,18 +1463,19 @@ public partial class ModuleExporter
 		}
 		EditorGUILayout.EndHorizontal();
 
-		if (selectedComponent.parameters.Count == 0)
+		if (parameterEntries.Count == 0)
 		{
 			EditorGUILayout.LabelField("No public properties", EditorStyles.miniLabel);
 		}
 		else
 		{
 			componentArtifactScroll = EditorGUILayout.BeginScrollView(componentArtifactScroll, GUILayout.ExpandHeight(true));
-			for (int i = 0; i < selectedComponent.parameters.Count; i++)
+			for (int i = 0; i < parameterEntries.Count; i++)
 			{
-				CapabilityParameterInfo parameter = selectedComponent.parameters[i];
+				CapabilityParameterTreeEntry entry = parameterEntries[i];
+				CapabilityParameterInfo parameter = entry.parameter;
 				string editableLabel = parameter.userEditable ? "Editable" : "Locked";
-				string label = (string.IsNullOrWhiteSpace(parameter.name) ? "New Property" : parameter.name) + " [" + editableLabel + "]";
+				string label = new string(' ', entry.depth * 2) + (string.IsNullOrWhiteSpace(parameter.name) ? "New Property" : parameter.name) + " [" + editableLabel + "]";
 				if (DrawSelectableListButton(label, selectedComponentArtifactIndex == i, GUILayout.Height(26f)))
 				{
 					selectedComponentArtifactIndex = i;
@@ -1485,9 +1487,9 @@ public partial class ModuleExporter
 
 		EditorGUILayout.BeginVertical("box", GUILayout.ExpandWidth(true));
 		componentEditorScroll = EditorGUILayout.BeginScrollView(componentEditorScroll, GUILayout.ExpandHeight(true));
-		if (selectedComponentArtifactIndex >= 0 && selectedComponentArtifactIndex < selectedComponent.parameters.Count)
+		if (selectedComponentArtifactIndex >= 0 && selectedComponentArtifactIndex < parameterEntries.Count)
 		{
-			DrawParameterArtifactEditor(selectedComponent, selectedComponent.parameters[selectedComponentArtifactIndex]);
+			DrawParameterArtifactEditor(selectedComponent, parameterEntries[selectedComponentArtifactIndex].parameter);
 		}
 		else
 		{
@@ -1775,10 +1777,63 @@ public partial class ModuleExporter
 		parameter.moduleScoped = EditorGUILayout.Toggle("Module Scoped", parameter.moduleScoped);
 		parameter.featureId = EditorGUILayout.TextField("Feature Id", parameter.featureId);
 		DrawStringListEditor("Tags", parameter.tags);
+		if (parameter.children != null && parameter.children.Count > 0)
+		{
+			EditorGUILayout.LabelField("Nested Properties", parameter.children.Count.ToString());
+		}
 		if (GUILayout.Button("Remove Property", GUILayout.Width(120f)))
 		{
-			component.parameters.Remove(parameter);
+			RemoveCapabilityParameter(component.parameters, parameter);
 			selectedComponentArtifactIndex = -1;
+		}
+	}
+
+	private bool RemoveCapabilityParameter(List<CapabilityParameterInfo> parameters, CapabilityParameterInfo target)
+	{
+		if (parameters == null || target == null)
+		{
+			return false;
+		}
+
+		if (parameters.Remove(target))
+		{
+			return true;
+		}
+
+		foreach (CapabilityParameterInfo parameter in parameters)
+		{
+			if (parameter != null && RemoveCapabilityParameter(parameter.children, target))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private List<CapabilityParameterTreeEntry> BuildCapabilityParameterTreeEntries(List<CapabilityParameterInfo> parameters)
+	{
+		List<CapabilityParameterTreeEntry> entries = new List<CapabilityParameterTreeEntry>();
+		AppendCapabilityParameterTreeEntries(entries, parameters, 0);
+		return entries;
+	}
+
+	private void AppendCapabilityParameterTreeEntries(List<CapabilityParameterTreeEntry> entries, List<CapabilityParameterInfo> parameters, int depth)
+	{
+		foreach (CapabilityParameterInfo parameter in parameters ?? new List<CapabilityParameterInfo>())
+		{
+			if (parameter == null)
+			{
+				continue;
+			}
+
+			entries.Add(new CapabilityParameterTreeEntry
+			{
+				parameter = parameter,
+				depth = depth
+			});
+
+			AppendCapabilityParameterTreeEntries(entries, parameter.children, depth + 1);
 		}
 	}
 
@@ -1837,6 +1892,12 @@ public partial class ModuleExporter
 		public CapabilityMethodInfo method;
 		public CapabilityEventInfo eventInfo;
 		public CapabilityParameterInfo parameter;
+	}
+
+	private class CapabilityParameterTreeEntry
+	{
+		public CapabilityParameterInfo parameter;
+		public int depth;
 	}
 
 	private class ComponentNamespaceNode

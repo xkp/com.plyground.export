@@ -162,6 +162,7 @@ public partial class ModuleExporter
 		public string featureId = "";
 		public List<string> tags = new List<string>();
 		public bool userEditable = true;
+		public List<CapabilityParameterInfo> children = new List<CapabilityParameterInfo>();
 	}
 
 	[Serializable]
@@ -1010,58 +1011,139 @@ public partial class ModuleExporter
 			field => field.name);
 		foreach (FieldInfo field in GetInspectorFields(type))
 		{
-			if (IsEventFieldType(field.FieldType) || !IsSimpleInspectorValueType(field.FieldType))
+			if (IsEventFieldType(field.FieldType))
 			{
 				continue;
 			}
 
 			sourceFieldMap.TryGetValue(field.Name, out SourceFieldInfo sourceField);
-			string defaultValue = GetCapabilityDefaultValue(field.FieldType, () => instance != null ? field.GetValue(instance) : null);
-
-			parameterMap["field|" + field.Name] = new CapabilityParameterInfo
+			CapabilityParameterInfo parameter = BuildCapabilityParameterTree(
+				field.Name,
+				field.FieldType,
+				!field.IsInitOnly,
+				sourceField != null && !string.IsNullOrWhiteSpace(sourceField.summary) ? sourceField.summary : "Serialized field",
+				"field:" + type.Name + "." + field.Name,
+				new List<string> { "serialized-field" },
+				() => instance != null ? field.GetValue(instance) : null,
+				new HashSet<Type>());
+			if (parameter != null)
 			{
-				name = field.Name,
-				type = GetFriendlyTypeName(field.FieldType),
-				required = !field.IsInitOnly,
-				@default = defaultValue,
-				description = sourceField != null && !string.IsNullOrWhiteSpace(sourceField.summary) ? sourceField.summary : "Serialized field",
-				moduleScoped = false,
-				featureId = "field:" + type.Name + "." + field.Name,
-				enumValues = field.FieldType.IsEnum ? Enum.GetNames(field.FieldType).ToList() : new List<string>(),
-				tags = new List<string> { "serialized-field" },
-				userEditable = !field.IsInitOnly
-			};
+				parameterMap["field|" + field.Name] = parameter;
+			}
 		}
 
 		foreach (PropertyInfo property in GetCapabilityProperties(type))
 		{
-			if (!IsSimpleInspectorValueType(property.PropertyType))
-			{
-				continue;
-			}
-
 			sourceFieldMap.TryGetValue(property.Name, out SourceFieldInfo sourceField);
-			string defaultValue = property.CanRead && property.GetIndexParameters().Length == 0
-				? GetCapabilityDefaultValue(property.PropertyType, () => instance != null ? property.GetValue(instance, null) : null)
-				: GuessCapabilityDefaultValue(property.PropertyType);
-
-			parameterMap["property|" + property.Name] = new CapabilityParameterInfo
+			CapabilityParameterInfo parameter = BuildCapabilityParameterTree(
+				property.Name,
+				property.PropertyType,
+				property.CanWrite,
+				sourceField != null && !string.IsNullOrWhiteSpace(sourceField.summary) ? sourceField.summary : "Public property",
+				"public-property:" + type.Name + "." + property.Name,
+				new List<string> { "public-property" },
+				() => property.CanRead && property.GetIndexParameters().Length == 0 && instance != null ? property.GetValue(instance, null) : null,
+				new HashSet<Type>());
+			if (parameter != null)
 			{
-				name = property.Name,
-				type = GetFriendlyTypeName(property.PropertyType),
-				required = property.CanWrite,
-				@default = defaultValue,
-				description = sourceField != null && !string.IsNullOrWhiteSpace(sourceField.summary) ? sourceField.summary : "Public property",
-				moduleScoped = false,
-				featureId = "public-property:" + type.Name + "." + property.Name,
-				enumValues = property.PropertyType.IsEnum ? Enum.GetNames(property.PropertyType).ToList() : new List<string>(),
-				tags = new List<string> { "public-property" },
-				userEditable = property.CanWrite
-			};
+				parameterMap["property|" + property.Name] = parameter;
+			}
 		}
 
 		parameters.AddRange(parameterMap.Values.OrderBy(parameter => parameter.name, StringComparer.OrdinalIgnoreCase));
 		return parameters;
+	}
+
+	private CapabilityParameterInfo BuildCapabilityParameterTree(
+		string name,
+		Type memberType,
+		bool writable,
+		string description,
+		string featureId,
+		List<string> tags,
+		Func<object> valueFactory,
+		HashSet<Type> typeStack)
+	{
+		if (string.IsNullOrWhiteSpace(name) || memberType == null)
+		{
+			return null;
+		}
+
+		CapabilityParameterInfo parameter = new CapabilityParameterInfo
+		{
+			name = name,
+			type = GetFriendlyTypeName(memberType),
+			required = writable,
+			description = description ?? "",
+			moduleScoped = false,
+			featureId = featureId ?? "",
+			tags = tags != null ? new List<string>(tags) : new List<string>(),
+			userEditable = writable,
+			enumValues = memberType.IsEnum ? Enum.GetNames(memberType).ToList() : new List<string>(),
+			children = new List<CapabilityParameterInfo>()
+		};
+
+		Type nestedType = GetCapabilityNestedMemberType(memberType);
+		if (nestedType != null && !typeStack.Contains(nestedType))
+		{
+			typeStack.Add(nestedType);
+			foreach (FieldInfo childField in GetInspectorFields(nestedType))
+			{
+				if (IsEventFieldType(childField.FieldType))
+				{
+					continue;
+				}
+
+				CapabilityParameterInfo child = BuildCapabilityParameterTree(
+					childField.Name,
+					childField.FieldType,
+					!childField.IsInitOnly,
+					"Serialized field",
+					parameter.featureId + "." + childField.Name,
+					new List<string>(parameter.tags),
+					null,
+					typeStack);
+				if (child != null)
+				{
+					parameter.children.Add(child);
+				}
+			}
+
+			foreach (PropertyInfo childProperty in GetCapabilityProperties(nestedType))
+			{
+				CapabilityParameterInfo child = BuildCapabilityParameterTree(
+					childProperty.Name,
+					childProperty.PropertyType,
+					childProperty.CanWrite,
+					"Public property",
+					parameter.featureId + "." + childProperty.Name,
+					new List<string> { "public-property" },
+					null,
+					typeStack);
+				if (child != null)
+				{
+					parameter.children.Add(child);
+				}
+			}
+
+			typeStack.Remove(nestedType);
+		}
+
+		if (parameter.children.Count > 0)
+		{
+			parameter.children = parameter.children
+				.OrderBy(child => child.name, StringComparer.OrdinalIgnoreCase)
+				.ToList();
+			return parameter;
+		}
+
+		if (!IsCapabilityLeafValueType(memberType) && !IsCapabilitySerializableLeafType(memberType))
+		{
+			return null;
+		}
+
+		parameter.@default = GetCapabilityDefaultValue(memberType, valueFactory);
+		return parameter;
 	}
 
 	private static string GetCapabilityDefaultValue(Type valueType, Func<object> valueFactory)
@@ -1585,13 +1667,7 @@ public partial class ModuleExporter
 
 	private static bool IsCapabilitySupportedFieldType(Type type)
 	{
-		return type.IsPrimitive ||
-			type == typeof(string) ||
-			type.IsEnum ||
-			type == typeof(Vector2) ||
-			type == typeof(Vector3) ||
-			type == typeof(Vector4) ||
-			type == typeof(Color);
+		return IsCapabilityLeafValueType(type) || GetCapabilityNestedMemberType(type) != null;
 	}
 
 	private static bool IsSimpleInspectorValueType(Type type)
@@ -1676,6 +1752,86 @@ public partial class ModuleExporter
 		}
 
 		return type.Name;
+	}
+
+	private static bool IsCapabilityLeafValueType(Type type)
+	{
+		if (type == null)
+		{
+			return false;
+		}
+
+		Type normalizedType = Nullable.GetUnderlyingType(type) ?? type;
+		return normalizedType.IsPrimitive ||
+			normalizedType == typeof(string) ||
+			normalizedType.IsEnum ||
+			normalizedType == typeof(decimal) ||
+			normalizedType == typeof(Vector2) ||
+			normalizedType == typeof(Vector3) ||
+			normalizedType == typeof(Vector4) ||
+			normalizedType == typeof(Color) ||
+			typeof(UnityEngine.Object).IsAssignableFrom(normalizedType);
+	}
+
+	private static bool IsCapabilitySerializableLeafType(Type type)
+	{
+		if (type == null)
+		{
+			return false;
+		}
+
+		Type normalizedType = Nullable.GetUnderlyingType(type) ?? type;
+		if (normalizedType.IsArray || (normalizedType.IsGenericType && normalizedType.GetGenericTypeDefinition() == typeof(List<>)))
+		{
+			return false;
+		}
+
+		return !typeof(UnityEngine.Object).IsAssignableFrom(normalizedType) &&
+			(normalizedType.IsDefined(typeof(SerializableAttribute), true) || normalizedType.IsValueType);
+	}
+
+	private static Type GetCapabilityNestedMemberType(Type type)
+	{
+		if (type == null)
+		{
+			return null;
+		}
+
+		Type normalizedType = Nullable.GetUnderlyingType(type) ?? type;
+		if (IsCapabilityLeafValueType(normalizedType))
+		{
+			return null;
+		}
+
+		if (normalizedType.IsArray)
+		{
+			Type elementType = normalizedType.GetElementType();
+			if (elementType == null || IsCapabilityLeafValueType(elementType))
+			{
+				return null;
+			}
+
+			return elementType;
+		}
+
+		if (normalizedType.IsGenericType && normalizedType.GetGenericTypeDefinition() == typeof(List<>))
+		{
+			Type elementType = normalizedType.GetGenericArguments()[0];
+			if (elementType == null || IsCapabilityLeafValueType(elementType))
+			{
+				return null;
+			}
+
+			return elementType;
+		}
+
+		if ((normalizedType.IsClass || normalizedType.IsValueType) &&
+			(normalizedType.IsDefined(typeof(SerializableAttribute), true) || normalizedType.IsValueType))
+		{
+			return normalizedType;
+		}
+
+		return null;
 	}
 
 	private static string GetTypeKind(Type type)
@@ -2968,8 +3124,7 @@ public partial class ModuleExporter
 				.ToList();
 			foreach (CapabilityParameterInfo parameter in clone.parameters)
 			{
-				parameter.enumValues = DistinctStrings(parameter.enumValues);
-				parameter.tags = DistinctStrings(parameter.tags);
+				NormalizeParameterTree(parameter);
 			}
 			clone.tags = DistinctStrings(clone.tags);
 			map[clone.componentId] = clone;
@@ -3088,6 +3243,25 @@ public partial class ModuleExporter
 	private static CapabilityParameterInfo CloneParameter(CapabilityParameterInfo source)
 	{
 		return source == null ? new CapabilityParameterInfo() : JsonUtility.FromJson<CapabilityParameterInfo>(JsonUtility.ToJson(source)) ?? new CapabilityParameterInfo();
+	}
+
+	private static void NormalizeParameterTree(CapabilityParameterInfo parameter)
+	{
+		if (parameter == null)
+		{
+			return;
+		}
+
+		parameter.enumValues = DistinctStrings(parameter.enumValues);
+		parameter.tags = DistinctStrings(parameter.tags);
+		parameter.children = (parameter.children ?? new List<CapabilityParameterInfo>())
+			.Where(child => child != null && !string.IsNullOrWhiteSpace(child.name))
+			.OrderBy(child => child.name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		foreach (CapabilityParameterInfo child in parameter.children)
+		{
+			NormalizeParameterTree(child);
+		}
 	}
 
 	private static CapabilityComponentInputInfo CloneComponentInput(CapabilityComponentInputInfo source)
