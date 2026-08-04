@@ -370,8 +370,8 @@ public partial class ModuleExporter
 				CapabilityPropertyTreeEntryV2 treeEntry = propertyEntries[i];
 				CapabilityPropertyEntryV2 property = treeEntry.property;
 				EditorGUILayout.BeginHorizontal();
-				string label = new string(' ', treeEntry.depth * 2) + GetCapabilityPropertyLabelV2(property);
-				if (DrawSelectableListButton(label, selectedCapabilityPropertyIndexV2 == i, GUILayout.Height(28f)))
+				GUILayout.Space(treeEntry.depth * 16f);
+				if (DrawSelectableListButton(GetCapabilityPropertyLabelV2(property), selectedCapabilityPropertyIndexV2 == i, GUILayout.Height(28f)))
 				{
 					selectedCapabilityPropertyIndexV2 = i;
 				}
