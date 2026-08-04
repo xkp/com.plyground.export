@@ -841,7 +841,7 @@ public partial class ModuleExporter
 			.Where(entry => entry != null && entry.isCustom)
 			.ToList();
 		List<CapabilityComponentEntryV2> rebuiltSourceEntries = normalizedSelection
-			.Select(BuildCapabilityComponentEntryFromSourceV2)
+			.SelectMany(BuildCapabilityComponentEntriesFromSourceV2)
 			.Where(entry => entry != null)
 			.ToList();
 
@@ -903,6 +903,110 @@ public partial class ModuleExporter
 		};
 
 		return entry;
+	}
+
+	private List<CapabilityComponentEntryV2> BuildCapabilityComponentEntriesFromSourceV2(string sourcePath)
+	{
+		List<CapabilityComponentEntryV2> entries = new List<CapabilityComponentEntryV2>();
+		List<Type> componentTypes = ResolveComponentTypesDeclaredInSourceV2(sourcePath);
+		if (componentTypes.Count == 0)
+		{
+			CapabilityComponentEntryV2 fallbackEntry = BuildCapabilityComponentEntryFromSourceV2(sourcePath);
+			if (fallbackEntry != null)
+			{
+				entries.Add(fallbackEntry);
+			}
+
+			return entries;
+		}
+
+		foreach (Type componentType in componentTypes)
+		{
+			SourceScriptInfo sourceInfo = ParseSourceScript(sourcePath, componentType);
+			UnityCapabilityComponentInfo componentInfo = BuildUnityComponentInfo(componentType, null, sourceInfo);
+			if (componentInfo == null)
+			{
+				continue;
+			}
+
+			entries.Add(new CapabilityComponentEntryV2
+			{
+				id = !string.IsNullOrWhiteSpace(componentInfo.componentId) ? componentInfo.componentId : componentType.FullName ?? componentType.Name,
+				displayName = !string.IsNullOrWhiteSpace(componentInfo.typeName) ? GetLeafTypeName(componentInfo.typeName) : componentType.Name,
+				sourcePath = sourcePath ?? "",
+				isCustom = false,
+				typeName = componentInfo.typeName ?? "",
+				baseType = componentInfo.baseType ?? "",
+				description = NormalizeImportedDescriptionV2(componentInfo.description),
+				canAdd = "No",
+				properties = BuildCapabilityPropertyEntriesV2(componentInfo.parameters),
+				methods = BuildCapabilityMethodEntriesV2(componentInfo.methods),
+				events = BuildCapabilityEventEntriesV2(componentInfo.events)
+			});
+		}
+
+		return entries
+			.GroupBy(entry => entry.id, StringComparer.OrdinalIgnoreCase)
+			.Select(group => group.First())
+			.OrderBy(entry => entry.displayName, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	private List<Type> ResolveComponentTypesDeclaredInSourceV2(string sourcePath)
+	{
+		HashSet<Type> resolvedTypes = new HashSet<Type>();
+		MonoScript script = AssetDatabase.LoadAssetAtPath<MonoScript>(sourcePath);
+		Type primaryType = script != null ? script.GetClass() : null;
+		if (primaryType != null && typeof(Component).IsAssignableFrom(primaryType))
+		{
+			resolvedTypes.Add(primaryType);
+		}
+
+		string fullPath = Path.GetFullPath(sourcePath ?? "");
+		if (!File.Exists(fullPath))
+		{
+			return resolvedTypes.OrderBy(type => type.Name, StringComparer.OrdinalIgnoreCase).ToList();
+		}
+
+		string namespaceName = "";
+		foreach (string rawLine in File.ReadAllLines(fullPath))
+		{
+			string line = rawLine.Trim();
+			if (line.StartsWith("namespace ", StringComparison.Ordinal))
+			{
+				string namespaceDeclaration = line.Substring("namespace ".Length).Trim();
+				int braceIndex = namespaceDeclaration.IndexOf('{');
+				namespaceName = braceIndex >= 0
+					? namespaceDeclaration.Substring(0, braceIndex).Trim()
+					: namespaceDeclaration.Trim();
+				continue;
+			}
+
+			int classIndex = line.IndexOf(" class ", StringComparison.Ordinal);
+			if (classIndex < 0)
+			{
+				continue;
+			}
+
+			string afterClass = line.Substring(classIndex + " class ".Length).Trim();
+			string[] classParts = afterClass.Split(new[] { ':', ' ', '\t', '{' }, StringSplitOptions.RemoveEmptyEntries);
+			if (classParts.Length == 0)
+			{
+				continue;
+			}
+
+			string className = classParts[0].Trim();
+			string fullName = string.IsNullOrWhiteSpace(namespaceName) ? className : namespaceName + "." + className;
+			Type resolved = ResolveTypeByName(fullName) ?? ResolveTypeByName(className);
+			if (resolved != null && typeof(Component).IsAssignableFrom(resolved))
+			{
+				resolvedTypes.Add(resolved);
+			}
+		}
+
+		return resolvedTypes
+			.OrderBy(type => type.Name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
 	}
 
 	private CapabilityComponentEntryV2 CreateCapabilitySourceEntryFallbackV2(string sourcePath)
