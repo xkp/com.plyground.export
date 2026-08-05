@@ -1939,6 +1939,14 @@ public partial class ModuleExporter
 		}
 
 		string value = description.Trim();
+		if (string.Equals(value, "inheritdoc", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(value, "<inheritdoc/>", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(value, "<inheritdoc />", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(value, "<inheritdoc></inheritdoc>", StringComparison.OrdinalIgnoreCase))
+		{
+			return "";
+		}
+
 		if (string.Equals(value, "Serialized field", StringComparison.OrdinalIgnoreCase) ||
 			string.Equals(value, "Public property", StringComparison.OrdinalIgnoreCase) ||
 			string.Equals(value, "Public method", StringComparison.OrdinalIgnoreCase) ||

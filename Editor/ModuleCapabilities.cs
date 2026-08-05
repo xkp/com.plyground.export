@@ -2485,7 +2485,7 @@ public partial class ModuleExporter
 			builder.Append(line);
 		}
 
-		return builder.ToString().Trim();
+		return NormalizeSourceCommentText(builder.ToString());
 	}
 
 	private SourceMethodInfo ParseSourceMethod(string line, string summary)
@@ -2652,7 +2652,34 @@ public partial class ModuleExporter
 
 		string joined = string.Join(" ", commentBuffer.Where(line => !string.IsNullOrWhiteSpace(line)));
 		commentBuffer.Clear();
-		return joined.Replace("summary", "").Trim();
+		return NormalizeSourceCommentText(joined.Replace("summary", "").Trim());
+	}
+
+	private string NormalizeSourceCommentText(string comment)
+	{
+		if (string.IsNullOrWhiteSpace(comment))
+		{
+			return "";
+		}
+
+		string normalized = comment.Trim();
+		normalized = normalized.Replace("<inheritdoc/>", "", StringComparison.OrdinalIgnoreCase);
+		normalized = normalized.Replace("<inheritdoc />", "", StringComparison.OrdinalIgnoreCase);
+		normalized = normalized.Replace("<inheritdoc></inheritdoc>", "", StringComparison.OrdinalIgnoreCase);
+		normalized = normalized.Trim().Trim('<', '>', '/', ' ');
+
+		if (string.IsNullOrWhiteSpace(normalized))
+		{
+			return "";
+		}
+
+		if (string.Equals(normalized, "inheritdoc", StringComparison.OrdinalIgnoreCase) ||
+			string.Equals(normalized, "cref", StringComparison.OrdinalIgnoreCase))
+		{
+			return "";
+		}
+
+		return normalized;
 	}
 
 	private List<SourceScriptInfo> GetRelevantSourceComponents(List<SourceScriptInfo> sourceScripts, HashSet<string> relevantNamespaceRoots)
