@@ -359,6 +359,11 @@ public partial class ModuleExporter
 
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(240f, position.width * 0.28f)), GUILayout.ExpandHeight(true));
 		GUILayout.Label("Properties", EditorStyles.boldLabel);
+		if (CanRestoreCapabilityEntryFromSourceV2(entry) && GUILayout.Button("Restore Missing", GUILayout.Width(140f)))
+		{
+			RestoreMissingCapabilityPropertiesV2(entry);
+			propertyEntries = BuildCapabilityPropertyTreeEntriesV2(entry.properties);
+		}
 		capabilityPropertyListScrollV2 = EditorGUILayout.BeginScrollView(capabilityPropertyListScrollV2, GUILayout.ExpandHeight(true));
 		if (propertyEntries.Count > 0)
 		{
@@ -480,6 +485,10 @@ public partial class ModuleExporter
 
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(240f, position.width * 0.28f)), GUILayout.ExpandHeight(true));
 		GUILayout.Label("Methods", EditorStyles.boldLabel);
+		if (CanRestoreCapabilityEntryFromSourceV2(entry) && GUILayout.Button("Restore Missing", GUILayout.Width(140f)))
+		{
+			RestoreMissingCapabilityMethodsV2(entry);
+		}
 		capabilityMethodListScrollV2 = EditorGUILayout.BeginScrollView(capabilityMethodListScrollV2, GUILayout.ExpandHeight(true));
 		if (entry.methods.Count > 0)
 		{
@@ -540,6 +549,10 @@ public partial class ModuleExporter
 
 		EditorGUILayout.BeginVertical("box", GUILayout.Width(Mathf.Max(240f, position.width * 0.28f)), GUILayout.ExpandHeight(true));
 		GUILayout.Label("Events", EditorStyles.boldLabel);
+		if (CanRestoreCapabilityEntryFromSourceV2(entry) && GUILayout.Button("Restore Missing", GUILayout.Width(140f)))
+		{
+			RestoreMissingCapabilityEventsV2(entry);
+		}
 		capabilityEventListScrollV2 = EditorGUILayout.BeginScrollView(capabilityEventListScrollV2, GUILayout.ExpandHeight(true));
 		if (entry.events.Count > 0)
 		{
@@ -967,6 +980,155 @@ public partial class ModuleExporter
 		};
 
 		return entry;
+	}
+
+	private bool CanRestoreCapabilityEntryFromSourceV2(CapabilityComponentEntryV2 entry)
+	{
+		return entry != null && !entry.isCustom && !string.IsNullOrWhiteSpace(entry.sourcePath);
+	}
+
+	private void RestoreMissingCapabilityPropertiesV2(CapabilityComponentEntryV2 entry)
+	{
+		CapabilityComponentEntryV2 sourceEntry = RebuildCapabilityComponentEntryFromSourceV2(entry);
+		if (sourceEntry == null)
+		{
+			return;
+		}
+
+		entry.properties = MergeCapabilityPropertyEntriesV2(entry.properties, sourceEntry.properties);
+	}
+
+	private void RestoreMissingCapabilityMethodsV2(CapabilityComponentEntryV2 entry)
+	{
+		CapabilityComponentEntryV2 sourceEntry = RebuildCapabilityComponentEntryFromSourceV2(entry);
+		if (sourceEntry == null)
+		{
+			return;
+		}
+
+		HashSet<string> existingKeys = new HashSet<string>(
+			(entry.methods ?? new List<CapabilityMethodEntryV2>()).Where(method => method != null).Select(GetCapabilityMethodRestoreKeyV2),
+			StringComparer.OrdinalIgnoreCase);
+
+		foreach (CapabilityMethodEntryV2 method in sourceEntry.methods ?? new List<CapabilityMethodEntryV2>())
+		{
+			if (method == null)
+			{
+				continue;
+			}
+
+			string key = GetCapabilityMethodRestoreKeyV2(method);
+			if (existingKeys.Add(key))
+			{
+				entry.methods.Add(method);
+			}
+		}
+
+		entry.methods = (entry.methods ?? new List<CapabilityMethodEntryV2>())
+			.Where(method => method != null)
+			.OrderBy(method => method.name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	private void RestoreMissingCapabilityEventsV2(CapabilityComponentEntryV2 entry)
+	{
+		CapabilityComponentEntryV2 sourceEntry = RebuildCapabilityComponentEntryFromSourceV2(entry);
+		if (sourceEntry == null)
+		{
+			return;
+		}
+
+		HashSet<string> existingKeys = new HashSet<string>(
+			(entry.events ?? new List<CapabilityEventEntryV2>()).Where(eventInfo => eventInfo != null).Select(GetCapabilityEventRestoreKeyV2),
+			StringComparer.OrdinalIgnoreCase);
+
+		foreach (CapabilityEventEntryV2 eventInfo in sourceEntry.events ?? new List<CapabilityEventEntryV2>())
+		{
+			if (eventInfo == null)
+			{
+				continue;
+			}
+
+			string key = GetCapabilityEventRestoreKeyV2(eventInfo);
+			if (existingKeys.Add(key))
+			{
+				entry.events.Add(eventInfo);
+			}
+		}
+
+		entry.events = (entry.events ?? new List<CapabilityEventEntryV2>())
+			.Where(eventInfo => eventInfo != null)
+			.OrderBy(eventInfo => eventInfo.name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	private CapabilityComponentEntryV2 RebuildCapabilityComponentEntryFromSourceV2(CapabilityComponentEntryV2 entry)
+	{
+		if (!CanRestoreCapabilityEntryFromSourceV2(entry))
+		{
+			return null;
+		}
+
+		List<CapabilityComponentEntryV2> sourceEntries = BuildCapabilityComponentEntriesFromSourceV2(entry.sourcePath);
+		return sourceEntries.FirstOrDefault(candidate =>
+			candidate != null &&
+			(string.Equals(candidate.id, entry.id, StringComparison.OrdinalIgnoreCase) ||
+			 string.Equals(candidate.typeName, entry.typeName, StringComparison.OrdinalIgnoreCase) ||
+			 string.Equals(candidate.displayName, entry.displayName, StringComparison.OrdinalIgnoreCase)));
+	}
+
+	private List<CapabilityPropertyEntryV2> MergeCapabilityPropertyEntriesV2(List<CapabilityPropertyEntryV2> current, List<CapabilityPropertyEntryV2> source)
+	{
+		List<CapabilityPropertyEntryV2> merged = current ?? new List<CapabilityPropertyEntryV2>();
+		Dictionary<string, CapabilityPropertyEntryV2> existingByKey = merged
+			.Where(property => property != null)
+			.ToDictionary(GetCapabilityPropertyRestoreKeyV2, property => property, StringComparer.OrdinalIgnoreCase);
+
+		foreach (CapabilityPropertyEntryV2 sourceProperty in source ?? new List<CapabilityPropertyEntryV2>())
+		{
+			if (sourceProperty == null)
+			{
+				continue;
+			}
+
+			string key = GetCapabilityPropertyRestoreKeyV2(sourceProperty);
+			if (existingByKey.TryGetValue(key, out CapabilityPropertyEntryV2 existing))
+			{
+				existing.children = MergeCapabilityPropertyEntriesV2(existing.children, sourceProperty.children);
+				continue;
+			}
+
+			CapabilityPropertyEntryV2 restored = CloneCapabilityPropertyEntryV2(sourceProperty);
+			merged.Add(restored);
+			existingByKey[key] = restored;
+		}
+
+		return merged
+			.Where(property => property != null)
+			.OrderBy(property => property.name, StringComparer.OrdinalIgnoreCase)
+			.ToList();
+	}
+
+	private string GetCapabilityPropertyRestoreKeyV2(CapabilityPropertyEntryV2 property)
+	{
+		return (property != null ? property.name : "") + "|" + (property != null ? property.type : "");
+	}
+
+	private string GetCapabilityMethodRestoreKeyV2(CapabilityMethodEntryV2 method)
+	{
+		return (method != null ? method.name : "") + "|" + (method != null ? method.declaringType : "") + "|" + (method != null ? method.returnType : "");
+	}
+
+	private string GetCapabilityEventRestoreKeyV2(CapabilityEventEntryV2 eventInfo)
+	{
+		return (eventInfo != null ? eventInfo.name : "") + "|" + (eventInfo != null ? eventInfo.declaringType : "") + "|" + (eventInfo != null ? eventInfo.payloadType : "");
+	}
+
+	private CapabilityPropertyEntryV2 CloneCapabilityPropertyEntryV2(CapabilityPropertyEntryV2 source)
+	{
+		return source == null
+			? new CapabilityPropertyEntryV2()
+			: JsonUtility.FromJson<CapabilityPropertyEntryV2>(JsonUtility.ToJson(source)) ?? new CapabilityPropertyEntryV2();
 	}
 
 	private List<CapabilityComponentEntryV2> BuildCapabilityComponentEntriesFromSourceV2(string sourcePath)
