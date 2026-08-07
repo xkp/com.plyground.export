@@ -541,16 +541,16 @@ using System;
 
 	private void ExportModule()
 	{
-		UpdateExportAssets();
-
-		//AskForExportFolder();
 		string moduleFolder = GetModuleFolder();
 		Directory.CreateDirectory(moduleFolder);
 		ClearModuleExportFolder(moduleFolder, new[]
 		{
-			Path.Combine("Assets", "Thumbnails"),
-			Path.Combine("Assets", "Models")
+			Path.Combine("Assets", "Thumbnails")
 		});
+
+		UpdateExportAssets();
+
+		//AskForExportFolder();
 
 /*		//Copy custom assets into 
 		DirectoryCopy(GetAssetModuleFolder(), moduleFolder, true);
