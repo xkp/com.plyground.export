@@ -1887,7 +1887,7 @@ using System;
 		{
 			double start = EditorApplication.timeSinceStartup;
 			// Poll without blocking editor message pump
-			while (AssetPreview.IsLoadingAssetPreview(item.prefab.GetInstanceID()))
+			while (IsAssetPreviewLoading(item.prefab))
 			{
 				// Try to get the texture each tick
 				preview = AssetPreview.GetAssetPreview(item.prefab);
@@ -1924,6 +1924,15 @@ using System;
 		}
 
 		return false;
+	}
+
+	private static bool IsAssetPreviewLoading(UnityEngine.Object asset)
+	{
+#if UNITY_6000_0_OR_NEWER
+		return AssetPreview.IsLoadingAssetPreview(asset.GetEntityId());
+#else
+		return AssetPreview.IsLoadingAssetPreview(asset.GetInstanceID());
+#endif
 	}
 
 	private void GenerateThumbnail(Item item)
