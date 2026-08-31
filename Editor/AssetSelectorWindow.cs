@@ -4,9 +4,19 @@ using UnityEditor.IMGUI.Controls;
 using System.Collections.Generic;
 using System.Linq;
 
+#if UNITY_6000_0_OR_NEWER
+using TreeViewStateType = UnityEditor.IMGUI.Controls.TreeViewState<int>;
+using TreeViewType = UnityEditor.IMGUI.Controls.TreeView<int>;
+using TreeViewItemType = UnityEditor.IMGUI.Controls.TreeViewItem<int>;
+#else
+using TreeViewStateType = UnityEditor.IMGUI.Controls.TreeViewState;
+using TreeViewType = UnityEditor.IMGUI.Controls.TreeView;
+using TreeViewItemType = UnityEditor.IMGUI.Controls.TreeViewItem;
+#endif
+
 public class AssetSelectorWindow : EditorWindow
 {
-	private TreeViewState _treeState;
+	private TreeViewStateType _treeState;
 	private AssetTreeView _treeView;
 	private List<string> _externalSelection;
 
@@ -23,7 +33,7 @@ public class AssetSelectorWindow : EditorWindow
 	private void OnEnable()
 	{
 		if (_treeState == null)
-			_treeState = new TreeViewState();
+			_treeState = new TreeViewStateType();
 		_treeView = new AssetTreeView(_treeState);
 		_treeView.Reload();
 	}
@@ -34,9 +44,9 @@ public class AssetSelectorWindow : EditorWindow
 		InitializeNode(_treeView.Root, _treeView.checkedIDs, _externalSelection);
 	}
 
-	private void InitializeNode(TreeViewItem node, HashSet<int> checkedIDs, List<string> input)
+	private void InitializeNode(TreeViewItemType node, HashSet<int> checkedIDs, List<string> input)
 	{
-		foreach (var child in node.children ?? Enumerable.Empty<TreeViewItem>())
+		foreach (var child in node.children ?? Enumerable.Empty<TreeViewItemType>())
 		{
 			var assetNode = child as AssetTreeView.AssetItem;
 			if (assetNode != null)
@@ -79,9 +89,9 @@ public class AssetSelectorWindow : EditorWindow
 		AddSelectedFromNode(_treeView.Root, _treeView.checkedIDs, _externalSelection);
 	}
 
-	private void AddSelectedFromNode(TreeViewItem node, HashSet<int> checkedIDs, List<string> output)
+	private void AddSelectedFromNode(TreeViewItemType node, HashSet<int> checkedIDs, List<string> output)
 	{
-		foreach (var child in node.children ?? Enumerable.Empty<TreeViewItem>())
+		foreach (var child in node.children ?? Enumerable.Empty<TreeViewItemType>())
 		{
 			var assetNode = child as AssetTreeView.AssetItem;
 			if (assetNode != null)
@@ -101,12 +111,12 @@ public class AssetSelectorWindow : EditorWindow
 		ApplySelection();
 	}
 
-	private class AssetTreeView : TreeView
+	private class AssetTreeView : TreeViewType
 	{
 		public HashSet<int> checkedIDs = new HashSet<int>();
-		public TreeViewItem Root;
+		public TreeViewItemType Root;
 
-		public class AssetItem : TreeViewItem
+		public class AssetItem : TreeViewItemType
 		{
 			public string assetPath;
 			public bool isFolder;
@@ -117,15 +127,15 @@ public class AssetSelectorWindow : EditorWindow
 			}
 		}
 
-		public AssetTreeView(TreeViewState state) : base(state)
+		public AssetTreeView(TreeViewStateType state) : base(state)
 		{
 			showBorder = true;
 			showAlternatingRowBackgrounds = false; // uniform row color
 		}
 
-		protected override TreeViewItem BuildRoot()
+		protected override TreeViewItemType BuildRoot()
 		{
-			var root = Root = new TreeViewItem { id = 0, depth = -1, displayName = "Root" };
+			var root = Root = new TreeViewItemType { id = 0, depth = -1, displayName = "Root" };
 			int idCounter = 1;
 			string[] guids = AssetDatabase.FindAssets("");
 			var paths = guids.Select(g => AssetDatabase.GUIDToAssetPath(g)).Distinct();
@@ -137,10 +147,10 @@ public class AssetSelectorWindow : EditorWindow
 			return root;
 		}
 
-		private void AddPathNode(string path, TreeViewItem parent, ref int idCounter)
+		private void AddPathNode(string path, TreeViewItemType parent, ref int idCounter)
 		{
 			var parts = path.Split('/');
-			TreeViewItem currentParent = parent;
+			TreeViewItemType currentParent = parent;
 			for (int depth = 0; depth < parts.Length; depth++)
 			{
 				string part = parts[depth];
@@ -152,7 +162,7 @@ public class AssetSelectorWindow : EditorWindow
 											  isFolder ? null : path,
 											  isFolder);
 					if (currentParent.children == null)
-						currentParent.children = new List<TreeViewItem>();
+						currentParent.children = new List<TreeViewItemType>();
 					currentParent.AddChild(node);
 					currentParent = node;
 				}
@@ -181,7 +191,7 @@ public class AssetSelectorWindow : EditorWindow
 			EditorGUI.LabelField(labelRect, item.displayName);
 		}
 
-		private void SetCheckedRecursive(TreeViewItem item, bool isChecked)
+		private void SetCheckedRecursive(TreeViewItemType item, bool isChecked)
 		{
 			if (isChecked) checkedIDs.Add(item.id);
 			else checkedIDs.Remove(item.id);

@@ -4,9 +4,19 @@ using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 
+#if UNITY_6000_0_OR_NEWER
+using TreeViewStateType = UnityEditor.IMGUI.Controls.TreeViewState<int>;
+using TreeViewType = UnityEditor.IMGUI.Controls.TreeView<int>;
+using TreeViewItemType = UnityEditor.IMGUI.Controls.TreeViewItem<int>;
+#else
+using TreeViewStateType = UnityEditor.IMGUI.Controls.TreeViewState;
+using TreeViewType = UnityEditor.IMGUI.Controls.TreeView;
+using TreeViewItemType = UnityEditor.IMGUI.Controls.TreeViewItem;
+#endif
+
 public class CSharpScriptSelectorWindow : EditorWindow
 {
-	private TreeViewState treeState;
+	private TreeViewStateType treeState;
 	private ScriptTreeView treeView;
 	private List<string> externalSelection;
 	private bool shouldApplySelection;
@@ -24,7 +34,7 @@ public class CSharpScriptSelectorWindow : EditorWindow
 	{
 		if (treeState == null)
 		{
-			treeState = new TreeViewState();
+			treeState = new TreeViewStateType();
 		}
 
 		treeView = new ScriptTreeView(treeState);
@@ -42,9 +52,9 @@ public class CSharpScriptSelectorWindow : EditorWindow
 		InitializeNode(treeView.Root, treeView.CheckedIds, externalSelection);
 	}
 
-	private void InitializeNode(TreeViewItem node, HashSet<int> checkedIds, List<string> input)
+	private void InitializeNode(TreeViewItemType node, HashSet<int> checkedIds, List<string> input)
 	{
-		foreach (TreeViewItem child in node.children ?? Enumerable.Empty<TreeViewItem>())
+		foreach (TreeViewItemType child in node.children ?? Enumerable.Empty<TreeViewItemType>())
 		{
 			ScriptTreeView.ScriptItem scriptNode = child as ScriptTreeView.ScriptItem;
 			if (scriptNode != null && !scriptNode.isFolder && input.Contains(scriptNode.assetPath))
@@ -101,9 +111,9 @@ public class CSharpScriptSelectorWindow : EditorWindow
 		AddSelectedFromNode(treeView.Root, treeView.CheckedIds, externalSelection);
 	}
 
-	private void AddSelectedFromNode(TreeViewItem node, HashSet<int> checkedIds, List<string> output)
+	private void AddSelectedFromNode(TreeViewItemType node, HashSet<int> checkedIds, List<string> output)
 	{
-		foreach (TreeViewItem child in node.children ?? Enumerable.Empty<TreeViewItem>())
+		foreach (TreeViewItemType child in node.children ?? Enumerable.Empty<TreeViewItemType>())
 		{
 			ScriptTreeView.ScriptItem scriptNode = child as ScriptTreeView.ScriptItem;
 			if (scriptNode != null && !scriptNode.isFolder && checkedIds.Contains(scriptNode.id))
@@ -123,12 +133,12 @@ public class CSharpScriptSelectorWindow : EditorWindow
 		}
 	}
 
-	private class ScriptTreeView : TreeView
+	private class ScriptTreeView : TreeViewType
 	{
 		public HashSet<int> CheckedIds = new HashSet<int>();
-		public TreeViewItem Root;
+		public TreeViewItemType Root;
 
-		public class ScriptItem : TreeViewItem
+		public class ScriptItem : TreeViewItemType
 		{
 			public string assetPath;
 			public bool isFolder;
@@ -140,15 +150,15 @@ public class CSharpScriptSelectorWindow : EditorWindow
 			}
 		}
 
-		public ScriptTreeView(TreeViewState state) : base(state)
+		public ScriptTreeView(TreeViewStateType state) : base(state)
 		{
 			showBorder = true;
 			showAlternatingRowBackgrounds = false;
 		}
 
-		protected override TreeViewItem BuildRoot()
+		protected override TreeViewItemType BuildRoot()
 		{
-			TreeViewItem root = Root = new TreeViewItem { id = 0, depth = -1, displayName = "Root" };
+			TreeViewItemType root = Root = new TreeViewItemType { id = 0, depth = -1, displayName = "Root" };
 			int idCounter = 1;
 			string[] guids = AssetDatabase.FindAssets("t:MonoScript", new[] { "Assets" });
 			IEnumerable<string> paths = guids
@@ -164,21 +174,21 @@ public class CSharpScriptSelectorWindow : EditorWindow
 			return root;
 		}
 
-		private void AddPathNode(string path, TreeViewItem parent, ref int idCounter)
+		private void AddPathNode(string path, TreeViewItemType parent, ref int idCounter)
 		{
 			string[] parts = path.Split('/');
-			TreeViewItem currentParent = parent;
+			TreeViewItemType currentParent = parent;
 			for (int depth = 0; depth < parts.Length; depth++)
 			{
 				string part = parts[depth];
-				TreeViewItem existing = currentParent.children?.FirstOrDefault(child => child.displayName == part);
+				TreeViewItemType existing = currentParent.children?.FirstOrDefault(child => child.displayName == part);
 				if (existing == null)
 				{
 					bool isFolder = depth < parts.Length - 1;
 					ScriptItem node = new ScriptItem(idCounter++, currentParent.depth + 1, part, isFolder ? null : path, isFolder);
 					if (currentParent.children == null)
 					{
-						currentParent.children = new List<TreeViewItem>();
+						currentParent.children = new List<TreeViewItemType>();
 					}
 
 					currentParent.AddChild(node);
@@ -209,7 +219,7 @@ public class CSharpScriptSelectorWindow : EditorWindow
 			EditorGUI.LabelField(labelRect, item.displayName);
 		}
 
-		private void SetCheckedRecursive(TreeViewItem item, bool isChecked)
+		private void SetCheckedRecursive(TreeViewItemType item, bool isChecked)
 		{
 			if (isChecked)
 			{
