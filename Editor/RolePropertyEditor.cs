@@ -27,6 +27,8 @@ public class RolePropertyEditor : EditorWindow
 		RolePropertyEditor window = GetWindow<RolePropertyEditor>("Roles");
 		window.minSize = new Vector2(460f, 420f);
 		window.inputJson = string.IsNullOrWhiteSpace(jsonString) ? "[]" : jsonString;
+		// Keep the existing payload unless the user explicitly saves role edits.
+		resultJson = window.inputJson;
 		window.availableComponents = (availableComponents ?? new List<string>())
 			.Where(component => !string.IsNullOrWhiteSpace(component))
 			.Distinct(StringComparer.OrdinalIgnoreCase)
@@ -131,6 +133,11 @@ public class RolePropertyEditor : EditorWindow
 
 		GUILayout.FlexibleSpace();
 		GUILayout.Space(16f);
+		EditorGUILayout.BeginHorizontal();
+		if (GUILayout.Button("Cancel", GUILayout.Height(28f)))
+		{
+			Close();
+		}
 		if (GUILayout.Button("Save", GUILayout.Height(28f)))
 		{
 			JArray output = new JArray();
@@ -148,6 +155,7 @@ public class RolePropertyEditor : EditorWindow
 			EditorGUIUtility.systemCopyBuffer = resultJson;
 			Close();
 		}
+		EditorGUILayout.EndHorizontal();
 
 		EditorGUILayout.EndVertical();
 	}
