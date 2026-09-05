@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEditor;
 using UnityEditorInternal; // for ReorderableList
 using System.IO;
@@ -998,7 +998,7 @@ using System;
 		}
 
 		var ext = Path.GetExtension(normalized);
-		if (ext == ".bgm" || ext == ".meta")
+		if (ext == ".bgm")
 		{
 			return true;
 		}
