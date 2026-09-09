@@ -63,6 +63,7 @@ using System;
 		public string name = "";
 		public string fileName = "";
 		public string assetFolder = "";
+		public bool paid = false;
 	}
 
 	[System.Serializable]
@@ -181,7 +182,8 @@ using System;
 				{
 					name = pkg.name,
 					fileName = pkg.fileName,
-					assetFolder = pkg.assetFolder
+					assetFolder = pkg.assetFolder,
+					paid = pkg.paid
 				});
 			}
 		}
@@ -459,7 +461,8 @@ using System;
 			{
 				name = package.name,
 				fileName = package.fileName,
-				assetFolder = package.assetFolder
+				assetFolder = package.assetFolder,
+				paid = package.paid
 			})
 			.ToList();
 		mod.filesToRemove = new List<string>(filesToRemove);

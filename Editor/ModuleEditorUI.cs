@@ -536,6 +536,10 @@ public partial class ModuleExporter
 				: !string.IsNullOrWhiteSpace(package.fileName)
 					? package.fileName
 					: $"Package {i + 1}";
+			if (package.paid)
+			{
+				packageLabel += " (Paid)";
+			}
 
 			EditorGUILayout.BeginVertical("helpbox");
 			EditorGUILayout.BeginHorizontal();
@@ -567,6 +571,7 @@ public partial class ModuleExporter
 			package.name = EditorGUILayout.TextField("Name", package.name);
 			package.fileName = EditorGUILayout.TextField("File Name", package.fileName);
 			package.assetFolder = EditorGUILayout.TextField("Asset Folder", package.assetFolder);
+			package.paid = EditorGUILayout.Toggle("Paid", package.paid);
 
 			if (!string.IsNullOrWhiteSpace(package.assetFolder) && !IsDirectAssetsChildFolder(package.assetFolder))
 			{

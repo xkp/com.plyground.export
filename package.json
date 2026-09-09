@@ -1,9 +1,9 @@
 {
     "name": "com.plyground.export",
-    "version": "0.9.45",
+    "version": "0.9.46",
     "displayName": "Plyground Module Exporter",
     "description": "An asset exporter to the plyground platform",
-    "unity": "6000.5",
+    "unity": "6000.3",
     "dependencies": {}
   }
   
