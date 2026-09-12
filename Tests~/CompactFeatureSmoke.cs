@@ -33,6 +33,8 @@ public static class CompactFeatureSmoke
             ModuleExporter.ReadCompactMembers(typeof(CompactApiFixture), api);
             api.publishes.Add("combat.prefab.spawned");
             api.notes.Add("Quoted \"text\" and newline\nwith slash\\.");
+            api.editor = new ModuleExporter.CapabilityComponentEntryV2 { id = api.component, typeName = api.component, displayName = "Spawner", canAdd = "Yes", sourcePath = "Assets/CompactApiFixture.cs" };
+            api.editor.properties.Add(new ModuleExporter.CapabilityPropertyEntryV2 { name = "count", type = "int", writable = true, userEditable = true, defaultValue = "3" });
             schema.components.Add(api);
             schema.features.Add(new CompactFeatureMapping { name = "Prefab Spawner", component = api.component });
             schema.features.Add(new CompactFeatureMapping { name = "Enemy Spawner", component = api.component });
@@ -41,6 +43,9 @@ public static class CompactFeatureSmoke
             Check(api.config.Contains("GameObject[] prefabs") && !api.config.Any(value => value.Contains("transient")), "Config visibility is wrong");
             Check(api.properties.Contains("bool Ready { get; }"), "Private setter exposed");
             var roundTrip = CompactFeatureSchema.Import(schema.Export());
+            Check(roundTrip.components[0].editor.canAdd == "Yes" && roundTrip.components[0].editor.properties[0].defaultValue == "3", "Item metadata lost");
+            var independent = new CompactFeatureSchema(); independent.components.Add(api);
+            Check(CompactFeatureSchema.Import(independent.Export()).components.Count == 1, "Unmapped component lost");
             Check(roundTrip.features.Count == 2 && roundTrip.components.Count == 1, "Shared component duplicated");
             Check(roundTrip.components[0].notes[0] == api.notes[0], "Escaping changed text");
             Check(!schema.Export().Contains("\"consumes\""), "Empty section emitted");
@@ -70,6 +75,18 @@ public static class CompactFeatureSmoke
             typeof(ModuleExporter).GetMethod("LoadModuleFromFile", flags).Invoke(window, new object[] { file });
             var loaded = (CompactFeatureSchema)typeof(ModuleExporter).GetField("compactFeatures", flags).GetValue(window);
             Check(loaded.features.Count == 2 && loaded.components[0].methods.Count == api.methods.Count, "Module load lost API");
+            Check(loaded.components[0].editor.canAdd == "Yes", "Load lost attachment metadata");
+            typeof(ModuleExporter).GetMethod("ProcessSelectedCapabilitySourceFilesV2", flags).Invoke(window, new object[] { new System.Collections.Generic.List<string> { "Assets/SourceFixture.cs" } });
+            var sourceApi = loaded.components.Single(value => value.component == "Smoke.SourceFixture");
+            Check(sourceApi.methods.Contains("void Fire(int count)"), "Source import lost public API");
+            Check(sourceApi.editor.properties.Any(value => value.name == "speed"), "Source import lost editable fields");
+            sourceApi.editor.canAdd = "Props";
+            sourceApi.editor.displayName = "Authored name";
+            typeof(ModuleExporter).GetMethod("ProcessSelectedCapabilitySourceFilesV2", flags).Invoke(window, new object[] { new System.Collections.Generic.List<string> { "Assets/SourceFixture.cs" } });
+            Check(sourceApi.editor.canAdd == "Props" && sourceApi.editor.displayName == "Authored name", "Reimport overwrote authoring");
+            Check(loaded.components.Count(value => value.component == sourceApi.component) == 1, "Reimport duplicated component");
+            typeof(ModuleExporter).GetMethod("SaveModule", flags).Invoke(window, null);
+            Check(CompactFeatureSchema.Import(File.ReadAllText(file)).components.Any(value => value.component == sourceApi.component), "Save lost unmapped source component");
             UnityEngine.Object.DestroyImmediate(window);
             Debug.Log("COMPACT_FEATURE_SMOKE_PASSED");
             EditorApplication.Exit(0);

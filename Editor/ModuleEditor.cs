@@ -241,6 +241,7 @@ using System;
 		}
 
 		compactFeatures = importedFeatures;
+        EnsureCompactComponentEditors();
 
 		dependencies.Clear();
 		if (mod.dependencies != null)

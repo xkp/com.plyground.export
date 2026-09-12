@@ -8,6 +8,7 @@ $smokeRoot = Join-Path ([IO.Path]::GetTempPath()) ('plyground-export-schema-' + 
 New-Item -ItemType Directory -Path "$smokeRoot/Assets/Editor", "$smokeRoot/Packages" | Out-Null
 Get-ChildItem -LiteralPath "$packageRoot/Editor" -Filter '*.cs' | Copy-Item -Destination "$smokeRoot/Assets/Editor"
 Copy-Item -LiteralPath "$PSScriptRoot/CompactFeatureSmoke.cs", $PlasticNewtonsoftDll -Destination "$smokeRoot/Assets/Editor"
+Copy-Item -LiteralPath "$PSScriptRoot/SourceFixture.cs" -Destination "$smokeRoot/Assets"
 Set-Content -LiteralPath "$smokeRoot/Packages/manifest.json" -Value '{"dependencies":{}}'
 $smokeProcess = Start-Process -FilePath $UnityEditor -ArgumentList "-batchmode -nographics -projectPath `"$smokeRoot`" -executeMethod CompactFeatureSmoke.Run -logFile `"$smokeRoot/smoke.log`"" -WindowStyle Hidden -PassThru
 $smokeProcess.WaitForExit()

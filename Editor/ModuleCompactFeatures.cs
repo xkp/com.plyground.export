@@ -14,11 +14,11 @@ public partial class ModuleExporter
     private void DrawCompactFeaturesTab()
     {
         compactFeatures = compactFeatures ?? new CompactFeatureSchema();
-        EditorGUILayout.HelpBox("Map canonical feature names to Unity components. Describe each component once. Descriptions and aliases for feature matching belong in the shared catalog.", MessageType.Info);
+        EditorGUILayout.HelpBox("Add components from C# source files and describe their APIs and item settings. Feature mappings are optional; feature matching descriptions belong in the shared catalog.", MessageType.Info);
         compactTab = GUILayout.Toolbar(compactTab, new[] { "Feature mappings", "Component APIs" });
         compactFeatureScroll = EditorGUILayout.BeginScrollView(compactFeatureScroll);
         if (compactTab == 0) DrawCompactMappings();
-        else DrawCompactApis();
+        else { EnsureCompactComponentEditors(); DrawCapabilitiesV2ComponentsWorkspace(); }
         EditorGUILayout.EndScrollView();
         try { compactFeatures.Validate(); }
         catch (Exception error) { EditorGUILayout.HelpBox(error.Message, MessageType.Error); }
@@ -43,44 +43,32 @@ public partial class ModuleExporter
         }
     }
 
-    private void DrawCompactApis()
+    private CompactComponentApi FindCompactApi(string type)
     {
-        EditorGUILayout.HelpBox("Methods and properties use public C# signatures. Config is serialized configuration, not public setters. Publishes/consumes contain GameplayBus event IDs, not C# event names. Enter one signature, ID, or note per line.", MessageType.Info);
-        if (GUILayout.Button("Add component API")) compactFeatures.components.Add(new CompactComponentApi());
-        for (int i = 0; i < compactFeatures.components.Count; i++)
+        var api = compactFeatures.components.FirstOrDefault(entry => entry.component == type);
+        if (api == null) { api = new CompactComponentApi { component = type }; compactFeatures.components.Add(api); }
+        return api;
+    }
+
+    private void EnsureCompactComponentEditors()
+    {
+        foreach (var api in compactFeatures.components)
         {
-            var api = compactFeatures.components[i];
-            EditorGUILayout.BeginVertical("box");
-            string previousType = api.component;
-            api.component = EditorGUILayout.TextField("Component type", api.component);
-            MonoScript script = EditorGUILayout.ObjectField("Read API from script", null, typeof(MonoScript), false) as MonoScript;
-            if (script != null)
-            {
-                var type = script.GetClass();
-                if (type == null || !typeof(MonoBehaviour).IsAssignableFrom(type) || type.IsAbstract || type.ContainsGenericParameters)
-                    EditorUtility.DisplayDialog("Component API", "Choose a compiled, concrete MonoBehaviour script.", "OK");
-                else
-                {
-                    api.component = type.FullName;
-                    ReadCompactMembers(type, api);
-                }
-            }
-            if (api.component != previousType && !string.IsNullOrEmpty(previousType))
-                foreach (var mapping in compactFeatures.features.Where(mapping => mapping.component == previousType)) mapping.component = api.component;
-            foreach (string section in CompactFeatureSchema.Sections)
-            {
-                EditorGUILayout.LabelField(ObjectNames.NicifyVariableName(section));
-                var entries = CompactFeatureSchema.Section(api, section);
-                string value = string.Join("\n", entries);
-                string edited = EditorGUILayout.TextArea(value, GUILayout.MinHeight(40));
-                // Preserve an unfinished trailing line so Enter works while editing a multiline list.
-                if (edited != value) { entries.Clear(); if (edited.Length > 0) entries.AddRange(edited.Split('\n').Select(line => line.Trim())); }
-            }
-            bool used = compactFeatures.features.Any(mapping => mapping.component == api.component);
-            using (new EditorGUI.DisabledScope(used))
-                if (GUILayout.Button("Remove component API")) { compactFeatures.components.RemoveAt(i); i--; }
-            if (used) EditorGUILayout.LabelField("Remove its feature mappings before deleting this component.", EditorStyles.miniLabel);
-            EditorGUILayout.EndVertical();
+            if (api.editor == null) api.editor = new CapabilityComponentEntryV2 { id = api.component, typeName = api.component, displayName = api.component.Split('.').Last() };
+        }
+        capabilityComponentsV2 = compactFeatures.components.Select(api => api.editor).ToList();
+    }
+
+    private void DrawCompactApiEditor(CompactComponentApi api)
+    {
+        EditorGUILayout.HelpBox("Public C# signatures and serialized config. Publishes/consumes are GameplayBus IDs; C# events are documented separately in Events. One entry per line.", MessageType.Info);
+        foreach (string section in CompactFeatureSchema.Sections)
+        {
+            EditorGUILayout.LabelField(ObjectNames.NicifyVariableName(section));
+            var entries = CompactFeatureSchema.Section(api, section);
+            string value = string.Join("\n", entries);
+            string edited = EditorGUILayout.TextArea(value, GUILayout.MinHeight(40));
+            if (edited != value) { entries.Clear(); if (edited.Length > 0) entries.AddRange(edited.Split('\n').Select(line => line.Trim())); }
         }
     }
 

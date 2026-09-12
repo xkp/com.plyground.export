@@ -16,6 +16,7 @@ public sealed class CompactFeatureMapping
 public sealed class CompactComponentApi
 {
     public string component = "";
+    public ModuleExporter.CapabilityComponentEntryV2 editor;
     public List<string> methods = new List<string>();
     public List<string> config = new List<string>();
     public List<string> properties = new List<string>();
@@ -44,6 +45,8 @@ public sealed class CompactFeatureSchema
         {
             if (api == null || !Regex.IsMatch(api.component ?? "", @"^[A-Za-z_]\w*(\.[A-Za-z_]\w*)+$"))
                 throw new InvalidDataException("Components need a fully qualified C# type name.");
+            if (api.editor != null && (api.editor.typeName != api.component || api.editor.id != api.component))
+                throw new InvalidDataException("Editor component identity must match its API key.");
             if (!types.Add(api.component)) throw new InvalidDataException("Duplicate component: " + api.component);
             foreach (var section in Sections)
                 if (Section(api, section) == null || Section(api, section).Any(string.IsNullOrWhiteSpace))
@@ -78,10 +81,16 @@ public sealed class CompactFeatureSchema
         foreach (var entry in definitions)
         {
             var fields = entry.Value as Dictionary<string, object>;
-            if (fields == null || fields.Keys.Any(key => !Sections.Contains(key))) throw new InvalidDataException("Invalid compact API: " + entry.Key);
+            if (fields == null || fields.Keys.Any(key => !Sections.Contains(key) && key != "editor")) throw new InvalidDataException("Invalid compact API: " + entry.Key);
             var api = new CompactComponentApi { component = entry.Key };
             foreach (var field in fields)
             {
+                if (field.Key == "editor")
+                {
+                    if (!(field.Value is Dictionary<string, object>)) throw new InvalidDataException("editor must be an object");
+                    api.editor = UnityEngine.JsonUtility.FromJson<ModuleExporter.CapabilityComponentEntryV2>(PlyFeatureJson.SerializeValue(field.Value));
+                    continue;
+                }
                 var values = field.Value as List<object>;
                 if (values == null || values.Any(value => !(value is string))) throw new InvalidDataException(field.Key + " must be an array of strings.");
                 Section(api, field.Key).AddRange(values.Cast<string>());
@@ -96,9 +105,12 @@ public sealed class CompactFeatureSchema
     {
         Validate();
         var maps = features.Select(feature => Quote(Regex.Replace(feature.name.Trim(), @"\s+", " ")) + ":" + Quote(feature.component));
-        var apis = components.Select(api => Quote(api.component) + ":{" + string.Join(",", Sections
-            .Where(section => Section(api, section).Count > 0)
-            .Select(section => Quote(section) + ":[" + string.Join(",", Section(api, section).Select(Quote)) + "]")) + "}");
+        var apis = components.Select(api => {
+            var fields = Sections.Where(section => Section(api, section).Count > 0)
+                .Select(section => Quote(section) + ":[" + string.Join(",", Section(api, section).Select(Quote)) + "]").ToList();
+            if (api.editor != null) fields.Add("\"editor\":" + UnityEngine.JsonUtility.ToJson(api.editor));
+            return Quote(api.component) + ":{" + string.Join(",", fields) + "}";
+        });
         return "{\"features\":{" + string.Join(",", maps) + "},\"components\":{" + string.Join(",", apis) + "}}";
     }
 

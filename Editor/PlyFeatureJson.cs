@@ -9,6 +9,16 @@ using UnityEngine;
 
 public static class PlyFeatureJson
 {
+    public static string SerializeValue(object value)
+    {
+        if (value == null) return "null";
+        if (value is string) return "\"" + string.Concat(((string)value).Select(ch => ch == '"' || ch == '\\' ? "\\" + ch : ch < 32 ? "\\u" + ((int)ch).ToString("x4") : ch.ToString())) + "\"";
+        if (value is bool) return (bool)value ? "true" : "false";
+        if (value is Dictionary<string, object>) return "{" + string.Join(",", ((Dictionary<string, object>)value).Select(pair => SerializeValue(pair.Key) + ":" + SerializeValue(pair.Value))) + "}";
+        if (value is IList) return "[" + string.Join(",", ((IList)value).Cast<object>().Select(SerializeValue)) + "]";
+        return Convert.ToString(value, CultureInfo.InvariantCulture);
+    }
+
     public static Dictionary<string, object> ParseObject(string json)
     {
         var root = MiniJson.Deserialize(json) as Dictionary<string, object>;

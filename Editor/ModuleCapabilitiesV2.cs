@@ -18,11 +18,12 @@ public partial class ModuleExporter
 		Component,
 		Properties,
 		Methods,
-		Events
+		Events,
+		Api
 	}
 
 	[Serializable]
-	private class CapabilityComponentEntryV2
+	public class CapabilityComponentEntryV2
 	{
 		public string id = "";
 		public string displayName = "";
@@ -32,13 +33,15 @@ public partial class ModuleExporter
 		public string baseType = "";
 		public string description = "";
 		public string canAdd = "No";
+        public string attachTarget = "self";
+        public List<string> requiredComponents = new List<string>();
 		public List<CapabilityPropertyEntryV2> properties = new List<CapabilityPropertyEntryV2>();
 		public List<CapabilityMethodEntryV2> methods = new List<CapabilityMethodEntryV2>();
 		public List<CapabilityEventEntryV2> events = new List<CapabilityEventEntryV2>();
 	}
 
 	[Serializable]
-	private class CapabilityPropertyEntryV2
+	public class CapabilityPropertyEntryV2
 	{
 		public string name = "";
 		public string displayName = "";
@@ -52,7 +55,7 @@ public partial class ModuleExporter
 	}
 
 	[Serializable]
-	private class CapabilityMethodEntryV2
+	public class CapabilityMethodEntryV2
 	{
 		public string name = "";
 		public string displayName = "";
@@ -65,7 +68,7 @@ public partial class ModuleExporter
 	}
 
 	[Serializable]
-	private class CapabilityEventEntryV2
+	public class CapabilityEventEntryV2
 	{
 		public string name = "";
 		public string displayName = "";
@@ -176,7 +179,7 @@ public partial class ModuleExporter
 	}
 
 	private readonly string[] capabilityTabsV2 = { "Components", "Features" };
-	private readonly string[] capabilityInspectorTabsV2 = { "Component", "Properties", "Methods", "Events" };
+	private readonly string[] capabilityInspectorTabsV2 = { "Component", "Properties", "Methods", "Events", "Compact API" };
 	private readonly string[] capabilityCanAddOptionsV2 = { "No", "Yes", "Characters", "Game", "Nature", "Props", "Other" };
 	private readonly string[] capabilityFeatureInspectorTabsV2 = { "Implementation", "Information" };
 	private const string CapabilityFeatureCatalogAssetPathV2 = "Editor/FeatureCatalog/default-feature-catalog-v2.json";
@@ -294,7 +297,14 @@ public partial class ModuleExporter
 
 				if (GUILayout.Button("X", GUILayout.Width(28f), GUILayout.Height(30f)))
 				{
-					capabilityComponentsV2.RemoveAt(i);
+					if (compactFeatures.features.Any(mapping => mapping.component == entry.typeName))
+                    {
+                        EditorUtility.DisplayDialog("Component in use", "Remove its feature mappings before deleting this component.", "OK");
+                        EditorGUILayout.EndHorizontal();
+                        break;
+                    }
+                    compactFeatures.components.RemoveAll(api => api.component == entry.typeName);
+                    capabilityComponentsV2.RemoveAt(i);
 					selectedCapabilityComponentIndexV2 = Mathf.Clamp(selectedCapabilityComponentIndexV2, 0, capabilityComponentsV2.Count - 1);
 					if (capabilityComponentsV2.Count == 0)
 					{
@@ -322,7 +332,10 @@ public partial class ModuleExporter
 		{
 			switch (activeCapabilityInspectorTabV2)
 			{
-				case CapabilityComponentInspectorTabV2.Component:
+				case CapabilityComponentInspectorTabV2.Api:
+                    DrawCompactApiEditor(FindCompactApi(entry.typeName));
+                    break;
+                case CapabilityComponentInspectorTabV2.Component:
 					DrawCapabilityComponentInspectorV2(entry);
 					break;
 				case CapabilityComponentInspectorTabV2.Properties:
@@ -350,6 +363,15 @@ public partial class ModuleExporter
 		entry.displayName = EditorGUILayout.TextField("Display Name", entry.displayName);
 		entry.description = EditorGUILayout.TextField("Description", entry.description);
 		entry.canAdd = DrawCapabilityCanAddPopupV2(entry.canAdd);
+        EditorGUILayout.LabelField("Source", entry.sourcePath);
+        if (GUILayout.Button("Refresh API from source"))
+        {
+            var type = ResolveTypeByName(entry.typeName);
+            if (type != null && typeof(MonoBehaviour).IsAssignableFrom(type)) ReadCompactMembers(type, FindCompactApi(entry.typeName));
+            RestoreMissingCapabilityPropertiesV2(entry);
+            RestoreMissingCapabilityMethodsV2(entry);
+            RestoreMissingCapabilityEventsV2(entry);
+        }
 	}
 
 	private void DrawCapabilityPropertyInspectorV2(CapabilityComponentEntryV2 entry)
@@ -914,18 +936,20 @@ public partial class ModuleExporter
 			.OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
 			.ToList();
 
-		List<CapabilityComponentEntryV2> retainedCustomEntries = capabilityComponentsV2
-			.Where(entry => entry != null && entry.isCustom)
-			.ToList();
-		List<CapabilityComponentEntryV2> rebuiltSourceEntries = normalizedSelection
-			.SelectMany(BuildCapabilityComponentEntriesFromSourceV2)
-			.Where(entry => entry != null)
-			.ToList();
-
-		capabilityComponentsV2 = retainedCustomEntries
-			.Concat(rebuiltSourceEntries)
-			.OrderBy(entry => entry.displayName, StringComparer.OrdinalIgnoreCase)
-			.ToList();
+        // Adding files must preserve authored labels, permissions, and property edits.
+        foreach (var entry in normalizedSelection.SelectMany(BuildCapabilityComponentEntriesFromSourceV2))
+        {
+            if (entry == null || capabilityComponentsV2.Any(old => old.typeName == entry.typeName)) continue;
+            capabilityComponentsV2.Add(entry);
+            var api = FindCompactApi(entry.typeName);
+            api.editor = entry;
+            var type = ResolveTypeByName(entry.typeName);
+            if (type != null && typeof(MonoBehaviour).IsAssignableFrom(type)) ReadCompactMembers(type, api);
+            else api.notes.Add("Source metadata only; verify the compiled component API before calling members.");
+            if (!CompactFeatureSchema.Sections.Any(section => CompactFeatureSchema.Section(api, section).Count > 0))
+                api.notes.Add("No public methods or serialized configuration extracted. Runs through Unity lifecycle callbacks.");
+        }
+        capabilityComponentsV2 = capabilityComponentsV2.OrderBy(entry => entry.displayName).ToList();
 		selectedCapabilityComponentIndexV2 = capabilityComponentsV2.Count > 0 ? 0 : -1;
 	}
 
@@ -974,6 +998,7 @@ public partial class ModuleExporter
 			baseType = componentInfo.baseType ?? "",
 			description = NormalizeImportedDescriptionV2(componentInfo.description),
 			canAdd = "No",
+            requiredComponents = componentInfo.requiredComponents ?? new List<string>(),
 			properties = BuildCapabilityPropertyEntriesV2(componentInfo.parameters),
 			methods = BuildCapabilityMethodEntriesV2(componentInfo.methods),
 			events = BuildCapabilityEventEntriesV2(componentInfo.events)
@@ -1165,6 +1190,7 @@ public partial class ModuleExporter
 				baseType = componentInfo.baseType ?? "",
 				description = NormalizeImportedDescriptionV2(componentInfo.description),
 				canAdd = "No",
+            requiredComponents = componentInfo.requiredComponents ?? new List<string>(),
 				properties = BuildCapabilityPropertyEntriesV2(componentInfo.parameters),
 				methods = BuildCapabilityMethodEntriesV2(componentInfo.methods),
 				events = BuildCapabilityEventEntriesV2(componentInfo.events)
@@ -2029,6 +2055,7 @@ public partial class ModuleExporter
 				baseType = component.baseType ?? "",
 				description = NormalizeImportedDescriptionV2(component.description),
 				canAdd = "No",
+            requiredComponents = component.requiredComponents ?? new List<string>(),
 				properties = BuildCapabilityPropertyEntriesV2(component.parameters),
 				methods = BuildCapabilityMethodEntriesV2(component.methods),
 				events = BuildCapabilityEventEntriesV2(component.events)
