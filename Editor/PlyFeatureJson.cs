@@ -9,6 +9,13 @@ using UnityEngine;
 
 public static class PlyFeatureJson
 {
+    public static Dictionary<string, object> ParseObject(string json)
+    {
+        var root = MiniJson.Deserialize(json) as Dictionary<string, object>;
+        if (root == null) throw new InvalidDataException("JSON root must be an object.");
+        return root;
+    }
+
     public static PlyFeatureManifest ImportFromFile(string filePath)
     {
         return Import(File.ReadAllText(filePath));
@@ -1127,6 +1134,7 @@ public static class PlyFeatureJson
                     }
 
                     reader.Read();
+                    if (table.ContainsKey(name)) throw new InvalidDataException("Duplicate JSON key: " + name);
                     table[name] = ParseValue();
                 }
             }
