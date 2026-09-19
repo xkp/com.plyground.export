@@ -101,6 +101,16 @@ public sealed class CompactFeatureSchema
         return result;
     }
 
+    // Components are module capabilities in their own right. Feature mappings are deliberately
+    // ignored by the current module format.
+    public static CompactFeatureSchema ImportComponents(string json)
+    {
+        var root = PlyFeatureJson.ParseObject(json);
+        if (!root.TryGetValue("components", out object components) || !(components is Dictionary<string, object>))
+            return new CompactFeatureSchema();
+        return Import("{\"features\":{},\"components\":" + PlyFeatureJson.SerializeValue(components) + "}");
+    }
+
     public string Export()
     {
         Validate();
@@ -119,6 +129,16 @@ public sealed class CompactFeatureSchema
         string schema = Export();
         string module = moduleJson.TrimEnd();
         return module.Substring(0, module.Length - 1) + "," + schema.Substring(1);
+    }
+
+    public string AppendComponentsToModule(string moduleJson)
+    {
+        var componentsOnly = new CompactFeatureSchema { components = components ?? new List<CompactComponentApi>() };
+        string schema = componentsOnly.Export();
+        var root = PlyFeatureJson.ParseObject(schema);
+        string componentObject = PlyFeatureJson.SerializeValue(root["components"]);
+        string module = moduleJson.TrimEnd();
+        return module.Substring(0, module.Length - 1) + ",\"components\":" + componentObject + "}";
     }
 
     private static string Quote(string value)

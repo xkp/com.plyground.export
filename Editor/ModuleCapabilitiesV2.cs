@@ -297,12 +297,6 @@ public partial class ModuleExporter
 
 				if (GUILayout.Button("X", GUILayout.Width(28f), GUILayout.Height(30f)))
 				{
-					if (compactFeatures.features.Any(mapping => mapping.component == entry.typeName))
-                    {
-                        EditorUtility.DisplayDialog("Component in use", "Remove its feature mappings before deleting this component.", "OK");
-                        EditorGUILayout.EndHorizontal();
-                        break;
-                    }
                     compactFeatures.components.RemoveAll(api => api.component == entry.typeName);
                     capabilityComponentsV2.RemoveAt(i);
 					selectedCapabilityComponentIndexV2 = Mathf.Clamp(selectedCapabilityComponentIndexV2, 0, capabilityComponentsV2.Count - 1);

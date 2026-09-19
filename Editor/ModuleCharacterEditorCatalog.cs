@@ -6,6 +6,15 @@ using UnityEngine;
 
 public partial class ModuleExporter
 {
+    private enum CharacterEditorCatalogTab
+    {
+        Appearance,
+        Equipment
+    }
+
+    private readonly string[] characterEditorCatalogTabs = { "Appearance", "Equipment" };
+    private CharacterEditorCatalogTab activeCharacterEditorCatalogTab;
+
     [Serializable]
     public class CharacterEditorCatalog
     {
@@ -55,9 +64,19 @@ public partial class ModuleExporter
 
         DrawCharacterEditorCapabilities();
         EditorGUILayout.Space(8f);
-        DrawCharacterEditorCatalogList("Equipment", characterEditorCatalog.equipment, true);
-        EditorGUILayout.Space(8f);
-        DrawCharacterEditorCatalogList("Clothing", characterEditorCatalog.clothing, false);
+        activeCharacterEditorCatalogTab = (CharacterEditorCatalogTab)GUILayout.Toolbar(
+            (int)activeCharacterEditorCatalogTab,
+            characterEditorCatalogTabs);
+        EditorGUILayout.Space(6f);
+        switch (activeCharacterEditorCatalogTab)
+        {
+            case CharacterEditorCatalogTab.Appearance:
+                DrawCharacterEditorCatalogList("Clothing", characterEditorCatalog.clothing, false);
+                break;
+            case CharacterEditorCatalogTab.Equipment:
+                DrawCharacterEditorCatalogList("Equipment", characterEditorCatalog.equipment, true);
+                break;
+        }
 
         string validation = GetCharacterEditorCatalogValidationError();
         if (!string.IsNullOrEmpty(validation)) EditorGUILayout.HelpBox(validation, MessageType.Error);

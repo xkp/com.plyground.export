@@ -238,7 +238,17 @@ using System;
 			}
 		}
 
-		compactFeatures = new CompactFeatureSchema();
+		try
+		{
+			compactFeatures = CompactFeatureSchema.ImportComponents(json);
+		}
+		catch (Exception error)
+		{
+			Debug.LogWarning("Module component catalog was ignored: " + error.Message);
+			compactFeatures = new CompactFeatureSchema();
+		}
+		compactFeatures.features.Clear();
+		EnsureCompactComponentEditors();
 		LoadCharacterEditorCatalog(mod.metadata);
 
 		dependencies.Clear();
@@ -461,6 +471,8 @@ using System;
 			})
 			.ToList();
 		mod.metadata = BuildCharacterEditorMetadata();
+		compactFeatures.features.Clear();
+		compactFeatures.Validate();
 		mod.itemGroups = new List<ExportedGroup>();
 		foreach (var group in itemGroups)
 		{
@@ -515,7 +527,8 @@ using System;
 			jsonFilePath = loadedModuleFilePath = Path.Combine(Application.dataPath, "module.bgm");
 		}
 
-		string json = JsonUtility.ToJson(mod, true);
+		compactFeatures.features.Clear();
+		string json = compactFeatures.AppendComponentsToModule(JsonUtility.ToJson(mod, true));
 		File.WriteAllText(jsonFilePath, json);
 		Debug.Log("Saved module JSON to " + jsonFilePath);
 		return jsonFilePath;
@@ -525,6 +538,8 @@ using System;
 	{
 		try
 		{
+			compactFeatures.features.Clear();
+			compactFeatures.Validate();
 			string characterEditorValidation = GetCharacterEditorCatalogValidationError();
 			if (!string.IsNullOrEmpty(characterEditorValidation)) throw new InvalidOperationException(characterEditorValidation);
 		}

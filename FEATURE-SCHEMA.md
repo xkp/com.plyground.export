@@ -1,6 +1,6 @@
 # Module capabilities
 
-The exporter no longer imports or emits the retired top-level `features`, `components`, or `capabilities` formats. Existing modules that contain those fields can still be opened; they are ignored on load and omitted on the next save.
+The exporter no longer imports or emits the retired top-level `features` or `capabilities` formats. Existing modules that contain those fields can still be opened; they are ignored on load and omitted on the next save. The top-level `components` catalog remains available under **Capabilities > Components**.
 
 ## Character editor
 

@@ -19,10 +19,11 @@ public partial class ModuleExporter
 	private readonly string[] topTabs = { "Overview", "Files", "Items", "Capabilities", "Export" };
 	private enum CapabilityWorkspaceTab
 	{
+		Components,
 		CharacterEditor
 	}
 
-	private readonly string[] capabilityTabs = { "Character Editor" };
+	private readonly string[] capabilityTabs = { "Components", "Character Editor" };
 	private CapabilityWorkspaceTab activeCapabilityTab;
 
 	private ModuleEditorTab activeTab;
@@ -1237,10 +1238,21 @@ public partial class ModuleExporter
 
 		switch (activeCapabilityTab)
 		{
+			case CapabilityWorkspaceTab.Components:
+				DrawCapabilityComponentsTab();
+				break;
 			case CapabilityWorkspaceTab.CharacterEditor:
 				DrawCharacterEditorCatalogTab();
 				break;
 		}
+	}
+
+	private void DrawCapabilityComponentsTab()
+	{
+		compactFeatures = compactFeatures ?? new CompactFeatureSchema();
+		EditorGUILayout.HelpBox("Expose the module's components and their editable APIs. Feature mappings are not part of the module format.", MessageType.Info);
+		EnsureCompactComponentEditors();
+		DrawCapabilitiesV2ComponentsWorkspace();
 	}
 
 	private void RebuildModuleCapabilitiesFromSelectedScripts()

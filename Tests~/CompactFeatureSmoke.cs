@@ -90,7 +90,7 @@ public static class CompactFeatureSmoke
             typeof(ModuleExporter).GetField("loadedModuleFilePath", flags).SetValue(window, file);
             typeof(ModuleExporter).GetMethod("SaveModule", flags).Invoke(window, null);
             var exportedRoot = PlyFeatureJson.ParseObject(File.ReadAllText(file));
-            Check(!exportedRoot.ContainsKey("features") && !exportedRoot.ContainsKey("components"), "Module export emitted retired feature schema");
+            Check(!exportedRoot.ContainsKey("features") && exportedRoot.ContainsKey("components"), "Module export did not emit its component catalog");
             var exportedMetadata = (System.Collections.Generic.Dictionary<string, object>)exportedRoot["metadata"];
             var exportedCharacterEditor = (System.Collections.Generic.Dictionary<string, object>)exportedMetadata["characterEditor"];
             Check((string)exportedCharacterEditor["schemaVersion"] == "plyground.character-catalog/v1", "Character editor schema version lost");
@@ -102,7 +102,7 @@ public static class CompactFeatureSmoke
             typeof(ModuleExporter).GetField("compactFeatures", flags).SetValue(window, new CompactFeatureSchema());
             typeof(ModuleExporter).GetMethod("LoadModuleFromFile", flags).Invoke(window, new object[] { file });
             var loaded = (CompactFeatureSchema)typeof(ModuleExporter).GetField("compactFeatures", flags).GetValue(window);
-            Check(loaded.features.Count == 0 && loaded.components.Count == 0, "Module load restored retired feature schema");
+            Check(loaded.features.Count == 0 && loaded.components.Count == 1, "Module load did not preserve its component catalog");
             var loadedCharacterCatalog = (ModuleExporter.CharacterEditorCatalog)typeof(ModuleExporter).GetField("characterEditorCatalog", flags).GetValue(window);
             Check(loadedCharacterCatalog.enabled && loadedCharacterCatalog.equipment.Count == 1 && loadedCharacterCatalog.equipment[0].attachmentBone == "RightHand", "Module load lost character editor catalog");
             UnityEngine.Object.DestroyImmediate(window);
