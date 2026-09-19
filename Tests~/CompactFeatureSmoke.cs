@@ -66,16 +66,47 @@ public static class CompactFeatureSmoke
             var flags = BindingFlags.Instance | BindingFlags.NonPublic;
             typeof(ModuleExporter).GetField("compactFeatures", flags).SetValue(window, schema);
             typeof(ModuleExporter).GetField("moduleId", flags).SetValue(window, "COMBAT");
+            var characterCatalog = new ModuleExporter.CharacterEditorCatalog
+            {
+                enabled = true,
+                capabilities = new System.Collections.Generic.List<string> { "transform", "collision" },
+                equipment = new System.Collections.Generic.List<ModuleExporter.CharacterEditorCatalogItem>
+                {
+                    new ModuleExporter.CharacterEditorCatalogItem
+                    {
+                        id = "steel-sword",
+                        displayName = "Steel Sword",
+                        slot = "right-hand",
+                        itemId = "weapon-sword",
+                        sourceAssetPath = "Assets/Weapons/SteelSword.prefab",
+                        attachmentBone = "RightHand",
+                        exclusiveGroup = "right-hand",
+                        conflictTags = new System.Collections.Generic.List<string> { "two-handed" }
+                    }
+                }
+            };
+            typeof(ModuleExporter).GetField("characterEditorCatalog", flags).SetValue(window, characterCatalog);
             string file = Path.Combine(Application.dataPath, "smoke-module.bgm");
             typeof(ModuleExporter).GetField("loadedModuleFilePath", flags).SetValue(window, file);
             typeof(ModuleExporter).GetMethod("SaveModule", flags).Invoke(window, null);
             var exported = CompactFeatureSchema.Import(File.ReadAllText(file));
             Check(exported.features.Count == 2 && exported.components.Count == 1, "SaveModule lost compact schema");
+            var exportedRoot = PlyFeatureJson.ParseObject(File.ReadAllText(file));
+            var exportedMetadata = (System.Collections.Generic.Dictionary<string, object>)exportedRoot["metadata"];
+            var exportedCharacterEditor = (System.Collections.Generic.Dictionary<string, object>)exportedMetadata["characterEditor"];
+            Check((string)exportedCharacterEditor["schemaVersion"] == "plyground.character-catalog/v1", "Character editor schema version lost");
+            var exportedCapabilities = (System.Collections.Generic.List<object>)exportedCharacterEditor["capabilities"];
+            Check(exportedCapabilities.Cast<string>().Contains("transform") && exportedCapabilities.Cast<string>().Contains("collision") && exportedCapabilities.Cast<string>().Contains("equipment"), "Character editor capabilities lost");
+            var exportedEquipment = (System.Collections.Generic.List<object>)exportedCharacterEditor["equipment"];
+            var exportedSword = (System.Collections.Generic.Dictionary<string, object>)exportedEquipment[0];
+            Check((string)exportedSword["attachmentBone"] == "RightHand" && (string)exportedSword["sourceAssetPath"] == "Assets/Weapons/SteelSword.prefab", "Character editor equipment lost");
             typeof(ModuleExporter).GetField("compactFeatures", flags).SetValue(window, new CompactFeatureSchema());
             typeof(ModuleExporter).GetMethod("LoadModuleFromFile", flags).Invoke(window, new object[] { file });
             var loaded = (CompactFeatureSchema)typeof(ModuleExporter).GetField("compactFeatures", flags).GetValue(window);
             Check(loaded.features.Count == 2 && loaded.components[0].methods.Count == api.methods.Count, "Module load lost API");
             Check(loaded.components[0].editor.canAdd == "Yes", "Load lost attachment metadata");
+            var loadedCharacterCatalog = (ModuleExporter.CharacterEditorCatalog)typeof(ModuleExporter).GetField("characterEditorCatalog", flags).GetValue(window);
+            Check(loadedCharacterCatalog.enabled && loadedCharacterCatalog.equipment.Count == 1 && loadedCharacterCatalog.equipment[0].attachmentBone == "RightHand", "Module load lost character editor catalog");
             typeof(ModuleExporter).GetMethod("ProcessSelectedCapabilitySourceFilesV2", flags).Invoke(window, new object[] { new System.Collections.Generic.List<string> { "Assets/SourceFixture.cs" } });
             var sourceApi = loaded.components.Single(value => value.component == "Smoke.SourceFixture");
             Check(sourceApi.methods.Contains("void Fire(int count)"), "Source import lost public API");

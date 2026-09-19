@@ -13,10 +13,11 @@ public partial class ModuleExporter
 		Files,
 		Items,
 		Capabilities,
+		CharacterEditor,
 		Export
 	}
 
-	private readonly string[] topTabs = { "Overview", "Files", "Items", "Features & APIs", "Export" };
+	private readonly string[] topTabs = { "Overview", "Files", "Items", "Features & APIs", "Character Editor", "Export" };
 	private enum CapabilityWorkspaceTab
 	{
 		Components,
@@ -79,6 +80,9 @@ public partial class ModuleExporter
 				break;
 			case ModuleEditorTab.Capabilities:
 				DrawCompactFeaturesTab();
+				break;
+			case ModuleEditorTab.CharacterEditor:
+				DrawCharacterEditorCatalogTab();
 				break;
 		}
 
@@ -256,7 +260,14 @@ public partial class ModuleExporter
 		GUILayout.FlexibleSpace();
 		if (GUILayout.Button("Save", EditorStyles.toolbarButton, GUILayout.Width(110f)))
 		{
-			SaveModule();
+			try
+			{
+				SaveModule();
+			}
+			catch (Exception error)
+			{
+				EditorUtility.DisplayDialog("Invalid character editor catalog", error.Message, "OK");
+			}
 		}
 		EditorGUILayout.EndHorizontal();
 		EditorGUILayout.Space(8f);

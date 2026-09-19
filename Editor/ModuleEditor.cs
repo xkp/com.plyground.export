@@ -52,6 +52,7 @@ using System;
 
 	private List<Property> moduleProperties = new List<Property>();
 	private List<ModuleTool> moduleTools = new List<ModuleTool>();
+	private CharacterEditorCatalog characterEditorCatalog = new CharacterEditorCatalog();
 	private CapabilityManifest moduleCapabilities = new CapabilityManifest();
 	private PlyFeatureManifest featureManifest = new PlyFeatureManifest();
 	private List<string> capabilitySourceScriptPaths = new List<string>();
@@ -242,6 +243,7 @@ using System;
 
 		compactFeatures = importedFeatures;
         EnsureCompactComponentEditors();
+		LoadCharacterEditorCatalog(mod.metadata);
 
 		dependencies.Clear();
 		if (mod.dependencies != null)
@@ -462,6 +464,7 @@ using System;
 				url = tool.url
 			})
 			.ToList();
+		mod.metadata = BuildCharacterEditorMetadata();
 		compactFeatures.Validate();
 		mod.itemGroups = new List<ExportedGroup>();
 		foreach (var group in itemGroups)
@@ -525,8 +528,13 @@ using System;
 
 	private void ExportModule()
 	{
-		try { compactFeatures.Validate(); }
-		catch (Exception error) { EditorUtility.DisplayDialog("Invalid feature schema", error.Message, "OK"); return; }
+		try
+		{
+			compactFeatures.Validate();
+			string characterEditorValidation = GetCharacterEditorCatalogValidationError();
+			if (!string.IsNullOrEmpty(characterEditorValidation)) throw new InvalidOperationException(characterEditorValidation);
+		}
+		catch (Exception error) { EditorUtility.DisplayDialog("Invalid module schema", error.Message, "OK"); return; }
 		string moduleFolder = GetModuleFolder();
 		Directory.CreateDirectory(moduleFolder);
 		ClearModuleExportFolder(moduleFolder, new[]
@@ -1126,7 +1134,14 @@ using System;
 		public List<ExportedGroup> itemGroups;
 		public List<Property> moduleProperties;
 		public List<ModuleTool> tools;
+		public ExportedModuleMetadata metadata;
 
+	}
+
+	[System.Serializable]
+	public class ExportedModuleMetadata
+	{
+		public CharacterEditorCatalogExport characterEditor;
 	}
 
 	[System.Serializable]
