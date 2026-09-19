@@ -13,18 +13,16 @@ public partial class ModuleExporter
 		Files,
 		Items,
 		Capabilities,
-		CharacterEditor,
 		Export
 	}
 
-	private readonly string[] topTabs = { "Overview", "Files", "Items", "Features & APIs", "Character Editor", "Export" };
+	private readonly string[] topTabs = { "Overview", "Files", "Items", "Capabilities", "Export" };
 	private enum CapabilityWorkspaceTab
 	{
-		Components,
-		Features
+		CharacterEditor
 	}
 
-	private readonly string[] capabilityTabs = { "Components", "Features" };
+	private readonly string[] capabilityTabs = { "Character Editor" };
 	private CapabilityWorkspaceTab activeCapabilityTab;
 
 	private ModuleEditorTab activeTab;
@@ -79,10 +77,7 @@ public partial class ModuleExporter
 				DrawExportTab();
 				break;
 			case ModuleEditorTab.Capabilities:
-				DrawCompactFeaturesTab();
-				break;
-			case ModuleEditorTab.CharacterEditor:
-				DrawCharacterEditorCatalogTab();
+				DrawCapabilitiesTab();
 				break;
 		}
 
@@ -1235,37 +1230,15 @@ public partial class ModuleExporter
 
 	private void DrawCapabilitiesTab()
 	{
-		moduleCapabilities ??= new CapabilityManifest();
-		PopulateCapabilityModuleMetadata(moduleCapabilities);
-
 		GUILayout.Label("CAPABILITIES", EditorStyles.boldLabel);
-		EditorGUILayout.BeginVertical("box");
-		EditorGUILayout.HelpBox("Capabilities are now scoped to curated components and feature mappings. Use Components to choose the module-facing components and public properties, then use Features to map those properties into semantic gameplay concepts.", MessageType.Info);
-
-		EditorGUILayout.BeginHorizontal();
-		if (GUILayout.Button("Infer Module Capabilities", GUILayout.Width(180f)))
-		{
-			RebuildModuleCapabilitiesFromSelectedScripts();
-		}
-
-		if (GUILayout.Button("Sync Metadata", GUILayout.Width(120f)))
-		{
-			PopulateCapabilityModuleMetadata(moduleCapabilities);
-		}
-		EditorGUILayout.EndHorizontal();
-		EditorGUILayout.EndVertical();
-
-		EditorGUILayout.Space(6f);
+		EditorGUILayout.HelpBox("Module capabilities are declared here. Each editor receives only the controls and visual catalog entries this module explicitly supports.", MessageType.Info);
 		activeCapabilityTab = (CapabilityWorkspaceTab)GUILayout.Toolbar((int)activeCapabilityTab, capabilityTabs);
 		EditorGUILayout.Space(6f);
 
 		switch (activeCapabilityTab)
 		{
-			case CapabilityWorkspaceTab.Components:
-				DrawCapabilitiesComponentsWorkspace();
-				break;
-			case CapabilityWorkspaceTab.Features:
-				DrawCapabilitiesFeaturesWorkspace();
+			case CapabilityWorkspaceTab.CharacterEditor:
+				DrawCharacterEditorCatalogTab();
 				break;
 		}
 	}

@@ -161,9 +161,6 @@ using System;
 		// Read the JSON file (assuming it is a valid ExportedModule JSON).
 		string json = File.ReadAllText(filePath);
 		ExportedModule mod = JsonUtility.FromJson<ExportedModule>(json);
-		CompactFeatureSchema importedFeatures;
-		try { importedFeatures = CompactFeatureSchema.Import(json); }
-		catch (Exception error) { EditorUtility.DisplayDialog("Invalid module schema", error.Message, "OK"); return; }
 
 		// Populate module settings.
 		moduleId = mod.id;
@@ -241,8 +238,7 @@ using System;
 			}
 		}
 
-		compactFeatures = importedFeatures;
-        EnsureCompactComponentEditors();
+		compactFeatures = new CompactFeatureSchema();
 		LoadCharacterEditorCatalog(mod.metadata);
 
 		dependencies.Clear();
@@ -465,7 +461,6 @@ using System;
 			})
 			.ToList();
 		mod.metadata = BuildCharacterEditorMetadata();
-		compactFeatures.Validate();
 		mod.itemGroups = new List<ExportedGroup>();
 		foreach (var group in itemGroups)
 		{
@@ -520,7 +515,7 @@ using System;
 			jsonFilePath = loadedModuleFilePath = Path.Combine(Application.dataPath, "module.bgm");
 		}
 
-		string json = compactFeatures.AppendToModule(JsonUtility.ToJson(mod, true));
+		string json = JsonUtility.ToJson(mod, true);
 		File.WriteAllText(jsonFilePath, json);
 		Debug.Log("Saved module JSON to " + jsonFilePath);
 		return jsonFilePath;
@@ -530,7 +525,6 @@ using System;
 	{
 		try
 		{
-			compactFeatures.Validate();
 			string characterEditorValidation = GetCharacterEditorCatalogValidationError();
 			if (!string.IsNullOrEmpty(characterEditorValidation)) throw new InvalidOperationException(characterEditorValidation);
 		}
