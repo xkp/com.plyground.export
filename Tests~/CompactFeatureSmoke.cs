@@ -70,6 +70,17 @@ public static class CompactFeatureSmoke
             {
                 enabled = true,
                 capabilities = new System.Collections.Generic.List<string> { "transform", "collision" },
+                characters = new System.Collections.Generic.List<ModuleExporter.CharacterEditorCatalogCharacter>
+                {
+                    new ModuleExporter.CharacterEditorCatalogCharacter
+                    {
+                        id = "hero-body",
+                        displayName = "Hero Body",
+                        itemId = "hero-body",
+                        sourceAssetPath = "Assets/Characters/Hero.prefab",
+                        bodyType = "humanoid"
+                    }
+                },
                 equipment = new System.Collections.Generic.List<ModuleExporter.CharacterEditorCatalogItem>
                 {
                     new ModuleExporter.CharacterEditorCatalogItem
@@ -81,6 +92,7 @@ public static class CompactFeatureSmoke
                         sourceAssetPath = "Assets/Weapons/SteelSword.prefab",
                         attachmentBone = "RightHand",
                         exclusiveGroup = "right-hand",
+                        compatibleBodyTypes = new System.Collections.Generic.List<string> { "humanoid" },
                         conflictTags = new System.Collections.Generic.List<string> { "two-handed" }
                     }
                 }
@@ -93,18 +105,21 @@ public static class CompactFeatureSmoke
             Check(!exportedRoot.ContainsKey("features") && exportedRoot.ContainsKey("components"), "Module export did not emit its component catalog");
             var exportedMetadata = (System.Collections.Generic.Dictionary<string, object>)exportedRoot["metadata"];
             var exportedCharacterEditor = (System.Collections.Generic.Dictionary<string, object>)exportedMetadata["characterEditor"];
-            Check((string)exportedCharacterEditor["schemaVersion"] == "plyground.character-catalog/v1", "Character editor schema version lost");
+            Check((string)exportedCharacterEditor["schemaVersion"] == "plyground.character-catalog/v2", "Character editor schema version lost");
             var exportedCapabilities = (System.Collections.Generic.List<object>)exportedCharacterEditor["capabilities"];
-            Check(exportedCapabilities.Cast<string>().Contains("transform") && exportedCapabilities.Cast<string>().Contains("collision") && exportedCapabilities.Cast<string>().Contains("equipment"), "Character editor capabilities lost");
+            Check(exportedCapabilities.Cast<string>().Contains("transform") && exportedCapabilities.Cast<string>().Contains("collision") && exportedCapabilities.Cast<string>().Contains("equipment") && exportedCapabilities.Cast<string>().Contains("appearance"), "Character editor capabilities lost");
+            var exportedCharacters = (System.Collections.Generic.List<object>)exportedCharacterEditor["characters"];
+            var exportedCharacter = (System.Collections.Generic.Dictionary<string, object>)exportedCharacters[0];
+            Check((string)exportedCharacter["bodyType"] == "humanoid", "Character body type lost");
             var exportedEquipment = (System.Collections.Generic.List<object>)exportedCharacterEditor["equipment"];
             var exportedSword = (System.Collections.Generic.Dictionary<string, object>)exportedEquipment[0];
-            Check((string)exportedSword["attachmentBone"] == "RightHand" && (string)exportedSword["sourceAssetPath"] == "Assets/Weapons/SteelSword.prefab", "Character editor equipment lost");
+            Check((string)exportedSword["attachmentBone"] == "RightHand" && (string)exportedSword["sourceAssetPath"] == "Assets/Weapons/SteelSword.prefab" && ((System.Collections.Generic.List<object>)exportedSword["compatibleBodyTypes"]).Cast<string>().Contains("humanoid"), "Character editor equipment lost");
             typeof(ModuleExporter).GetField("compactFeatures", flags).SetValue(window, new CompactFeatureSchema());
             typeof(ModuleExporter).GetMethod("LoadModuleFromFile", flags).Invoke(window, new object[] { file });
             var loaded = (CompactFeatureSchema)typeof(ModuleExporter).GetField("compactFeatures", flags).GetValue(window);
             Check(loaded.features.Count == 0 && loaded.components.Count == 1, "Module load did not preserve its component catalog");
             var loadedCharacterCatalog = (ModuleExporter.CharacterEditorCatalog)typeof(ModuleExporter).GetField("characterEditorCatalog", flags).GetValue(window);
-            Check(loadedCharacterCatalog.enabled && loadedCharacterCatalog.equipment.Count == 1 && loadedCharacterCatalog.equipment[0].attachmentBone == "RightHand", "Module load lost character editor catalog");
+            Check(loadedCharacterCatalog.enabled && loadedCharacterCatalog.characters.Count == 1 && loadedCharacterCatalog.characters[0].bodyType == "humanoid" && loadedCharacterCatalog.equipment.Count == 1 && loadedCharacterCatalog.equipment[0].attachmentBone == "RightHand", "Module load lost character editor catalog");
             UnityEngine.Object.DestroyImmediate(window);
             Debug.Log("COMPACT_FEATURE_SMOKE_PASSED");
             EditorApplication.Exit(0);

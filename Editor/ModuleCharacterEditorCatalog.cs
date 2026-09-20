@@ -8,11 +8,12 @@ public partial class ModuleExporter
 {
     private enum CharacterEditorCatalogTab
     {
+        Characters,
         Appearance,
         Equipment
     }
 
-    private readonly string[] characterEditorCatalogTabs = { "Appearance", "Equipment" };
+    private readonly string[] characterEditorCatalogTabs = { "Characters", "Appearance", "Equipment" };
     private CharacterEditorCatalogTab activeCharacterEditorCatalogTab;
 
     [Serializable]
@@ -20,6 +21,7 @@ public partial class ModuleExporter
     {
         [NonSerialized] public bool enabled;
         public List<string> capabilities = new List<string> { "transform" };
+        public List<CharacterEditorCatalogCharacter> characters = new List<CharacterEditorCatalogCharacter>();
         public List<CharacterEditorCatalogItem> equipment = new List<CharacterEditorCatalogItem>();
         public List<CharacterEditorCatalogItem> clothing = new List<CharacterEditorCatalogItem>();
     }
@@ -27,8 +29,9 @@ public partial class ModuleExporter
     [Serializable]
     public class CharacterEditorCatalogExport
     {
-        public string schemaVersion = "plyground.character-catalog/v1";
+        public string schemaVersion = "plyground.character-catalog/v2";
         public List<string> capabilities = new List<string>();
+        public List<CharacterEditorCatalogCharacter> characters = new List<CharacterEditorCatalogCharacter>();
         public List<CharacterEditorCatalogItem> equipment = new List<CharacterEditorCatalogItem>();
         public List<CharacterEditorCatalogItem> clothing = new List<CharacterEditorCatalogItem>();
     }
@@ -45,6 +48,17 @@ public partial class ModuleExporter
         public string exclusiveGroup = "";
         public List<string> incompatibleItemIds = new List<string>();
         public List<string> conflictTags = new List<string>();
+        public List<string> compatibleBodyTypes = new List<string>();
+    }
+
+    [Serializable]
+    public class CharacterEditorCatalogCharacter
+    {
+        public string id = "";
+        public string displayName = "";
+        public string itemId = "";
+        public string sourceAssetPath = "";
+        public string bodyType = "";
     }
 
     private void DrawCharacterEditorCatalogTab()
@@ -70,6 +84,9 @@ public partial class ModuleExporter
         EditorGUILayout.Space(6f);
         switch (activeCharacterEditorCatalogTab)
         {
+            case CharacterEditorCatalogTab.Characters:
+                DrawCharacterEditorCharacters();
+                break;
             case CharacterEditorCatalogTab.Appearance:
                 DrawCharacterEditorCatalogList("Clothing", characterEditorCatalog.clothing, false);
                 break;
@@ -90,6 +107,41 @@ public partial class ModuleExporter
         EditorGUILayout.HelpBox(
             "Equipment and clothing capabilities are automatically exported only when their respective lists contain valid entries.",
             MessageType.None);
+    }
+
+    private void DrawCharacterEditorCharacters()
+    {
+        characterEditorCatalog.characters ??= new List<CharacterEditorCatalogCharacter>();
+        EditorGUILayout.BeginVertical("box");
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("CHARACTER BODIES", EditorStyles.boldLabel);
+        GUILayout.FlexibleSpace();
+        if (GUILayout.Button("Add module item", GUILayout.Width(130f))) AddCharacterEditorCharacter();
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.HelpBox(
+            "Publish the base prefabs this module provides. Body type is the compatibility key used to filter appearance and equipment from selected modules.",
+            MessageType.None);
+        if (characterEditorCatalog.characters.Count == 0)
+            EditorGUILayout.LabelField("No character bodies. This module can still contribute equipment or appearance to another body.", EditorStyles.miniLabel);
+
+        for (int index = 0; index < characterEditorCatalog.characters.Count; index++)
+        {
+            CharacterEditorCatalogCharacter entry = characterEditorCatalog.characters[index] ?? new CharacterEditorCatalogCharacter();
+            characterEditorCatalog.characters[index] = entry;
+            EditorGUILayout.BeginVertical("helpbox");
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(entry.displayName) ? "New character body" : entry.displayName, EditorStyles.boldLabel);
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Remove", GUILayout.Width(70f))) { characterEditorCatalog.characters.RemoveAt(index); EditorGUILayout.EndHorizontal(); EditorGUILayout.EndVertical(); break; }
+            EditorGUILayout.EndHorizontal();
+            entry.id = EditorGUILayout.TextField("Character ID", entry.id);
+            entry.displayName = EditorGUILayout.TextField("Display name", entry.displayName);
+            entry.sourceAssetPath = EditorGUILayout.TextField("Prefab asset path", entry.sourceAssetPath);
+            entry.itemId = EditorGUILayout.TextField("Module item ID", entry.itemId);
+            entry.bodyType = EditorGUILayout.TextField("Body type", entry.bodyType);
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.EndVertical();
     }
 
     private void DrawCharacterEditorCapabilityToggle(string capability, string label)
@@ -137,6 +189,7 @@ public partial class ModuleExporter
             entry.itemId = EditorGUILayout.TextField("Module item ID", entry.itemId);
             if (isEquipment) entry.attachmentBone = EditorGUILayout.TextField("Attachment bone", entry.attachmentBone);
             entry.exclusiveGroup = EditorGUILayout.TextField("Exclusive group", entry.exclusiveGroup);
+            DrawCharacterEditorStringList("Compatible body types", entry.compatibleBodyTypes);
             DrawCharacterEditorStringList("Incompatible catalog IDs", entry.incompatibleItemIds);
             DrawCharacterEditorStringList("Conflict tags", entry.conflictTags);
             EditorGUILayout.EndVertical();
@@ -177,6 +230,37 @@ public partial class ModuleExporter
         menu.ShowAsContext();
     }
 
+    private void AddCharacterEditorCharacter()
+    {
+        List<Item> candidates = itemGroups.Where(group => group != null)
+            .SelectMany(group => group.items ?? new List<Item>())
+            .Where(item => item != null && !string.IsNullOrWhiteSpace(item.id) && !string.IsNullOrWhiteSpace(item.prefabPath))
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            EditorUtility.DisplayDialog("Character Editor", "Add a module item with a prefab asset path before publishing it as a character body.", "OK");
+            return;
+        }
+
+        GenericMenu menu = new GenericMenu();
+        foreach (Item item in candidates)
+        {
+            Item selected = item;
+            menu.AddItem(new GUIContent(selected.name + "  [" + selected.id + "]"), false, () => {
+                characterEditorCatalog.characters.Add(new CharacterEditorCatalogCharacter
+                {
+                    id = selected.id,
+                    itemId = selected.id,
+                    displayName = selected.name,
+                    sourceAssetPath = selected.prefabPath,
+                    bodyType = "humanoid"
+                });
+                Repaint();
+            });
+        }
+        menu.ShowAsContext();
+    }
+
     private static void DrawCharacterEditorStringList(string label, List<string> values)
     {
         values ??= new List<string>();
@@ -196,11 +280,13 @@ public partial class ModuleExporter
         CharacterEditorCatalogExport catalog = new CharacterEditorCatalogExport
         {
             capabilities = DistinctCharacterEditorStrings(characterEditorCatalog.capabilities),
+            characters = CloneCharacterEditorCharacters(characterEditorCatalog.characters),
             equipment = CloneCharacterEditorEntries(characterEditorCatalog.equipment),
             clothing = CloneCharacterEditorEntries(characterEditorCatalog.clothing)
         };
         if (catalog.equipment.Count > 0) catalog.capabilities.Add("equipment");
         if (catalog.clothing.Count > 0) catalog.capabilities.Add("clothing");
+        if (catalog.characters.Count > 0 || catalog.clothing.Count > 0) catalog.capabilities.Add("appearance");
         catalog.capabilities = DistinctCharacterEditorStrings(catalog.capabilities);
         return new ExportedModuleMetadata { characterEditor = catalog };
     }
@@ -217,6 +303,7 @@ public partial class ModuleExporter
         {
             enabled = true,
             capabilities = DistinctCharacterEditorStrings(imported.capabilities),
+            characters = CloneCharacterEditorCharacters(imported.characters),
             equipment = CloneCharacterEditorEntries(imported.equipment),
             clothing = CloneCharacterEditorEntries(imported.clothing)
         };
@@ -228,7 +315,21 @@ public partial class ModuleExporter
         if (characterEditorCatalog == null || !characterEditorCatalog.enabled) return "";
         return ValidateCharacterEditorEntries(characterEditorCatalog.equipment, "equipment")
             ?? ValidateCharacterEditorEntries(characterEditorCatalog.clothing, "clothing")
+            ?? ValidateCharacterEditorCharacters(characterEditorCatalog.characters)
             ?? "";
+    }
+
+    private static string ValidateCharacterEditorCharacters(List<CharacterEditorCatalogCharacter> entries)
+    {
+        HashSet<string> ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (CharacterEditorCatalogCharacter entry in entries ?? new List<CharacterEditorCatalogCharacter>())
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(entry.id)) return "Each character body needs a character ID.";
+            if (!ids.Add(entry.id.Trim())) return "Duplicate character body ID: " + entry.id;
+            if (string.IsNullOrWhiteSpace(entry.sourceAssetPath)) return entry.id + " needs a prefab asset path.";
+            if (string.IsNullOrWhiteSpace(entry.bodyType)) return entry.id + " needs a body type.";
+        }
+        return null;
     }
 
     private static string ValidateCharacterEditorEntries(List<CharacterEditorCatalogItem> entries, string label)
@@ -261,7 +362,20 @@ public partial class ModuleExporter
             attachmentBone = entry.attachmentBone ?? "",
             exclusiveGroup = entry.exclusiveGroup ?? "",
             incompatibleItemIds = DistinctCharacterEditorStrings(entry.incompatibleItemIds),
-            conflictTags = DistinctCharacterEditorStrings(entry.conflictTags)
+            conflictTags = DistinctCharacterEditorStrings(entry.conflictTags),
+            compatibleBodyTypes = DistinctCharacterEditorStrings(entry.compatibleBodyTypes)
+        }).ToList();
+    }
+
+    private static List<CharacterEditorCatalogCharacter> CloneCharacterEditorCharacters(IEnumerable<CharacterEditorCatalogCharacter> entries)
+    {
+        return (entries ?? Enumerable.Empty<CharacterEditorCatalogCharacter>()).Where(entry => entry != null).Select(entry => new CharacterEditorCatalogCharacter
+        {
+            id = entry.id ?? "",
+            displayName = entry.displayName ?? "",
+            itemId = entry.itemId ?? "",
+            sourceAssetPath = entry.sourceAssetPath ?? "",
+            bodyType = entry.bodyType ?? ""
         }).ToList();
     }
 }
