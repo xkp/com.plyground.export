@@ -918,29 +918,24 @@ public partial class ModuleExporter
 		selectedItem.template = EditorGUILayout.Toggle("Is Template", selectedItem.template);
 
 		GUILayout.Label("ASSETS", EditorStyles.boldLabel);
-		selectedItem.prefabPath = EditorGUILayout.TextField("Prefab:", selectedItem.prefabPath);
-		string previousIcon = selectedItem.icon;
+		GameObject selectedPrefab = (GameObject)EditorGUILayout.ObjectField("Prefab", selectedItem.prefab, typeof(GameObject), false);
+		if (selectedPrefab != selectedItem.prefab)
+		{
+			selectedItem.prefab = selectedPrefab;
+			selectedItem.prefabPath = selectedPrefab != null ? AssetDatabase.GetAssetPath(selectedPrefab) : "";
+			selectedItem.prefabStructure = selectedPrefab != null ? BuildPrefabStructureIfNested(selectedPrefab) : null;
+		}
+		selectedItem.prefabPath = EditorGUILayout.TextField("Prefab path", selectedItem.prefabPath);
 		selectedItem.icon = IconPickerUI.DrawIconField(selectedItem.icon, CopyCustomIcon, "Item icon:");
-		if (!string.Equals(previousIcon, selectedItem.icon, StringComparison.Ordinal) &&
-			AssetDatabase.LoadAssetAtPath<Texture2D>((selectedItem.icon ?? "").Replace('\\', '/')) != null)
+		EditorGUILayout.HelpBox("Choose an image to use it as the palette icon; choose none to use the prefab visual. The prefab remains bundled so existing RTE placement keeps working.", MessageType.None);
+		GameObject selectedIcon3D = AssetDatabase.LoadAssetAtPath<GameObject>((selectedItem.modelPath ?? "").Replace('\\', '/'));
+		selectedIcon3D = (GameObject)EditorGUILayout.ObjectField("Icon 3D (optional)", selectedIcon3D, typeof(GameObject), false);
+		string selectedIcon3DPath = selectedIcon3D != null ? AssetDatabase.GetAssetPath(selectedIcon3D) : "";
+		if (!string.Equals(selectedIcon3DPath, (selectedItem.modelPath ?? "").Replace('\\', '/'), StringComparison.OrdinalIgnoreCase))
 		{
-			selectedItem.iconOverridesPrefab = true;
+			selectedItem.modelPath = selectedIcon3DPath;
 		}
-		selectedItem.iconOverridesPrefab = EditorGUILayout.Toggle("Use icon instead of prefab", selectedItem.iconOverridesPrefab);
-		EditorGUILayout.HelpBox("Off: consumers use the prefab visual. On: consumers that support palette icons may use the bundled texture instead. The prefab remains in the bundle so existing RTE placement keeps working.", MessageType.None);
-		if (selectedItem.prefab == null)
-		{
-			int selectedIcon3dIndex = Array.IndexOf(
-				allowedCustomItemIcon3dValues,
-				NormalizeCustomItemIcon3dValue(selectedItem.modelPath));
-			if (selectedIcon3dIndex < 0)
-			{
-				selectedIcon3dIndex = 0;
-			}
-
-			selectedIcon3dIndex = EditorGUILayout.Popup("Icon 3D", selectedIcon3dIndex, allowedCustomItemIcon3dValues);
-			selectedItem.modelPath = allowedCustomItemIcon3dValues[selectedIcon3dIndex];
-		}
+		EditorGUILayout.HelpBox("When supplied, RTE first tries this GameObject from the AssetBundle, then falls back to the item's prefab if it is unavailable.", MessageType.None);
 
 		GUILayout.Label("PROPERTIES", EditorStyles.boldLabel);
 		DrawSelectedItemProperties();

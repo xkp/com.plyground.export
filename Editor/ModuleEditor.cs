@@ -42,7 +42,6 @@ using System;
 
 	// Allowed types for properties.
 	private readonly string[] allowedTypes = new string[] { "string", "int", "float", "bool", "enum", "gameitem", "roles", "avatar", "asset", "object" };
-	private readonly string[] allowedCustomItemIcon3dValues = new string[] { "default", "avatar", "npc" };
 	public const string PropertyAudienceUser = "user";
 	public const string PropertyAudienceSystem = "system";
 
@@ -78,10 +77,9 @@ using System;
 		public bool template = false;
 		public GameObject prefab;
 		public string prefabPath;
-		// A source-project icon path. When set to an image asset, the exported
-		// bundle uses it as this item's lightweight visual instead of its prefab.
+		// A source-project icon path. When it resolves to an image asset, the
+		// exported bundle publishes it as this item's palette visual.
 		public string icon;
-		public bool iconOverridesPrefab;
 		public string modelPath;
 		// All properties are now stored in a single dictionary.
 		// For component properties, the key is typically "ComponentName.FieldName" and its Property.component is set.
@@ -287,7 +285,6 @@ using System;
 					item.prefabPath = exportedItem.prefab;
 					item.prefab = AssetDatabase.LoadAssetAtPath<GameObject>(item.prefabPath);
 					item.icon = exportedItem.icon;
-					item.iconOverridesPrefab = exportedItem.iconOverridesPrefab;
 					item.modelPath = "";
 					item.prefabStructure = ClonePrefabNodeSnapshot(exportedItem.prefabStructure);
 					item.pivotOffset = exportedItem.pivotOffset;
@@ -497,12 +494,11 @@ using System;
 				ei.template = item.template;
 				ei.prefab = item.prefabPath;
 				ei.icon = item.icon;
-				ei.iconOverridesPrefab = item.iconOverridesPrefab;
 				ei.iconAssetPath = GetItemIconAssetPath(item);
 				ei.visualAssetPath = string.IsNullOrEmpty(ei.iconAssetPath)
 					? item.prefabPath
 					: ei.iconAssetPath;
-				ei.icon3d = "";
+				ei.icon3d = GetItemIcon3DAssetPath(item);
 				ei.prefabStructure = item.prefab != null
 					? BuildPrefabStructureIfNested(item.prefab)
 					: ClonePrefabNodeSnapshot(item.prefabStructure);
@@ -632,6 +628,12 @@ using System;
 				if (!string.IsNullOrEmpty(itemIconAssetPath))
 				{
 					assetsFromGroups.Add(itemIconAssetPath);
+				}
+
+				string itemIcon3DAssetPath = GetItemIcon3DAssetPath(item);
+				if (!string.IsNullOrEmpty(itemIcon3DAssetPath))
+				{
+					assetsFromGroups.Add(itemIcon3DAssetPath);
 				}
 
 				//make sure all meshes are read/write
@@ -1144,17 +1146,6 @@ using System;
 			: PropertyAudienceUser;
 	}
 
-	protected string NormalizeCustomItemIcon3dValue(string value)
-	{
-		if (string.IsNullOrWhiteSpace(value))
-		{
-			return allowedCustomItemIcon3dValues[0];
-		}
-
-		string match = allowedCustomItemIcon3dValues.FirstOrDefault(option => string.Equals(option, value, StringComparison.OrdinalIgnoreCase));
-		return string.IsNullOrEmpty(match) ? allowedCustomItemIcon3dValues[0] : match;
-	}
-
 	[System.Serializable]
 	private class ExportedModule
 	{
@@ -1205,7 +1196,6 @@ using System;
 		public bool template = false;
 		public string prefab;
 		public string icon;
-		public bool iconOverridesPrefab;
 		// Texture asset key within the module AssetBundle. This is deliberately
 		// separate from icon so older consumers can continue reading icon.
 		public string iconAssetPath;
@@ -1241,7 +1231,7 @@ using System;
 		newItem.prefab = null;
 		newItem.prefabPath = "";
 		newItem.icon = "";
-		newItem.modelPath = allowedCustomItemIcon3dValues[0];
+		newItem.modelPath = "";
 		newItem.properties = new List<Property>();
 		newItem.components = new List<string>();
 		newItem.prefabStructure = null;
@@ -1321,8 +1311,8 @@ using System;
 					item.prefabStructure = BuildPrefabStructureIfNested(item.prefab);
 
 					// Runtime content is supplied exclusively by the AssetBundle.
-					// Do not generate legacy item OBJ/GLB exports.
-					item.modelPath = "";
+					// Do not generate legacy item OBJ/GLB exports. modelPath is retained
+					// only as the optional authored icon3d AssetBundle reference.
 				}
 			}
 		}
@@ -1339,8 +1329,8 @@ using System;
 					item.prefabStructure = BuildPrefabStructureIfNested(item.prefab);
 
 					// Runtime content is supplied exclusively by the AssetBundle.
-					// Do not generate legacy item OBJ/GLB exports.
-					item.modelPath = "";
+					// Do not generate legacy item OBJ/GLB exports. modelPath is retained
+					// only as the optional authored icon3d AssetBundle reference.
 				}
 			}
 		}
@@ -2006,7 +1996,7 @@ using System;
 
 	private static string GetItemIconAssetPath(Item item)
 	{
-		if (item == null || !item.iconOverridesPrefab || string.IsNullOrWhiteSpace(item.icon)) return "";
+		if (item == null || string.IsNullOrWhiteSpace(item.icon)) return "";
 		string candidate = item.icon.Trim().Replace('\\', '/');
 		if (AssetDatabase.LoadAssetAtPath<Texture2D>(candidate) != null) return candidate;
 
@@ -2020,6 +2010,13 @@ using System;
 		}
 
 		return "";
+	}
+
+	private static string GetItemIcon3DAssetPath(Item item)
+	{
+		if (item == null || string.IsNullOrWhiteSpace(item.modelPath)) return "";
+		string candidate = item.modelPath.Trim().Replace('\\', '/');
+		return AssetDatabase.LoadAssetAtPath<GameObject>(candidate) != null ? candidate : "";
 	}
 
 	private static bool HasItemIconAsset(Item item)
