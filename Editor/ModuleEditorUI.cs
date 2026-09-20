@@ -919,7 +919,15 @@ public partial class ModuleExporter
 
 		GUILayout.Label("ASSETS", EditorStyles.boldLabel);
 		selectedItem.prefabPath = EditorGUILayout.TextField("Prefab:", selectedItem.prefabPath);
-		selectedItem.icon = IconPickerUI.DrawIconField(selectedItem.icon, CopyCustomIcon);
+		string previousIcon = selectedItem.icon;
+		selectedItem.icon = IconPickerUI.DrawIconField(selectedItem.icon, CopyCustomIcon, "Item icon:");
+		if (!string.Equals(previousIcon, selectedItem.icon, StringComparison.Ordinal) &&
+			AssetDatabase.LoadAssetAtPath<Texture2D>((selectedItem.icon ?? "").Replace('\\', '/')) != null)
+		{
+			selectedItem.iconOverridesPrefab = true;
+		}
+		selectedItem.iconOverridesPrefab = EditorGUILayout.Toggle("Use icon instead of prefab", selectedItem.iconOverridesPrefab);
+		EditorGUILayout.HelpBox("Off: consumers use the prefab visual. On: consumers that support palette icons may use the bundled texture instead. The prefab remains in the bundle so existing RTE placement keeps working.", MessageType.None);
 		if (selectedItem.prefab == null)
 		{
 			int selectedIcon3dIndex = Array.IndexOf(
@@ -1153,6 +1161,12 @@ public partial class ModuleExporter
 	{
 		if (!string.IsNullOrEmpty(item.icon))
 		{
+			Texture2D bundledSourceIcon = AssetDatabase.LoadAssetAtPath<Texture2D>(item.icon.Replace('\\', '/'));
+			if (bundledSourceIcon != null)
+			{
+				return bundledSourceIcon;
+			}
+
 			string assetIconPath = Path.Combine(GetAssetModuleFolder(), item.icon);
 			Texture2D thumbnail = LoadTextureFromFile(assetIconPath);
 			if (thumbnail != null)
@@ -1182,6 +1196,15 @@ public partial class ModuleExporter
 
 	private Texture2D GetEditorThumbnail(Item item)
 	{
+		if (!string.IsNullOrEmpty(item.icon))
+		{
+			Texture2D bundledSourceIcon = AssetDatabase.LoadAssetAtPath<Texture2D>(item.icon.Replace('\\', '/'));
+			if (bundledSourceIcon != null)
+			{
+				return bundledSourceIcon;
+			}
+		}
+
 		if (item.prefab != null)
 		{
 			Texture2D preview = AssetPreview.GetAssetPreview(item.prefab);

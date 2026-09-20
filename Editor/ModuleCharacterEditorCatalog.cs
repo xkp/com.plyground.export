@@ -116,10 +116,10 @@ public partial class ModuleExporter
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("CHARACTER BODIES", EditorStyles.boldLabel);
         GUILayout.FlexibleSpace();
-        if (GUILayout.Button("Add module item", GUILayout.Width(130f))) AddCharacterEditorCharacter();
+        if (GUILayout.Button("Add skinned mesh", GUILayout.Width(130f))) AddCharacterEditorCharacter();
         EditorGUILayout.EndHorizontal();
         EditorGUILayout.HelpBox(
-            "Publish the base prefabs this module provides. Body type is the compatibility key used to filter appearance and equipment from selected modules.",
+            "Pick a skinned-mesh prefab or imported model from this Unity project. It is included directly in this module's AssetBundle. Body type filters appearance and equipment from selected modules.",
             MessageType.None);
         if (characterEditorCatalog.characters.Count == 0)
             EditorGUILayout.LabelField("No character bodies. This module can still contribute equipment or appearance to another body.", EditorStyles.miniLabel);
@@ -232,33 +232,51 @@ public partial class ModuleExporter
 
     private void AddCharacterEditorCharacter()
     {
-        List<Item> candidates = itemGroups.Where(group => group != null)
-            .SelectMany(group => group.items ?? new List<Item>())
-            .Where(item => item != null && !string.IsNullOrWhiteSpace(item.id) && !string.IsNullOrWhiteSpace(item.prefabPath))
+        List<string> selectedPaths = new List<string>();
+        AssetSelectorWindow.OpenWindow(selectedPaths);
+        List<string> skinnedMeshPaths = selectedPaths
+            .Where(IsSkinnedMeshAssetPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
-        if (candidates.Count == 0)
+        if (skinnedMeshPaths.Count == 0)
         {
-            EditorUtility.DisplayDialog("Character Editor", "Add a module item with a prefab asset path before publishing it as a character body.", "OK");
+            EditorUtility.DisplayDialog("Character Editor", "Select a prefab or imported model containing a SkinnedMeshRenderer.", "OK");
             return;
         }
 
-        GenericMenu menu = new GenericMenu();
-        foreach (Item item in candidates)
+        foreach (string path in skinnedMeshPaths)
         {
-            Item selected = item;
-            menu.AddItem(new GUIContent(selected.name + "  [" + selected.id + "]"), false, () => {
-                characterEditorCatalog.characters.Add(new CharacterEditorCatalogCharacter
-                {
-                    id = selected.id,
-                    itemId = selected.id,
-                    displayName = selected.name,
-                    sourceAssetPath = selected.prefabPath,
-                    bodyType = "humanoid"
-                });
-                Repaint();
+            string displayName = System.IO.Path.GetFileNameWithoutExtension(path);
+            string id = displayName;
+            int suffix = 2;
+            while (characterEditorCatalog.characters.Any(entry => entry != null && string.Equals(entry.id, id, StringComparison.OrdinalIgnoreCase)))
+                id = displayName + "-" + suffix++;
+            characterEditorCatalog.characters.Add(new CharacterEditorCatalogCharacter
+            {
+                id = id,
+                itemId = id,
+                displayName = displayName,
+                sourceAssetPath = path,
+                bodyType = "humanoid"
             });
         }
-        menu.ShowAsContext();
+        Repaint();
+    }
+
+    private static bool IsSkinnedMeshAssetPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        GameObject asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        return asset != null && asset.GetComponentInChildren<SkinnedMeshRenderer>(true) != null;
+    }
+
+    private IEnumerable<string> GetCharacterEditorBodyAssetPaths()
+    {
+        return (characterEditorCatalog?.characters ?? new List<CharacterEditorCatalogCharacter>())
+            .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.sourceAssetPath))
+            .Select(entry => entry.sourceAssetPath.Trim())
+            .Where(IsSkinnedMeshAssetPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
     private static void DrawCharacterEditorStringList(string label, List<string> values)

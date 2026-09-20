@@ -78,7 +78,10 @@ using System;
 		public bool template = false;
 		public GameObject prefab;
 		public string prefabPath;
-		public string icon;    // Path to the generated thumbnail (relative to the module folder)
+		// A source-project icon path. When set to an image asset, the exported
+		// bundle uses it as this item's lightweight visual instead of its prefab.
+		public string icon;
+		public bool iconOverridesPrefab;
 		public string modelPath;
 		// All properties are now stored in a single dictionary.
 		// For component properties, the key is typically "ComponentName.FieldName" and its Property.component is set.
@@ -284,7 +287,8 @@ using System;
 					item.prefabPath = exportedItem.prefab;
 					item.prefab = AssetDatabase.LoadAssetAtPath<GameObject>(item.prefabPath);
 					item.icon = exportedItem.icon;
-					item.modelPath = exportedItem.icon3d;
+					item.iconOverridesPrefab = exportedItem.iconOverridesPrefab;
+					item.modelPath = "";
 					item.prefabStructure = ClonePrefabNodeSnapshot(exportedItem.prefabStructure);
 					item.pivotOffset = exportedItem.pivotOffset;
 					item.exportTranslation = exportedItem.exportTranslation;
@@ -493,7 +497,12 @@ using System;
 				ei.template = item.template;
 				ei.prefab = item.prefabPath;
 				ei.icon = item.icon;
-				ei.icon3d = item.modelPath;
+				ei.iconOverridesPrefab = item.iconOverridesPrefab;
+				ei.iconAssetPath = GetItemIconAssetPath(item);
+				ei.visualAssetPath = string.IsNullOrEmpty(ei.iconAssetPath)
+					? item.prefabPath
+					: ei.iconAssetPath;
+				ei.icon3d = "";
 				ei.prefabStructure = item.prefab != null
 					? BuildPrefabStructureIfNested(item.prefab)
 					: ClonePrefabNodeSnapshot(item.prefabStructure);
@@ -614,8 +623,16 @@ using System;
 		{
 			foreach (var item in group.items)
 			{
+				string itemIconAssetPath = GetItemIconAssetPath(item);
+				// RTE continues to load instantiated items by prefab path. Icons are
+				// supplemental palette metadata until RTE explicitly supports an
+				// icon-only placeholder, so never omit the prefab from its bundle.
 				if (!string.IsNullOrEmpty(item.prefabPath))
 					assetsFromGroups.Add(item.prefabPath);
+				if (!string.IsNullOrEmpty(itemIconAssetPath))
+				{
+					assetsFromGroups.Add(itemIconAssetPath);
+				}
 
 				//make sure all meshes are read/write
 				if (item.prefab != null)
@@ -634,6 +651,20 @@ using System;
 							MakeMeshRW(smr.sharedMesh, processed);
 					}
 				}
+			}
+		}
+
+		// Character bodies are independent of draggable item groups. Their
+		// project assets are explicitly placed in this module's AssetBundle.
+		foreach (string characterBodyPath in GetCharacterEditorBodyAssetPaths())
+		{
+			assetsFromGroups.Add(characterBodyPath);
+			GameObject body = AssetDatabase.LoadAssetAtPath<GameObject>(characterBodyPath);
+			if (body == null) continue;
+			HashSet<Mesh> processed = new HashSet<Mesh>();
+			foreach (var renderer in body.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+			{
+				if (renderer.sharedMesh) MakeMeshRW(renderer.sharedMesh, processed);
 			}
 		}
 
@@ -1174,6 +1205,13 @@ using System;
 		public bool template = false;
 		public string prefab;
 		public string icon;
+		public bool iconOverridesPrefab;
+		// Texture asset key within the module AssetBundle. This is deliberately
+		// separate from icon so older consumers can continue reading icon.
+		public string iconAssetPath;
+		// The AssetBundle key a visual consumer should load: the custom icon when
+		// present, otherwise the item's prefab.
+		public string visualAssetPath;
 		public string icon3d;
 		public PrefabNodeSnapshot prefabStructure;
 		public List<ExportedProperty> properties;
@@ -1274,8 +1312,6 @@ using System;
 
 	private void UpdateAssets()
 	{
-		var modulePath = GetModuleFolder();
-		var texCache = new Dictionary<Texture2D, string>();
 		foreach (var group in itemGroups)
 		{
 			foreach (var item in group.items)
@@ -1284,15 +1320,9 @@ using System;
 				{
 					item.prefabStructure = BuildPrefabStructureIfNested(item.prefab);
 
-					if (string.IsNullOrEmpty(item.icon) || !File.Exists(Path.Combine(modulePath, item.icon)))
-					{
-						GenerateThumbnail(item);
-					}
-
-					if (string.IsNullOrEmpty(item.modelPath) || !File.Exists(Path.Combine(modulePath, item.modelPath)))
-					{
-						GenerateModel(item, ExportFormat.OBJ, true, texCache);
-					}
+					// Runtime content is supplied exclusively by the AssetBundle.
+					// Do not generate legacy item OBJ/GLB exports.
+					item.modelPath = "";
 				}
 			}
 		}
@@ -1300,8 +1330,6 @@ using System;
 
 	private void UpdateExportAssets()
 	{
-		var modulePath = GetModuleFolder();
-		var texCache = new Dictionary<Texture2D, string>();
 		foreach (var group in itemGroups)
 		{
 			foreach (var item in group.items)
@@ -1310,15 +1338,9 @@ using System;
 				{
 					item.prefabStructure = BuildPrefabStructureIfNested(item.prefab);
 
-					if (string.IsNullOrEmpty(item.icon) || !File.Exists(Path.Combine(modulePath, item.icon)))
-					{
-						GenerateThumbnail(item);
-					}
-
-					if (string.IsNullOrEmpty(item.modelPath) || !File.Exists(Path.Combine(modulePath, item.modelPath)))
-					{
-						GenerateModel(item, ExportFormat.OBJ, true, texCache);
-					}
+					// Runtime content is supplied exclusively by the AssetBundle.
+					// Do not generate legacy item OBJ/GLB exports.
+					item.modelPath = "";
 				}
 			}
 		}
@@ -1382,7 +1404,7 @@ using System;
 		if (item.prefab == null)
 			return;
 
-		string moduleFolder = GetModuleFolder();
+		string moduleFolder = GetAssetModuleFolder();
 		string assetsDirectory = Path.Combine(moduleFolder, "Assets");
 		Directory.CreateDirectory(assetsDirectory);
 		string thumbDirectory = Path.Combine(assetsDirectory, "Thumbnails");
@@ -1398,8 +1420,8 @@ using System;
 				{
 					string thumbPath = Path.Combine(thumbDirectory, item.name + ".png");
 					File.WriteAllBytes(thumbPath, pngData);
-					string relativeThumbPath = Path.Combine("Assets", "Thumbnails", item.name + ".png");
-					item.icon = relativeThumbPath;
+					item.icon = GetModuleIconAssetPath(item.name + ".png");
+					AssetDatabase.ImportAsset(item.icon, ImportAssetOptions.ForceUpdate);
 				}
 			}
 			catch
@@ -1463,7 +1485,7 @@ using System;
 
 	private void GenerateModel(Item item, ExportFormat format = ExportFormat.OBJ, bool includeMaterials = true, Dictionary<Texture2D, string> texCache = null)
 	{
-		string moduleFolder = GetModuleFolder();
+		string moduleFolder = GetAssetModuleFolder();
 		string assetsDirectory = Path.Combine(moduleFolder, "Assets");
 		Directory.CreateDirectory(assetsDirectory);
 		string modelDirectory = Path.Combine(assetsDirectory, "Models");
@@ -1900,8 +1922,8 @@ using System;
 				{
 					string thumbPath = Path.Combine(thumbDirectory, item.name + ".png");
 					File.WriteAllBytes(thumbPath, pngData);
-					string relativeThumbPath = Path.Combine("Assets", "Thumbnails", item.name + ".png");
-					item.icon = relativeThumbPath;
+					item.icon = GetModuleIconAssetPath(item.name + ".png");
+					AssetDatabase.ImportAsset(item.icon, ImportAssetOptions.ForceUpdate);
 					return true;
 				}
 			}
@@ -1972,8 +1994,37 @@ using System;
 
 		var filename = Path.GetFileName(imagePath);
 		File.Copy(imagePath, Path.Combine(thumbDirectory, filename), true);
+		string assetPath = GetModuleIconAssetPath(filename);
+		AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+		return assetPath;
+	}
 
-		return Path.Combine("Assets", "Thumbnails", filename);
+	private static string GetModuleIconAssetPath(string fileName)
+	{
+		return "Assets/Plyground/Module/Assets/Thumbnails/" + fileName.Replace('\\', '/');
+	}
+
+	private static string GetItemIconAssetPath(Item item)
+	{
+		if (item == null || !item.iconOverridesPrefab || string.IsNullOrWhiteSpace(item.icon)) return "";
+		string candidate = item.icon.Trim().Replace('\\', '/');
+		if (AssetDatabase.LoadAssetAtPath<Texture2D>(candidate) != null) return candidate;
+
+		// Legacy saved modules used an export-relative thumbnail path. Its source
+		// now lives under Assets/Plyground/Module and can be packed into the bundle.
+		const string legacyPrefix = "Assets/Thumbnails/";
+		if (candidate.StartsWith(legacyPrefix, StringComparison.OrdinalIgnoreCase))
+		{
+			string migrated = "Assets/Plyground/Module/" + candidate;
+			if (AssetDatabase.LoadAssetAtPath<Texture2D>(migrated) != null) return migrated;
+		}
+
+		return "";
+	}
+
+	private static bool HasItemIconAsset(Item item)
+	{
+		return !string.IsNullOrEmpty(GetItemIconAssetPath(item));
 	}
 
 	private string GetAssetModuleFolder()

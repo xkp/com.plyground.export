@@ -9,7 +9,7 @@ public static class IconPickerUI
 	private static string[] predefinedIcons = { "none", "custom", "animals", "enemy", "grass", "logic", "npc", "stone", "tree", "weapons", "objective" };
 	private static int selectedIndex = 0;
 
-	public static string DrawIconField(string currentValue, Func<string, string> uploadFn)
+	public static string DrawIconField(string currentValue, Func<string, string> uploadFn, string label = "Icon:")
 	{
 		if (string.IsNullOrEmpty(currentValue))
 			selectedIndex = 0;
@@ -24,7 +24,7 @@ public static class IconPickerUI
 
 		EditorGUILayout.BeginHorizontal();
 
-		GUILayout.Label("Icon:", GUILayout.Width(148));
+		GUILayout.Label(label, GUILayout.Width(148));
 
 		selectedIndex = EditorGUILayout.Popup(selectedIndex, predefinedIcons, GUILayout.Width(218));
 		if (selectedIndex == 1)
