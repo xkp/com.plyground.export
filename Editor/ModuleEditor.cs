@@ -562,6 +562,7 @@ using System;
 		});
 
 		UpdateExportAssets();
+		GenerateMissingExportThumbnails();
 
 		//AskForExportFolder();
 
@@ -1435,6 +1436,37 @@ using System;
 			{
 				item.icon = string.Empty;
 			}
+		}
+	}
+
+	private void GenerateMissingExportThumbnails()
+	{
+		int generatedCount = 0;
+		foreach (ItemGroup group in itemGroups ?? new List<ItemGroup>())
+		{
+			foreach (Item item in group.items ?? new List<Item>())
+			{
+				if (item?.prefab == null || HasItemIconAsset(item))
+				{
+					continue;
+				}
+
+				GenerateExportThumbnail(item);
+				if (HasItemIconAsset(item))
+				{
+					generatedCount++;
+				}
+				else
+				{
+					Debug.LogWarning($"Could not generate an export thumbnail for item: {item.name}");
+				}
+			}
+		}
+
+		if (generatedCount > 0)
+		{
+			AssetDatabase.SaveAssets();
+			Debug.Log($"Generated {generatedCount} missing module thumbnail(s) for export.");
 		}
 	}
 

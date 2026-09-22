@@ -1242,7 +1242,15 @@ public partial class ModuleExporter
 		GUI.enabled = !string.IsNullOrWhiteSpace(moduleName);
 		if (GUILayout.Button("EXPORT MODULE", GUILayout.Height(52f)))
 		{
-			ExportModule();
+			try
+			{
+				ExportModule();
+			}
+			catch (Exception error)
+			{
+				Debug.LogException(error);
+				EditorUtility.DisplayDialog("Module export failed", error.Message, "OK");
+			}
 		}
 		GUI.enabled = true;
 	}
