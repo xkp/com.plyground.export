@@ -58,6 +58,7 @@ using System;
 	private List<ModuleTool> moduleTools = new List<ModuleTool>();
 	private CharacterEditorCatalog characterEditorCatalog = new CharacterEditorCatalog();
 	private CapabilityManifest moduleCapabilities = new CapabilityManifest();
+	private MultiplayerFeatureContract multiplayerCapability = MultiplayerFeatureContract.CreateUnsupported();
 	private PlyFeatureManifest featureManifest = new PlyFeatureManifest();
 	private List<string> capabilitySourceScriptPaths = new List<string>();
 	private readonly string[] allowedToolIds = new string[] { "Character Capabilities", "Character Builder" };
@@ -115,6 +116,30 @@ using System;
 	{
 		public string id;
 		public string url;
+	}
+
+	// A declaration of a reviewed runtime adapter. It does not generate
+	// networking code; backend validation still admits only approved bindings.
+	[System.Serializable]
+	public class MultiplayerFeatureContract
+	{
+		public int version = 1;
+		public string support = "unsupported";
+		public string reason = "No reviewed multiplayer runtime adapter is included.";
+		public int testedPlayers = 2;
+		public string authority = "host";
+		public string stateScope = "session";
+		public string conflictRule = "firstValidRequest";
+		public string lateJoin = "currentState";
+		public bool dedicatedServerCompatible;
+		public string bindingId = "";
+		public int bindingVersion = 1;
+		public List<string> operations = new List<string>();
+
+		public static MultiplayerFeatureContract CreateUnsupported()
+		{
+			return new MultiplayerFeatureContract();
+		}
 	}
 
 	[System.Serializable]
@@ -177,6 +202,7 @@ using System;
 		matchDescription = mod.matchDescription;
 		author = mod.author;
 		url = mod.url;
+		multiplayerCapability = mod.multiplayer ?? MultiplayerFeatureContract.CreateUnsupported();
 
 		// Populate package metadata.
 		unityPackages.Clear();
@@ -441,6 +467,7 @@ using System;
 
 	private ExportedModule BuildExportedModule()
 	{
+		ValidateMultiplayerCapabilityForExport();
 		ExportedModule mod = new ExportedModule();
 		if (string.IsNullOrEmpty(moduleId))
 			moduleId = System.Guid.NewGuid().ToString().ToUpper();
@@ -453,6 +480,11 @@ using System;
 		mod.matchDescription = matchDescription;
 		mod.author = author;
 		mod.url = url;
+		// Only a reviewed, supported contract is published. Leaving it absent is
+		// the established representation for modules without multiplayer support.
+		mod.multiplayer = multiplayerCapability?.support == "supported"
+			? multiplayerCapability
+			: null;
 		mod.packages = unityPackages
 			.Select(package => new PackageDefinition
 			{
@@ -532,6 +564,22 @@ using System;
 		return mod;
 	}
 
+	private void ValidateMultiplayerCapabilityForExport()
+	{
+		if (multiplayerCapability?.support != "supported")
+			return;
+		if (moduleType != "Game")
+			throw new InvalidOperationException("Reviewed multiplayer support can be exported only by a Game module.");
+		if (multiplayerCapability.testedPlayers < 1 || multiplayerCapability.testedPlayers > 8)
+			throw new InvalidOperationException("Reviewed multiplayer player count must be between 1 and 8.");
+		if (string.IsNullOrWhiteSpace(multiplayerCapability.bindingId))
+			throw new InvalidOperationException("A reviewed multiplayer binding ID is required.");
+		if (multiplayerCapability.bindingVersion < 1)
+			throw new InvalidOperationException("A reviewed multiplayer binding version is required.");
+		if (multiplayerCapability.operations == null || multiplayerCapability.operations.Count == 0)
+			throw new InvalidOperationException("At least one reviewed multiplayer operation is required.");
+	}
+
 	private string SaveModule()
 	{
 		ExportedModule mod = BuildExportedModule();
@@ -544,6 +592,18 @@ using System;
 
 		compactFeatures.features.Clear();
 		string json = compactFeatures.AppendComponentsToModule(JsonUtility.ToJson(mod, true));
+		var moduleJson = PlyFeatureJson.ParseObject(json);
+		if (mod.multiplayer == null)
+		{
+			moduleJson.Remove("multiplayer");
+		}
+		else if (moduleJson.TryGetValue("multiplayer", out object multiplayerObject) && multiplayerObject is Dictionary<string, object> multiplayerJson)
+		{
+			// "reason" is valid only for the unsupported schema variant. A reviewed
+			// supported contract must not publish it.
+			multiplayerJson.Remove("reason");
+		}
+		json = PlyFeatureJson.SerializeValue(moduleJson);
 		File.WriteAllText(jsonFilePath, json);
 		Debug.Log("Saved module JSON to " + jsonFilePath);
 		return jsonFilePath;
@@ -1211,6 +1271,7 @@ using System;
 		public List<Property> moduleProperties;
 		public List<ModuleTool> tools;
 		public ExportedModuleMetadata metadata;
+		public MultiplayerFeatureContract multiplayer;
 
 	}
 

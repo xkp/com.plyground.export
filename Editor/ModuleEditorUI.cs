@@ -20,10 +20,11 @@ public partial class ModuleExporter
 	private enum CapabilityWorkspaceTab
 	{
 		Components,
+		Multiplayer,
 		CharacterEditor
 	}
 
-	private readonly string[] capabilityTabs = { "Components", "Character Editor" };
+	private readonly string[] capabilityTabs = { "Components", "Multiplayer", "Character Editor" };
 	private CapabilityWorkspaceTab activeCapabilityTab;
 
 	private ModuleEditorTab activeTab;
@@ -1267,10 +1268,63 @@ public partial class ModuleExporter
 			case CapabilityWorkspaceTab.Components:
 				DrawCapabilityComponentsTab();
 				break;
+			case CapabilityWorkspaceTab.Multiplayer:
+				DrawMultiplayerCapabilityTab();
+				break;
 			case CapabilityWorkspaceTab.CharacterEditor:
 				DrawCharacterEditorCatalogTab();
 				break;
 		}
+	}
+
+	private void DrawMultiplayerCapabilityTab()
+	{
+		multiplayerCapability ??= MultiplayerFeatureContract.CreateUnsupported();
+		GUILayout.Label("MULTIPLAYER CAPABILITY", EditorStyles.boldLabel);
+		EditorGUILayout.HelpBox(
+			"Declare a reviewed multiplayer runtime adapter shipped by this module. This does not generate networking code; unapproved bindings remain unavailable to games.",
+			MessageType.Info);
+
+		bool supported = multiplayerCapability.support == "supported";
+		bool nextSupported = EditorGUILayout.Toggle("Reviewed Multiplayer Support", supported);
+		if (nextSupported != supported)
+		{
+			multiplayerCapability.support = nextSupported ? "supported" : "unsupported";
+			multiplayerCapability.reason = nextSupported ? "" : "No reviewed multiplayer runtime adapter is included.";
+		}
+
+		if (!nextSupported)
+		{
+			multiplayerCapability.version = 1;
+			multiplayerCapability.reason = EditorGUILayout.TextField("Reason", multiplayerCapability.reason);
+			return;
+		}
+
+		if (moduleType != "Game")
+			EditorGUILayout.HelpBox("Multiplayer gameplay support is normally declared by a Game module. The backend will reject unsupported combinations.", MessageType.Warning);
+
+		multiplayerCapability.version = 1;
+		multiplayerCapability.testedPlayers = EditorGUILayout.IntSlider("Reviewed Players", multiplayerCapability.testedPlayers, 1, 8);
+		multiplayerCapability.bindingId = EditorGUILayout.TextField("Binding ID", multiplayerCapability.bindingId);
+		multiplayerCapability.bindingVersion = Mathf.Max(1, EditorGUILayout.IntField("Binding Version", multiplayerCapability.bindingVersion));
+		string operations = string.Join(", ", multiplayerCapability.operations ?? new List<string>());
+		operations = EditorGUILayout.TextField("Operations", operations);
+		multiplayerCapability.operations = operations
+			.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+			.Select(value => value.Trim())
+			.Where(value => !string.IsNullOrEmpty(value))
+			.Distinct()
+			.ToList();
+
+		// Required v1 feature-contract fields. They are intentionally fixed: this
+		// exporter declares a runtime adapter but does not author networking behavior.
+		multiplayerCapability.authority = "host";
+		multiplayerCapability.stateScope = "session";
+		multiplayerCapability.conflictRule = "firstValidRequest";
+		multiplayerCapability.lateJoin = "currentState";
+		multiplayerCapability.dedicatedServerCompatible = false;
+		EditorGUILayout.LabelField("Authority", "Host");
+		EditorGUILayout.LabelField("Late Join", "Current state");
 	}
 
 	private void DrawCapabilityComponentsTab()
