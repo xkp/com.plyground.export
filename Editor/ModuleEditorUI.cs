@@ -1156,6 +1156,17 @@ public partial class ModuleExporter
 	{
 		if (!string.IsNullOrEmpty(item.icon))
 		{
+			string exportedThumbnailPath = Path.Combine(
+				GetModuleFolder(),
+				"Assets",
+				"Thumbnails",
+				Path.GetFileName(item.icon));
+			Texture2D thumbnail = LoadTextureFromFile(exportedThumbnailPath);
+			if (thumbnail != null)
+			{
+				return thumbnail;
+			}
+
 			Texture2D bundledSourceIcon = AssetDatabase.LoadAssetAtPath<Texture2D>(item.icon.Replace('\\', '/'));
 			if (bundledSourceIcon != null)
 			{
@@ -1163,7 +1174,7 @@ public partial class ModuleExporter
 			}
 
 			string assetIconPath = Path.Combine(GetAssetModuleFolder(), item.icon);
-			Texture2D thumbnail = LoadTextureFromFile(assetIconPath);
+			thumbnail = LoadTextureFromFile(assetIconPath);
 			if (thumbnail != null)
 			{
 				return thumbnail;

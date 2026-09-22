@@ -1893,7 +1893,10 @@ using System;
 		if (item.prefab == null)
 			return false;
 
-		string moduleFolder = GetModuleFolder();
+		// The item icon path is a Unity asset under Assets/Plyground/Module.
+		// Save Unity's own preview there so the editor, metadata, and bundle all
+		// resolve the same PNG rather than retaining a stale export-folder copy.
+		string moduleFolder = GetAssetModuleFolder();
 		string assetsDirectory = Path.Combine(moduleFolder, "Assets");
 		Directory.CreateDirectory(assetsDirectory);
 		string thumbDirectory = Path.Combine(assetsDirectory, "Thumbnails");
@@ -1948,10 +1951,7 @@ using System;
 
 	private void GenerateThumbnail(Item item)
 	{
-		if (!TryGenerateUnityThumbnail(item))
-		{
-			GenerateExportThumbnail(item);
-		}
+		RecalculateThumbnailWithUnity(item);
 	}
 
 	private void RecalculateThumbnailWithUnity(Item item)
