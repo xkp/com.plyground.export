@@ -50,6 +50,11 @@ using System;
 	private Dictionary<int, bool> packageFoldouts = new Dictionary<int, bool>();
 
 	private List<Property> moduleProperties = new List<Property>();
+	// AssetPreview is produced on editor update frames. Keep refresh work on those
+	// frames rather than blocking the editor thread while Unity is generating it.
+	private readonly Queue<Item> pendingUnityThumbnailRefreshes = new Queue<Item>();
+	private Item activeUnityThumbnailRefresh;
+	private double activeUnityThumbnailRefreshStartedAt;
 	private List<ModuleTool> moduleTools = new List<ModuleTool>();
 	private CharacterEditorCatalog characterEditorCatalog = new CharacterEditorCatalog();
 	private CapabilityManifest moduleCapabilities = new CapabilityManifest();
@@ -959,7 +964,19 @@ using System;
 		}
 
 		string destinationDirectory = Path.Combine(moduleFolder, "Assets", "Thumbnails");
-		DirectoryCopy(sourceDirectory, destinationDirectory, true);
+		foreach (string sourceFile in Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories))
+		{
+			// .meta files are Unity editor bookkeeping, not exported thumbnail assets.
+			if (sourceFile.EndsWith(".meta", StringComparison.OrdinalIgnoreCase))
+			{
+				continue;
+			}
+
+			string relativePath = sourceFile.Substring(sourceDirectory.Length).TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+			string destinationFile = Path.Combine(destinationDirectory, relativePath);
+			Directory.CreateDirectory(Path.GetDirectoryName(destinationFile));
+			File.Copy(sourceFile, destinationFile, true);
+		}
 		Debug.Log($"Copied project thumbnails to {destinationDirectory}");
 	}
 
@@ -1899,7 +1916,7 @@ using System;
 		return dst;
 	}
 
-	private bool TryGenerateUnityThumbnail(Item item, float timeoutSeconds = 2f)
+	private bool TryGenerateUnityThumbnail(Item item)
 	{
 		if (item.prefab == null)
 			return false;
@@ -1914,18 +1931,6 @@ using System;
 		Directory.CreateDirectory(thumbDirectory);
 
 		Texture2D preview = AssetPreview.GetAssetPreview(item.prefab);
-		if (preview == null)
-		{
-			double start = EditorApplication.timeSinceStartup;
-			while (IsAssetPreviewLoading(item.prefab))
-			{
-				preview = AssetPreview.GetAssetPreview(item.prefab);
-				if (preview != null) break;
-				System.Threading.Thread.Sleep(15);
-				if (EditorApplication.timeSinceStartup - start > timeoutSeconds)
-					break;
-			}
-		}
 
 		if (preview != null)
 		{
@@ -1973,10 +1978,9 @@ using System;
 			return;
 		}
 
-		if (!TryGenerateUnityThumbnail(item, 5f))
-		{
-			Debug.LogWarning($"Unity thumbnail generation did not complete for item: {item.name}");
-		}
+		AssetPreview.SetDirty(item.prefab);
+		pendingUnityThumbnailRefreshes.Enqueue(item);
+		StartUnityThumbnailRefresh();
 	}
 
 	private void RecalculateGroupThumbnailsWithUnity(ItemGroup group)
@@ -1990,8 +1994,47 @@ using System;
 		{
 			if (item?.prefab != null)
 			{
-				RecalculateThumbnailWithUnity(item);
+				AssetPreview.SetDirty(item.prefab);
+				pendingUnityThumbnailRefreshes.Enqueue(item);
 			}
+		}
+
+		StartUnityThumbnailRefresh();
+	}
+
+	private void StartUnityThumbnailRefresh()
+	{
+		EditorApplication.update -= ProcessUnityThumbnailRefresh;
+		EditorApplication.update += ProcessUnityThumbnailRefresh;
+	}
+
+	private void ProcessUnityThumbnailRefresh()
+	{
+		if (activeUnityThumbnailRefresh == null)
+		{
+			if (pendingUnityThumbnailRefreshes.Count == 0)
+			{
+				EditorApplication.update -= ProcessUnityThumbnailRefresh;
+				AssetDatabase.SaveAssets();
+				Repaint();
+				return;
+			}
+
+			activeUnityThumbnailRefresh = pendingUnityThumbnailRefreshes.Dequeue();
+			activeUnityThumbnailRefreshStartedAt = EditorApplication.timeSinceStartup;
+		}
+
+		if (TryGenerateUnityThumbnail(activeUnityThumbnailRefresh))
+		{
+			activeUnityThumbnailRefresh = null;
+			Repaint();
+			return;
+		}
+
+		if (EditorApplication.timeSinceStartup - activeUnityThumbnailRefreshStartedAt > 15d)
+		{
+			Debug.LogWarning($"Unity thumbnail generation did not complete for item: {activeUnityThumbnailRefresh.name}");
+			activeUnityThumbnailRefresh = null;
 		}
 	}
 
