@@ -556,12 +556,10 @@ using System;
 		catch (Exception error) { EditorUtility.DisplayDialog("Invalid module schema", error.Message, "OK"); return; }
 		string moduleFolder = GetModuleFolder();
 		Directory.CreateDirectory(moduleFolder);
-		ClearModuleExportFolder(moduleFolder, new[]
-		{
-			Path.Combine("Assets", "Thumbnails")
-		});
+		ClearModuleExportFolder(moduleFolder, Array.Empty<string>());
 
 		UpdateExportAssets();
+		CopyProjectThumbnailsToExport(moduleFolder);
 
 		//AskForExportFolder();
 
@@ -950,6 +948,19 @@ using System;
 
 		Debug.Log($"AssetBundleUtility: Built '{bundleName}' with {filtered.Count} assets at {fullOutput} for {buildTarget} using {buildOptions}");
 		return manifest;
+	}
+
+	private void CopyProjectThumbnailsToExport(string moduleFolder)
+	{
+		string sourceDirectory = Path.Combine(GetAssetModuleFolder(), "Assets", "Thumbnails");
+		if (!Directory.Exists(sourceDirectory))
+		{
+			return;
+		}
+
+		string destinationDirectory = Path.Combine(moduleFolder, "Assets", "Thumbnails");
+		DirectoryCopy(sourceDirectory, destinationDirectory, true);
+		Debug.Log($"Copied project thumbnails to {destinationDirectory}");
 	}
 
 	private static void DirectoryCopy(
