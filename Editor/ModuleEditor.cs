@@ -562,7 +562,6 @@ using System;
 		});
 
 		UpdateExportAssets();
-		GenerateMissingExportThumbnails();
 
 		//AskForExportFolder();
 
@@ -1439,37 +1438,6 @@ using System;
 		}
 	}
 
-	private void GenerateMissingExportThumbnails()
-	{
-		int generatedCount = 0;
-		foreach (ItemGroup group in itemGroups ?? new List<ItemGroup>())
-		{
-			foreach (Item item in group.items ?? new List<Item>())
-			{
-				if (item?.prefab == null || HasItemIconAsset(item))
-				{
-					continue;
-				}
-
-				if (TryGenerateUnityThumbnail(item, 5f))
-				{
-					generatedCount++;
-				}
-				else
-				{
-					Debug.LogWarning($"Unity preview thumbnail generation did not complete for item: {item.name}");
-				}
-			}
-		}
-
-		if (generatedCount > 0)
-		{
-			AssetDatabase.SaveAssets();
-			Debug.Log($"Generated {generatedCount} missing module thumbnail(s) for export.");
-		}
-	}
-
-
 	private void GenerateModelsForGroup(ItemGroup group)
 	{
 		foreach (var item in group.items)
@@ -1935,17 +1903,11 @@ using System;
 		if (preview == null)
 		{
 			double start = EditorApplication.timeSinceStartup;
-			// Poll without blocking editor message pump
 			while (IsAssetPreviewLoading(item.prefab))
 			{
-				// Try to get the texture each tick
 				preview = AssetPreview.GetAssetPreview(item.prefab);
 				if (preview != null) break;
-
-				// Give the editor a breath so jobs advance
 				System.Threading.Thread.Sleep(15);
-
-				// Bail on timeout to avoid infinite loops
 				if (EditorApplication.timeSinceStartup - start > timeoutSeconds)
 					break;
 			}
