@@ -1451,14 +1451,13 @@ using System;
 					continue;
 				}
 
-				GenerateExportThumbnail(item);
-				if (HasItemIconAsset(item))
+				if (TryGenerateUnityThumbnail(item, 5f))
 				{
 					generatedCount++;
 				}
 				else
 				{
-					Debug.LogWarning($"Could not generate an export thumbnail for item: {item.name}");
+					Debug.LogWarning($"Unity preview thumbnail generation did not complete for item: {item.name}");
 				}
 			}
 		}
