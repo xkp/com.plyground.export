@@ -1978,7 +1978,9 @@ using System;
 			return;
 		}
 
-		AssetPreview.SetDirty(item.prefab);
+		// AssetPreview has no SetDirty API. Mark the source asset dirty, then let
+		// the queued editor-update pass request a fresh preview from Unity.
+		EditorUtility.SetDirty(item.prefab);
 		pendingUnityThumbnailRefreshes.Enqueue(item);
 		StartUnityThumbnailRefresh();
 	}
@@ -1994,7 +1996,7 @@ using System;
 		{
 			if (item?.prefab != null)
 			{
-				AssetPreview.SetDirty(item.prefab);
+				EditorUtility.SetDirty(item.prefab);
 				pendingUnityThumbnailRefreshes.Enqueue(item);
 			}
 		}
