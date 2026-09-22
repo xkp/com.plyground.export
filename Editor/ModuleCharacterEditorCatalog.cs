@@ -22,6 +22,7 @@ public partial class ModuleExporter
         [NonSerialized] public bool enabled;
         public List<string> capabilities = new List<string> { "transform" };
         public List<CharacterEditorCatalogCharacter> characters = new List<CharacterEditorCatalogCharacter>();
+        public List<CharacterEditorCatalogSkin> skins = new List<CharacterEditorCatalogSkin>();
         public List<CharacterEditorCatalogItem> equipment = new List<CharacterEditorCatalogItem>();
         public List<CharacterEditorCatalogItem> clothing = new List<CharacterEditorCatalogItem>();
     }
@@ -32,6 +33,7 @@ public partial class ModuleExporter
         public string schemaVersion = "plyground.character-catalog/v2";
         public List<string> capabilities = new List<string>();
         public List<CharacterEditorCatalogCharacter> characters = new List<CharacterEditorCatalogCharacter>();
+        public List<CharacterEditorCatalogSkin> skins = new List<CharacterEditorCatalogSkin>();
         public List<CharacterEditorCatalogItem> equipment = new List<CharacterEditorCatalogItem>();
         public List<CharacterEditorCatalogItem> clothing = new List<CharacterEditorCatalogItem>();
     }
@@ -61,6 +63,16 @@ public partial class ModuleExporter
         public string bodyType = "";
     }
 
+    /// <summary>Material choice applied to the published body's named Body renderer.</summary>
+    [Serializable]
+    public class CharacterEditorCatalogSkin
+    {
+        public string id = "";
+        public string displayName = "";
+        public string sourceAssetPath = "";
+        public List<string> compatibleBodyTypes = new List<string>();
+    }
+
     private void DrawCharacterEditorCatalogTab()
     {
         characterEditorCatalog ??= new CharacterEditorCatalog();
@@ -88,6 +100,8 @@ public partial class ModuleExporter
                 DrawCharacterEditorCharacters();
                 break;
             case CharacterEditorCatalogTab.Appearance:
+                DrawCharacterEditorSkins();
+                EditorGUILayout.Space(8f);
                 DrawCharacterEditorCatalogList("Clothing", characterEditorCatalog.clothing, false);
                 break;
             case CharacterEditorCatalogTab.Equipment:
@@ -139,6 +153,39 @@ public partial class ModuleExporter
             entry.sourceAssetPath = EditorGUILayout.TextField("Prefab asset path", entry.sourceAssetPath);
             entry.itemId = EditorGUILayout.TextField("Module item ID", entry.itemId);
             entry.bodyType = EditorGUILayout.TextField("Body type", entry.bodyType);
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.EndVertical();
+    }
+
+    private void DrawCharacterEditorSkins()
+    {
+        characterEditorCatalog.skins ??= new List<CharacterEditorCatalogSkin>();
+        EditorGUILayout.BeginVertical("box");
+        EditorGUILayout.BeginHorizontal();
+        EditorGUILayout.LabelField("SKIN MATERIALS", EditorStyles.boldLabel);
+        GUILayout.FlexibleSpace();
+        if (GUILayout.Button("Add material", GUILayout.Width(110f)))
+            characterEditorCatalog.skins.Add(new CharacterEditorCatalogSkin());
+        EditorGUILayout.EndHorizontal();
+        EditorGUILayout.HelpBox("A skin material is applied to the base body's Body SkinnedMeshRenderer. Use compatible body types to keep male and female palettes separate.", MessageType.None);
+
+        for (int index = 0; index < characterEditorCatalog.skins.Count; index++)
+        {
+            CharacterEditorCatalogSkin entry = characterEditorCatalog.skins[index] ?? new CharacterEditorCatalogSkin();
+            characterEditorCatalog.skins[index] = entry;
+            EditorGUILayout.BeginVertical("helpbox");
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(string.IsNullOrWhiteSpace(entry.displayName) ? "New skin material" : entry.displayName, EditorStyles.boldLabel);
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Remove", GUILayout.Width(70f))) { characterEditorCatalog.skins.RemoveAt(index); EditorGUILayout.EndHorizontal(); EditorGUILayout.EndVertical(); break; }
+            EditorGUILayout.EndHorizontal();
+            entry.id = EditorGUILayout.TextField("Skin ID", entry.id);
+            entry.displayName = EditorGUILayout.TextField("Display name", entry.displayName);
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(entry.sourceAssetPath);
+            Material selected = (Material)EditorGUILayout.ObjectField("Material", material, typeof(Material), false);
+            if (selected != material) entry.sourceAssetPath = selected ? AssetDatabase.GetAssetPath(selected) : "";
+            DrawCharacterEditorStringList("Compatible body types", entry.compatibleBodyTypes);
             EditorGUILayout.EndVertical();
         }
         EditorGUILayout.EndVertical();
@@ -279,6 +326,15 @@ public partial class ModuleExporter
             .Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
+    private IEnumerable<string> GetCharacterEditorSkinAssetPaths()
+    {
+        return (characterEditorCatalog?.skins ?? new List<CharacterEditorCatalogSkin>())
+            .Where(entry => entry != null && !string.IsNullOrWhiteSpace(entry.sourceAssetPath))
+            .Select(entry => entry.sourceAssetPath.Trim())
+            .Where(path => AssetDatabase.LoadAssetAtPath<Material>(path) != null)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+    }
+
     private static void DrawCharacterEditorStringList(string label, List<string> values)
     {
         values ??= new List<string>();
@@ -299,12 +355,13 @@ public partial class ModuleExporter
         {
             capabilities = DistinctCharacterEditorStrings(characterEditorCatalog.capabilities),
             characters = CloneCharacterEditorCharacters(characterEditorCatalog.characters),
+            skins = CloneCharacterEditorSkins(characterEditorCatalog.skins),
             equipment = CloneCharacterEditorEntries(characterEditorCatalog.equipment),
             clothing = CloneCharacterEditorEntries(characterEditorCatalog.clothing)
         };
         if (catalog.equipment.Count > 0) catalog.capabilities.Add("equipment");
         if (catalog.clothing.Count > 0) catalog.capabilities.Add("clothing");
-        if (catalog.characters.Count > 0 || catalog.clothing.Count > 0) catalog.capabilities.Add("appearance");
+        if (catalog.characters.Count > 0 || catalog.skins.Count > 0 || catalog.clothing.Count > 0) catalog.capabilities.Add("appearance");
         catalog.capabilities = DistinctCharacterEditorStrings(catalog.capabilities);
         return new ExportedModuleMetadata { characterEditor = catalog };
     }
@@ -322,6 +379,7 @@ public partial class ModuleExporter
             enabled = true,
             capabilities = DistinctCharacterEditorStrings(imported.capabilities),
             characters = CloneCharacterEditorCharacters(imported.characters),
+            skins = CloneCharacterEditorSkins(imported.skins),
             equipment = CloneCharacterEditorEntries(imported.equipment),
             clothing = CloneCharacterEditorEntries(imported.clothing)
         };
@@ -333,6 +391,7 @@ public partial class ModuleExporter
         if (characterEditorCatalog == null || !characterEditorCatalog.enabled) return "";
         return ValidateCharacterEditorEntries(characterEditorCatalog.equipment, "equipment")
             ?? ValidateCharacterEditorEntries(characterEditorCatalog.clothing, "clothing")
+            ?? ValidateCharacterEditorSkins(characterEditorCatalog.skins)
             ?? ValidateCharacterEditorCharacters(characterEditorCatalog.characters)
             ?? "";
     }
@@ -358,6 +417,19 @@ public partial class ModuleExporter
             if (entry == null || string.IsNullOrWhiteSpace(entry.id)) return "Each " + label + " entry needs a catalog ID.";
             if (!ids.Add(entry.id.Trim())) return "Duplicate " + label + " catalog ID: " + entry.id;
             if (string.IsNullOrWhiteSpace(entry.sourceAssetPath)) return entry.id + " needs a prefab asset path.";
+        }
+        return null;
+    }
+
+    private static string ValidateCharacterEditorSkins(List<CharacterEditorCatalogSkin> entries)
+    {
+        HashSet<string> ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (CharacterEditorCatalogSkin entry in entries ?? new List<CharacterEditorCatalogSkin>())
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(entry.id)) return "Each skin material needs a skin ID.";
+            if (!ids.Add(entry.id.Trim())) return "Duplicate skin material ID: " + entry.id;
+            if (string.IsNullOrWhiteSpace(entry.sourceAssetPath)) return entry.id + " needs a material asset path.";
+            if (AssetDatabase.LoadAssetAtPath<Material>(entry.sourceAssetPath) == null) return entry.id + " must reference a Material asset.";
         }
         return null;
     }
@@ -394,6 +466,17 @@ public partial class ModuleExporter
             itemId = entry.itemId ?? "",
             sourceAssetPath = entry.sourceAssetPath ?? "",
             bodyType = entry.bodyType ?? ""
+        }).ToList();
+    }
+
+    private static List<CharacterEditorCatalogSkin> CloneCharacterEditorSkins(IEnumerable<CharacterEditorCatalogSkin> entries)
+    {
+        return (entries ?? Enumerable.Empty<CharacterEditorCatalogSkin>()).Where(entry => entry != null).Select(entry => new CharacterEditorCatalogSkin
+        {
+            id = entry.id ?? "",
+            displayName = entry.displayName ?? "",
+            sourceAssetPath = entry.sourceAssetPath ?? "",
+            compatibleBodyTypes = DistinctCharacterEditorStrings(entry.compatibleBodyTypes)
         }).ToList();
     }
 }

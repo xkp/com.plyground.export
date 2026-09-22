@@ -285,7 +285,9 @@ using System;
 					item.prefabPath = exportedItem.prefab;
 					item.prefab = AssetDatabase.LoadAssetAtPath<GameObject>(item.prefabPath);
 					item.icon = exportedItem.icon;
-					item.modelPath = "";
+					// modelPath is the editor's persisted Icon 3D field. Older
+					// manifests simply leave icon3d empty, so this is backward-safe.
+					item.modelPath = exportedItem.icon3d ?? "";
 					item.prefabStructure = ClonePrefabNodeSnapshot(exportedItem.prefabStructure);
 					item.pivotOffset = exportedItem.pivotOffset;
 					item.exportTranslation = exportedItem.exportTranslation;
@@ -495,10 +497,13 @@ using System;
 				ei.prefab = item.prefabPath;
 				ei.icon = item.icon;
 				ei.iconAssetPath = GetItemIconAssetPath(item);
-				ei.visualAssetPath = string.IsNullOrEmpty(ei.iconAssetPath)
-					? item.prefabPath
-					: ei.iconAssetPath;
 				ei.icon3d = GetItemIcon3DAssetPath(item);
+				// An authored Icon 3D is a lightweight AssetBundle stand-in for
+				// the source prefab. The prefab path is still preserved above for
+				// project materialization, but it is not the RTE runtime visual.
+				ei.visualAssetPath = !string.IsNullOrEmpty(ei.icon3d)
+					? ei.icon3d
+					: string.IsNullOrEmpty(ei.iconAssetPath) ? item.prefabPath : ei.iconAssetPath;
 				ei.prefabStructure = item.prefab != null
 					? BuildPrefabStructureIfNested(item.prefab)
 					: ClonePrefabNodeSnapshot(item.prefabStructure);
@@ -620,26 +625,28 @@ using System;
 			foreach (var item in group.items)
 			{
 				string itemIconAssetPath = GetItemIconAssetPath(item);
-				// RTE continues to load instantiated items by prefab path. Icons are
-				// supplemental palette metadata until RTE explicitly supports an
-				// icon-only placeholder, so never omit the prefab from its bundle.
-				if (!string.IsNullOrEmpty(item.prefabPath))
-					assetsFromGroups.Add(item.prefabPath);
+				string itemIcon3DAssetPath = GetItemIcon3DAssetPath(item);
+				// Icon 3D is the optional runtime substitute. Keep the authored
+				// prefab path in module metadata for materialization, but avoid
+				// pulling its often-large dependency tree into the RTE bundle.
+				string runtimeVisualAssetPath = !string.IsNullOrEmpty(itemIcon3DAssetPath)
+					? itemIcon3DAssetPath
+					: item.prefabPath;
+				if (!string.IsNullOrEmpty(runtimeVisualAssetPath))
+					assetsFromGroups.Add(runtimeVisualAssetPath);
 				if (!string.IsNullOrEmpty(itemIconAssetPath))
 				{
 					assetsFromGroups.Add(itemIconAssetPath);
 				}
 
-				string itemIcon3DAssetPath = GetItemIcon3DAssetPath(item);
-				if (!string.IsNullOrEmpty(itemIcon3DAssetPath))
+				// Make the actual bundle visual read/write. This can be the compact
+				// 3D icon rather than the original package prefab.
+				var runtimeVisual = !string.IsNullOrEmpty(itemIcon3DAssetPath)
+					? AssetDatabase.LoadAssetAtPath<GameObject>(itemIcon3DAssetPath)
+					: item.prefab;
+				if (runtimeVisual != null)
 				{
-					assetsFromGroups.Add(itemIcon3DAssetPath);
-				}
-
-				//make sure all meshes are read/write
-				if (item.prefab != null)
-				{
-					var instance = item.prefab;
+					var instance = runtimeVisual;
 					HashSet<Mesh> processed = new HashSet<Mesh>();
 					foreach (var mf in instance.GetComponentsInChildren<MeshFilter>(true))
 					{
@@ -668,6 +675,13 @@ using System;
 			{
 				if (renderer.sharedMesh) MakeMeshRW(renderer.sharedMesh, processed);
 			}
+		}
+
+		// Appearance material choices are also standalone catalog assets. They
+		// must travel in the same bundle as their body prefab.
+		foreach (string skinMaterialPath in GetCharacterEditorSkinAssetPaths())
+		{
+			assetsFromGroups.Add(skinMaterialPath);
 		}
 
 		assetsFromGroups = assetsFromGroups.Distinct().ToList();
@@ -881,12 +895,11 @@ using System;
 			|| shaderName.StartsWith("VertexLit", StringComparison.OrdinalIgnoreCase);
 	}
 
-	public static void BuildBundleFromPaths(List<string> assetPaths, string bundleName, string outputDirectory, BuildTarget buildTarget)
+	public static AssetBundleManifest BuildBundleFromPaths(List<string> assetPaths, string bundleName, string outputDirectory, BuildTarget buildTarget)
 	{
 		if (assetPaths == null || assetPaths.Count == 0)
 		{
-			Debug.LogWarning("AssetBundleUtility: No asset paths provided.");
-			return;
+			throw new InvalidOperationException("AssetBundleUtility: No asset paths were provided for bundle export.");
 		}
 
 		// Filter out any folder paths
@@ -899,8 +912,7 @@ using System;
 
 		if (filtered.Count == 0)
 		{
-			Debug.LogWarning("AssetBundleUtility: No valid files found in provided paths.");
-			return;
+			throw new InvalidOperationException("AssetBundleUtility: No valid asset files were available for bundle export.");
 		}
 
 		// Resolve output directory
@@ -930,9 +942,14 @@ using System;
 		);
 
 		if (manifest == null)
-			Debug.LogError($"AssetBundleUtility: Failted Building'{bundleName}' with {filtered.Count} assets at {fullOutput} for {buildTarget}");
-		else
-			Debug.Log($"AssetBundleUtility: Built '{bundleName}' with {filtered.Count} assets at {fullOutput} for {buildTarget} using {buildOptions}");
+		{
+			throw new InvalidOperationException(
+				$"AssetBundleUtility: Failed building '{bundleName}' with {filtered.Count} assets at {fullOutput} for {buildTarget}. " +
+				"The module export was aborted; see the Unity Console for the underlying build error.");
+		}
+
+		Debug.Log($"AssetBundleUtility: Built '{bundleName}' with {filtered.Count} assets at {fullOutput} for {buildTarget} using {buildOptions}");
+		return manifest;
 	}
 
 	private static void DirectoryCopy(
