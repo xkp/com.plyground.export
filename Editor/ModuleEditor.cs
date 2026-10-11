@@ -621,7 +621,8 @@ using System;
 		catch (Exception error) { EditorUtility.DisplayDialog("Invalid module schema", error.Message, "OK"); return; }
 		string moduleFolder = GetModuleFolder();
 		Directory.CreateDirectory(moduleFolder);
-		ClearModuleExportFolder(moduleFolder, Array.Empty<string>());
+		ClearModuleExportFolder(moduleFolder, HasCurrentPreviewData(moduleFolder)
+			? new[] { "Preview" } : Array.Empty<string>());
 
 		UpdateExportAssets();
 		CopyProjectThumbnailsToExport(moduleFolder);

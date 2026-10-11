@@ -1254,6 +1254,28 @@ public partial class ModuleExporter
 			}
 		}
 		GUI.enabled = true;
+
+		EditorGUILayout.Space(12f);
+		GUILayout.Label("PREVIEW DATA", EditorStyles.boldLabel);
+		EditorGUILayout.HelpBox("Export transpiled module code and Unity prefab assets for local Preview independently of the Unity module export. Unsupported code or assets stop publication with diagnostics.", MessageType.Info);
+		string previewToolRoot = EditorPrefs.GetString("Plyground.PreviewToolRoot", "");
+		string nextPreviewToolRoot = EditorGUILayout.TextField("Plythreejs Root", previewToolRoot);
+		if (nextPreviewToolRoot != previewToolRoot)
+			EditorPrefs.SetString("Plyground.PreviewToolRoot", nextPreviewToolRoot);
+		GUI.enabled = !string.IsNullOrWhiteSpace(moduleName) && !string.IsNullOrWhiteSpace(controllerClass);
+		if (GUILayout.Button("EXPORT PREVIEW DATA", GUILayout.Height(52f)))
+		{
+			try
+			{
+				ExportPreviewData();
+			}
+			catch (Exception error)
+			{
+				Debug.LogException(error);
+				EditorUtility.DisplayDialog("Preview data export failed", error.Message, "OK");
+			}
+		}
+		GUI.enabled = true;
 	}
 
 	private void DrawCapabilitiesTab()
