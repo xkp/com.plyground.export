@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using UnityEditor;
 using UnityEditor.Animations;
@@ -44,6 +45,8 @@ public partial class ModuleExporter
     {
         public string entry;
         public string controller;
+        public string revision;
+        public string sourceRevision;
     }
 
     [Serializable]
@@ -63,6 +66,7 @@ public partial class ModuleExporter
         public string revision;
         public PreviewRuntimeReference runtime = new PreviewRuntimeReference();
         public PreviewEntry code;
+        public PreviewEntry systemEditor;
         public PreviewEntry editor;
         public PreviewPath assets;
         public PreviewPath solution;
@@ -144,6 +148,12 @@ public partial class ModuleExporter
         Directory.CreateDirectory(preview);
         try
         {
+            string systemEditorAsmdef = FindPreviewSystemEditorAssembly(projectRoot);
+            string systemEditorOutput = Path.Combine(preview, "editor", "system.mjs");
+            EditorUtility.DisplayProgressBar("Export Preview Data", "Transpiling shared editor SDK", 0.1f);
+            RunPreviewTool("dotnet", "run", "--project", transpiler, "--", "--editor-project",
+                projectRoot, systemEditorAsmdef, systemEditorOutput, "@plythreejs/runtime",
+                "--root", "BaseGameModule", "--root", "BaseCharacterModule");
             EditorUtility.DisplayProgressBar("Export Preview Data", "Transpiling editor controller", 0.2f);
             string editorOutput = Path.Combine(preview, "editor", "controller.mjs");
             string controllerAsmdef = FindPreviewAssemblyDefinition(controllerSource, projectRoot);
@@ -166,17 +176,51 @@ public partial class ModuleExporter
                 SearchOption.AllDirectories).Select(path => new {
                     path,
                     name = JsonUtility.FromJson<PreviewAssemblyName>(File.ReadAllText(path))?.name
-                }).Where(value => !string.IsNullOrWhiteSpace(value.name)
-                    && !value.name.EndsWith(".Editor", StringComparison.OrdinalIgnoreCase))
+                }).Where(value => !string.IsNullOrWhiteSpace(value.name))
                 .ToDictionary(value => value.name, value => value.path, StringComparer.OrdinalIgnoreCase);
             var referencedTypes = JsonUtility.FromJson<PreviewTypeReferences>(
                 File.ReadAllText(editorOutput + ".references.json"));
+            var editorSources = new List<(string path, string typeName)>();
             foreach (var reference in referencedTypes?.references ?? new PreviewTypeReference[0])
             {
                 if (!string.IsNullOrWhiteSpace(reference?.assembly)
                     && assemblyDefinitions.TryGetValue(reference.assembly, out string definition))
-                    runtimeSources.Add((definition, reference.type));
+                {
+                    if (reference.assembly.EndsWith(".Editor", StringComparison.OrdinalIgnoreCase)
+                        || IsPreviewEditorType(definition, reference.type, projectRoot))
+                        editorSources.Add((definition, reference.type));
+                    else runtimeSources.Add((definition, reference.type));
+                }
             }
+            var editorEntries = new List<string> { "import { UnityType } from '@plythreejs/runtime';" };
+            int editorIndex = 0;
+            var emittedEditorTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            while (true)
+            {
+                var assembly = editorSources.Where(source => !emittedEditorTypes.Contains(source.path + "|" + source.typeName))
+                    .GroupBy(source => source.path, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+                if (assembly == null) break;
+                var roots = assembly.Select(source => source.typeName).Distinct(StringComparer.Ordinal).ToArray();
+                foreach (string type in roots) emittedEditorTypes.Add(assembly.Key + "|" + type);
+                int index = editorIndex++;
+                string output = Path.Combine(preview, "editor", "type-" + index + ".mjs");
+                var arguments = new[] { "run", "--project", transpiler, "--", "--editor-project",
+                    projectRoot, assembly.Key, output, "@plythreejs/runtime" }
+                    .Concat(roots.SelectMany(type => new[] { "--root", type })).ToArray();
+                RunPreviewTool("dotnet", arguments);
+                editorEntries.Insert(1, "const type" + index + " = await import('./type-" + index + ".mjs');");
+                editorEntries.Insert(2, "UnityType.RegisterModuleEditor(type" + index + ".unityTypes);");
+                var dependencies = JsonUtility.FromJson<PreviewTypeReferences>(File.ReadAllText(output + ".references.json"));
+                foreach (var dependency in dependencies?.references ?? new PreviewTypeReference[0])
+                {
+                    if (assemblyDefinitions.TryGetValue(dependency.assembly ?? "", out string definition)
+                        && IsPreviewEditorType(definition, dependency.type, projectRoot))
+                        editorSources.Add((definition, dependency.type));
+                }
+            }
+            editorEntries.Add("const controller = await import('./controller.mjs');");
+            editorEntries.Add("export const unityTypes = controller.unityTypes;");
+            WritePreviewFile(Path.Combine(preview, "editor", "module.mjs"), string.Join("\n", editorEntries) + "\n");
             EditorUtility.DisplayProgressBar("Export Preview Data", "Transpiling runtime scripts", 0.5f);
             var entries = new List<string> { "import { UnityType } from '@plythreejs/runtime';" };
             var registrations = new List<string>();
@@ -270,6 +314,7 @@ public partial class ModuleExporter
                 }
             }
             foreach (string definition in runtimeSources.Select(value => FindPreviewAssemblyDefinition(value.path, projectRoot))
+                .Concat(editorSources.Select(value => value.path))
                 .Where(value => value != null).Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 string assemblyRoot = Path.GetDirectoryName(definition);
@@ -277,7 +322,8 @@ public partial class ModuleExporter
                 {
                     if (!string.Equals(FindPreviewAssemblyDefinition(file, projectRoot), definition,
                         StringComparison.OrdinalIgnoreCase)) continue;
-                    if (Path.GetRelativePath(assemblyRoot, file).Split(Path.DirectorySeparatorChar)
+                    if (!editorSources.Any(value => string.Equals(value.path, definition, StringComparison.OrdinalIgnoreCase))
+                        && Path.GetRelativePath(assemblyRoot, file).Split(Path.DirectorySeparatorChar)
                         .Contains("Editor", StringComparer.OrdinalIgnoreCase)) continue;
                     sourcePaths.Add(file);
                 }
@@ -308,7 +354,10 @@ public partial class ModuleExporter
                 moduleType = moduleType,
                 name = moduleName,
                 code = new PreviewEntry { entry = "Preview/code/module.mjs" },
-                editor = new PreviewEntry { entry = "Preview/editor/controller.mjs", controller = controllerClass },
+                systemEditor = new PreviewEntry { entry = "Preview/editor/system.mjs",
+                    revision = ComputePreviewFileRevision(systemEditorOutput),
+                    sourceRevision = ComputePreviewRevision(Path.GetDirectoryName(systemEditorAsmdef)) },
+                editor = new PreviewEntry { entry = "Preview/editor/module.mjs", controller = controllerClass },
                 assets = new PreviewPath { bundle = "Preview/assets/bundle.json" },
                 solution = new PreviewPath { manifest = "Preview/solution/manifest.json" },
                 revision = ComputePreviewRevision(preview)
@@ -347,6 +396,36 @@ public partial class ModuleExporter
         return matches[0];
     }
 
+    private static string FindPreviewSystemEditorAssembly(string projectRoot)
+    {
+        var roots = new[] { Path.Combine(projectRoot, "Packages"), Path.Combine(projectRoot, "Library", "PackageCache") };
+        var matches = roots.Where(Directory.Exists)
+            .SelectMany(root => Directory.GetFiles(root, "Plyground.SDK.Editor.asmdef", SearchOption.AllDirectories))
+            .Where(path => Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(path)))
+                .StartsWith("com.plyground.sdk", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (matches.Length != 1)
+            throw new InvalidOperationException("Expected one installed Plyground SDK editor assembly; found " + matches.Length + ".");
+        return matches[0];
+    }
+
+    private static bool IsPreviewEditorType(string asmdef, string typeName, string projectRoot)
+    {
+        if (string.IsNullOrWhiteSpace(typeName)) return false;
+        string root = Path.GetDirectoryName(asmdef);
+        string shortName = typeName.Split('.').Last();
+        string declaration = @"\b(class|struct|interface|enum)\s+" + Regex.Escape(shortName) + @"\b";
+        foreach (string file in Directory.GetFiles(root, "*.cs", SearchOption.AllDirectories))
+        {
+            if (!string.Equals(FindPreviewAssemblyDefinition(file, projectRoot), asmdef,
+                StringComparison.OrdinalIgnoreCase)) continue;
+            if (!Path.GetRelativePath(root, file).Split(Path.DirectorySeparatorChar)
+                .Any(part => part.IndexOf("Editor", StringComparison.OrdinalIgnoreCase) >= 0)) continue;
+            if (Regex.IsMatch(File.ReadAllText(file), declaration)) return true;
+        }
+        return false;
+    }
+
     private bool HasCurrentPreviewData(string moduleFolder)
     {
         try
@@ -357,6 +436,11 @@ public partial class ModuleExporter
             var manifest = JsonUtility.FromJson<PreviewModuleManifest>(File.ReadAllText(manifestPath));
             if (manifest == null || !string.Equals(manifest.moduleId, moduleId, StringComparison.OrdinalIgnoreCase)
                 || !string.Equals(manifest.editor?.controller, controllerClass, StringComparison.Ordinal)) return false;
+            if (manifest.systemEditor == null || string.IsNullOrWhiteSpace(manifest.systemEditor.revision)
+                || !File.Exists(Path.Combine(preview, "editor", "system.mjs"))
+                || !string.Equals(manifest.systemEditor.sourceRevision,
+                    ComputePreviewRevision(Path.GetDirectoryName(FindPreviewSystemEditorAssembly(
+                        Directory.GetParent(Application.dataPath).FullName))), StringComparison.Ordinal)) return false;
             string solutionPath = Path.Combine(preview, "solution", "manifest.json");
             var solution = JsonUtility.FromJson<PreviewSolutionManifest>(File.ReadAllText(solutionPath));
             if (solution?.sources == null || solution.sources.Length == 0) return false;
@@ -639,5 +723,12 @@ public partial class ModuleExporter
             data.Position = 0;
             return "sha256:" + BitConverter.ToString(sha.ComputeHash(data)).Replace("-", "").ToLowerInvariant();
         }
+    }
+
+    private static string ComputePreviewFileRevision(string path)
+    {
+        using (var sha = SHA256.Create())
+            return "sha256:" + BitConverter.ToString(sha.ComputeHash(File.ReadAllBytes(path)))
+                .Replace("-", "").ToLowerInvariant();
     }
 }
