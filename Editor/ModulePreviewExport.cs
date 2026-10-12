@@ -672,34 +672,28 @@ public partial class ModuleExporter
 
     private static void PublishPreviewFolder(string source, string destination)
     {
+        if (!string.Equals(Path.GetFileName(Path.GetFullPath(destination)), "Preview",
+            StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Preview output must target a Preview directory: " + destination);
         Directory.CreateDirectory(Path.GetDirectoryName(destination));
-        string pending = destination + "." + Guid.NewGuid().ToString("N") + ".pending";
-        string previous = destination + "." + Guid.NewGuid().ToString("N") + ".previous";
-        try
+        if (Directory.Exists(destination))
         {
-            CopyPreviewTree(source, pending);
-            if (Directory.Exists(destination)) Directory.Move(destination, previous);
-            try { Directory.Move(pending, destination); }
-            catch
-            {
-                if (Directory.Exists(previous)) Directory.Move(previous, destination);
-                throw;
-            }
+            foreach (string file in Directory.GetFiles(destination)) File.Delete(file);
+            foreach (string directory in Directory.GetDirectories(destination)) Directory.Delete(directory, true);
         }
-        finally
-        {
-            if (Directory.Exists(pending)) Directory.Delete(pending, true);
-            if (Directory.Exists(previous) && Directory.Exists(destination)) Directory.Delete(previous, true);
-        }
+        CopyPreviewTree(source, destination);
     }
 
     private static void CopyPreviewTree(string source, string destination)
     {
         Directory.CreateDirectory(destination);
-        foreach (string file in Directory.GetFiles(source))
-            File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
         foreach (string directory in Directory.GetDirectories(source))
             CopyPreviewTree(directory, Path.Combine(destination, Path.GetFileName(directory)));
+        foreach (string file in Directory.GetFiles(source).Where(path =>
+            !string.Equals(Path.GetFileName(path), "manifest.json", StringComparison.OrdinalIgnoreCase)))
+            File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
+        string manifest = Path.Combine(source, "manifest.json");
+        if (File.Exists(manifest)) File.Copy(manifest, Path.Combine(destination, "manifest.json"), true);
     }
 
     private static void WritePreviewFile(string path, string content)
