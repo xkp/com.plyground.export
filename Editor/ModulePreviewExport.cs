@@ -69,6 +69,7 @@ public partial class ModuleExporter
         public PreviewEntry systemEditor;
         public PreviewEntry editor;
         public PreviewPath assets;
+        public PreviewEntry previewAnimation;
         public PreviewPath solution;
     }
 
@@ -166,12 +167,18 @@ public partial class ModuleExporter
 
             var itemPrefabs = ResolvePreviewItemPrefabs();
             var catalogAssets = ResolvePreviewCatalogAssets(controllerSource, projectRoot);
-            // An exploratory export only needs types referenced by the importing
-            // controller. Optional catalog prefabs can contain scripts that are
-            // unrelated to this scene and still lack browser runtime support.
+            // Serialize first: references inside prefab and ScriptableObject fields can
+            // introduce components absent from the initial catalog dependency scan.
+            string assetSource = Path.Combine(staging, "asset-source", "source.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(assetSource));
+            var exportedRuntimeSources = Plyground.Preview.Editor.PlygroundPreviewAssetExporter.ExportPrefabsToPath(
+                assetSource, itemPrefabs.Select(value => value.prefab), catalogAssets);
+            // Exploratory exports can skip the dependency scan, but every type
+            // actually emitted into the asset bundle still needs runtime code.
             var runtimeSources = Environment.GetEnvironmentVariable("PLYGROUND_PREVIEW_ALLOW_APPROXIMATIONS") == "1"
                 ? new List<(string path, string typeName)>()
                 : GetPreviewRuntimeSources(projectRoot, itemPrefabs, catalogAssets);
+            runtimeSources.AddRange(exportedRuntimeSources);
             var assemblyDefinitions = Directory.GetFiles(Path.Combine(projectRoot, "Assets"), "*.asmdef",
                 SearchOption.AllDirectories).Select(path => new {
                     path,
@@ -263,10 +270,6 @@ public partial class ModuleExporter
                 + string.Join(", ", registries) + ");\n");
 
             EditorUtility.DisplayProgressBar("Export Preview Data", "Preparing assets and source snapshot", 0.75f);
-            string assetSource = Path.Combine(staging, "asset-source", "source.json");
-            Directory.CreateDirectory(Path.GetDirectoryName(assetSource));
-            Plyground.Preview.Editor.PlygroundPreviewAssetExporter.ExportPrefabsToPath(assetSource,
-                itemPrefabs.Select(value => value.prefab), catalogAssets);
             string itemMapPath = Path.Combine(staging, "item-prefabs.json");
             WritePreviewFile(itemMapPath, JsonUtility.ToJson(new PreviewItemPrefabMap {
                 items = itemGroups.SelectMany(group => group.items).Select(value => new PreviewItemPrefab {
@@ -281,6 +284,9 @@ public partial class ModuleExporter
             string assetPreprocessor = Path.Combine(toolRoot, "unity-runtime", "src", "preview-module-assets.js");
             if (!File.Exists(assetPreprocessor)) throw new FileNotFoundException("Preview asset preprocessor is missing.", assetPreprocessor);
             RunPreviewTool("node", assetPreprocessor, assetSource, Path.Combine(preview, "assets"), itemMapPath);
+            string animationPath = Path.Combine(preview, "animation", "humanoid-controllers.json");
+            bool hasHumanoidAnimation = Plyground.Preview.Editor.PreviewHumanoidClipExporter.Export(
+                animationPath, catalogAssets, itemPrefabs.Select(value => value.prefab));
             Directory.Delete(Path.GetDirectoryName(assetSource), true);
             File.Delete(itemMapPath);
             var sourcePaths = new HashSet<string>(runtimeSources.Where(value => value.path.EndsWith(".cs",
@@ -359,6 +365,8 @@ public partial class ModuleExporter
                     sourceRevision = ComputePreviewRevision(Path.GetDirectoryName(systemEditorAsmdef)) },
                 editor = new PreviewEntry { entry = "Preview/editor/module.mjs", controller = controllerClass },
                 assets = new PreviewPath { bundle = "Preview/assets/bundle.json" },
+                previewAnimation = hasHumanoidAnimation
+                    ? new PreviewEntry { entry = "Preview/animation/humanoid-controllers.json" } : null,
                 solution = new PreviewPath { manifest = "Preview/solution/manifest.json" },
                 revision = ComputePreviewRevision(preview)
             };
@@ -566,11 +574,25 @@ public partial class ModuleExporter
         List<(string id, GameObject prefab)> itemPrefabs, List<UnityEngine.Object> catalogAssets)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var prefab in itemPrefabs.Select(item => item.prefab).Concat(catalogAssets.OfType<GameObject>()).Distinct())
+        var prefabPaths = itemPrefabs.Select(item => AssetDatabase.GetAssetPath(item.prefab))
+            .Concat(catalogAssets.OfType<GameObject>().Select(AssetDatabase.GetAssetPath))
+            .Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var prefabs = prefabPaths.Concat(AssetDatabase.GetDependencies(prefabPaths, true))
+            .Where(path => path.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(path => AssetDatabase.LoadAssetAtPath<GameObject>(path))
+            .Where(prefab => prefab != null);
+        foreach (var prefab in prefabs)
         {
+            bool missingScript = false;
             foreach (var component in prefab.GetComponentsInChildren<MonoBehaviour>(true))
             {
-                if (component == null) throw new InvalidOperationException("A Preview prefab has a missing MonoBehaviour script.");
+                if (component == null)
+                {
+                    missingScript = true;
+                    continue;
+                }
                 var script = MonoScript.FromMonoBehaviour(component);
                 string assetPath = AssetDatabase.GetAssetPath(script);
                 if (string.IsNullOrWhiteSpace(assetPath) || !assetPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
@@ -580,6 +602,9 @@ public partial class ModuleExporter
                     continue;
                 result[Path.Combine(projectRoot, assetPath.Replace('/', Path.DirectorySeparatorChar))] = component.GetType().FullName;
             }
+            if (missingScript)
+                UnityEngine.Debug.LogWarning("Preview skipped missing MonoBehaviour scripts in prefab "
+                    + AssetDatabase.GetAssetPath(prefab) + ".");
         }
         foreach (var scriptable in catalogAssets.OfType<ScriptableObject>())
         {

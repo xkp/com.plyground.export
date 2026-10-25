@@ -19,6 +19,7 @@ namespace Plyground.Preview.Editor
     {
         private static string exportOutputDirectory;
         private static HashSet<string> exportedPrefabIds;
+        private static List<(string path, string typeName)> exportedRuntimeSources;
         public static void ExportActiveScene()
         {
             Scene scene = SceneManager.GetActiveScene();
@@ -71,11 +72,11 @@ namespace Plyground.Preview.Editor
         }
 
         /** Export asset creator prefabs without requiring an active scene. */
-        public static void ExportPrefabsToPath(string path, IEnumerable<GameObject> prefabs)
+        public static List<(string path, string typeName)> ExportPrefabsToPath(string path, IEnumerable<GameObject> prefabs)
             => ExportPrefabsToPath(path, prefabs, Array.Empty<UnityEngine.Object>());
 
         /** Export prefabs plus assets addressed directly by a module controller. */
-        public static void ExportPrefabsToPath(string path, IEnumerable<GameObject> prefabs,
+        public static List<(string path, string typeName)> ExportPrefabsToPath(string path, IEnumerable<GameObject> prefabs,
             IEnumerable<UnityEngine.Object> additionalAssets)
         {
             var selected = new List<GameObject>();
@@ -90,6 +91,7 @@ namespace Plyground.Preview.Editor
             Directory.CreateDirectory(outputDirectory);
             exportOutputDirectory = outputDirectory;
             exportedPrefabIds = new HashSet<string>(seen);
+            exportedRuntimeSources = new List<(string path, string typeName)>();
             var diagnostics = new List<object>();
             var assets = new List<object>();
             var scriptableAssetIds = new HashSet<string>();
@@ -123,8 +125,11 @@ namespace Plyground.Preview.Editor
                 else if (asset is AnimationClip animationClip)
                     ExportStandaloneAnimationClip(animationClip, diagnostics, assets, scriptableAssetIds);
                 else if (asset is AnimatorController animatorController)
+                {
+                    AddAnimatorRuntimeSources(animatorController);
                     assets.Add(Map("id", id, "kind", "animatorController",
                         "graph", PreviewAnimatorGraphExporter.Export(animatorController)));
+                }
                 else
                     diagnostics.Add("AssetDatabase asset needs Preview serialization: " +
                         AssetDatabase.GetAssetPath(asset) + " (" + asset.GetType().FullName + ")");
@@ -136,6 +141,7 @@ namespace Plyground.Preview.Editor
                 "assetPaths", assetPaths, "resources", resources, "layers", layers,
                 "diagnostics", diagnostics);
             File.WriteAllText(path, Json(source), new UTF8Encoding(false));
+            return exportedRuntimeSources;
         }
 
         private static void AddCatalogEntry(UnityEngine.Object asset,
@@ -568,6 +574,7 @@ namespace Plyground.Preview.Editor
                 properties["humanBones"] = bones;
                 if (animator.runtimeAnimatorController is AnimatorController controller)
                 {
+                    AddAnimatorRuntimeSources(controller);
                     var layers = new List<object>();
                     foreach (AnimatorControllerLayer layer in controller.layers)
                     {
@@ -693,6 +700,7 @@ namespace Plyground.Preview.Editor
             else if (source is MonoBehaviour script)
             {
                 type = source.GetType().FullName;
+                AddRuntimeSource(MonoScript.FromMonoBehaviour(script), type);
                 ExportScriptFields(script, properties, diagnostics, assets, scriptableAssetIds);
             }
             else
@@ -921,7 +929,40 @@ namespace Plyground.Preview.Editor
             var record = Map("id", id, "kind", "scriptableObject", "type", source.GetType().FullName,
                 "name", source.name, "properties", properties);
             assets.Add(record);
+            AddRuntimeSource(MonoScript.FromScriptableObject(source), source.GetType().FullName);
             ExportScriptFields(source, properties, diagnostics, assets, scriptableAssetIds);
+        }
+
+        private static void AddRuntimeSource(MonoScript script, string typeName)
+        {
+            if (exportedRuntimeSources == null || script == null) return;
+            string assetPath = AssetDatabase.GetAssetPath(script);
+            if (string.IsNullOrWhiteSpace(assetPath)
+                || !assetPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase)
+                || assetPath.IndexOf("/Editor/", StringComparison.OrdinalIgnoreCase) >= 0
+                || assetPath.IndexOf("/Editor Library/", StringComparison.OrdinalIgnoreCase) >= 0)
+                return;
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            string sourcePath = Path.Combine(projectRoot, assetPath.Replace('/', Path.DirectorySeparatorChar));
+            if (!exportedRuntimeSources.Any(value => value.path == sourcePath && value.typeName == typeName))
+                exportedRuntimeSources.Add((sourcePath, typeName));
+        }
+
+        private static void AddAnimatorRuntimeSources(AnimatorController controller)
+        {
+            foreach (var layer in controller.layers)
+                AddAnimatorRuntimeSources(layer.stateMachine);
+        }
+
+        private static void AddAnimatorRuntimeSources(AnimatorStateMachine machine)
+        {
+            foreach (var child in machine.states)
+                foreach (var behaviour in child.state.behaviours)
+                    if (behaviour != null)
+                        AddRuntimeSource(MonoScript.FromScriptableObject(behaviour),
+                            behaviour.GetType().FullName);
+            foreach (var child in machine.stateMachines)
+                AddAnimatorRuntimeSources(child.stateMachine);
         }
 
         private static string Id(UnityEngine.Object value)
@@ -1061,6 +1102,9 @@ namespace Plyground.Preview.Editor
                         "values", scales));
                 }
             }
+            if (tracks.Count == 0)
+                diagnostics.Add("Animation clip has no playable Transform tracks; sample its imported avatar for Preview: "
+                    + AssetDatabase.GetAssetPath(clip) + " (" + clip.name + ")");
             assets.Add(Map("id", id, "kind", "animationClip", "name", clip.name,
                 "duration", clip.length, "tracks", tracks));
             return Map("$asset", id);
