@@ -41,6 +41,10 @@
 ExportedObj/
 .consulo/
 *.csproj
+!Tools~/plythreejs/unity-runtime/tools/UnityTranspiler/UnityTranspiler.csproj
+/Tools~/plythreejs/unity-runtime/node_modules/
+/Tools~/plythreejs/unity-runtime/tools/UnityTranspiler/bin/
+/Tools~/plythreejs/unity-runtime/tools/UnityTranspiler/obj/
 *.unityproj
 *.sln
 *.suo

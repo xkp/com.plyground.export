@@ -1,0 +1,34 @@
+{
+  "name": "unity-three-runtime-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=1",
+    "audit": "dotnet run --project tools/UnityTranspiler -- --audit",
+    "preprocess": "node src/preprocess.js",
+    "materialize-preview": "node src/preview-build.js",
+    "validate-preview": "node src/preview-validate.js",
+    "prepare:ju3-clips": "node examples/prepare-ju3-clips.js",
+    "prepare:ju3-engine-compare": "node examples/ju3-engine-compare/prepare.js",
+    "compare:ju3-parity": "node examples/compare-ju3-parity.js",
+    "compare:ju3-shooting": "node examples/compare-ju3-shooting.js",
+    "compare:ju3-shooting-matrix": "node examples/compare-ju3-shooting-matrix.js",
+    "compare:ju3-armed-movement": "node examples/compare-ju3-armed-movement.js",
+    "compare:ju3-shoot-walk": "node examples/compare-ju3-shoot-walk.js",
+    "prepare:ju3-zombie-clips": "node examples/prepare-ju3-zombie-clips.js",
+    "fixture": "node examples/prepare-fixture.js",
+    "transpile:fixture": "node examples/transpile-fixture.js",
+    "serve": "node examples/serve.js"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.21.0",
+    "@recast-navigation/three": "^0.43.1",
+    "recast-navigation": "^0.43.1",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@babylonjs/core": "^9.36.0",
+    "@babylonjs/loaders": "^9.36.0"
+  }
+}

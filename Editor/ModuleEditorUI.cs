@@ -1258,10 +1258,6 @@ public partial class ModuleExporter
 		EditorGUILayout.Space(12f);
 		GUILayout.Label("PREVIEW DATA", EditorStyles.boldLabel);
 		EditorGUILayout.HelpBox("Export transpiled module code and Unity prefab assets for local Preview independently of the Unity module export. Unsupported code or assets stop publication with diagnostics.", MessageType.Info);
-		string previewToolRoot = EditorPrefs.GetString("Plyground.PreviewToolRoot", "");
-		string nextPreviewToolRoot = EditorGUILayout.TextField("Plythreejs Root", previewToolRoot);
-		if (nextPreviewToolRoot != previewToolRoot)
-			EditorPrefs.SetString("Plyground.PreviewToolRoot", nextPreviewToolRoot);
 		GUI.enabled = !string.IsNullOrWhiteSpace(moduleName) && !string.IsNullOrWhiteSpace(controllerClass);
 		if (GUILayout.Button("EXPORT PREVIEW DATA", GUILayout.Height(52f)))
 		{

@@ -19,6 +19,7 @@ namespace Plyground.Preview.Editor
     {
         private static string exportOutputDirectory;
         private static HashSet<string> exportedPrefabIds;
+        private static HashSet<string> exportedTextureIds;
         private static List<(string path, string typeName)> exportedRuntimeSources;
         public static void ExportActiveScene()
         {
@@ -46,6 +47,7 @@ namespace Plyground.Preview.Editor
             var assets = new List<object>();
             var scriptableAssetIds = new HashSet<string>();
             exportedPrefabIds = new HashSet<string>();
+            exportedTextureIds = new HashSet<string>();
             var layers = new Dictionary<string, object>();
             for (int index = 0; index < 32; index++)
             {
@@ -91,6 +93,7 @@ namespace Plyground.Preview.Editor
             Directory.CreateDirectory(outputDirectory);
             exportOutputDirectory = outputDirectory;
             exportedPrefabIds = new HashSet<string>(seen);
+            exportedTextureIds = new HashSet<string>();
             exportedRuntimeSources = new List<(string path, string typeName)>();
             var diagnostics = new List<object>();
             var assets = new List<object>();
@@ -798,6 +801,31 @@ namespace Plyground.Preview.Editor
                     if (reference is AudioClip)
                     {
                         value = ExportAudioClip((AudioClip)reference, diagnostics, assets, scriptableAssetIds);
+                        return true;
+                    }
+                    if (reference is Texture2D texture)
+                    {
+                        string id = Id(texture);
+                        if (exportedTextureIds.Add(id))
+                        {
+                            try
+                            {
+                                string filename = HashId(id) + ".png";
+                                string relativePath = "textures/" + filename;
+                                string target = Path.Combine(exportOutputDirectory, "textures", filename);
+                                Directory.CreateDirectory(Path.GetDirectoryName(target));
+                                File.WriteAllBytes(target, ReadTexturePng(texture));
+                                assets.Add(Map("id", id, "kind", "texture", "path", relativePath,
+                                    "name", texture.name));
+                            }
+                            catch (Exception error)
+                            {
+                                exportedTextureIds.Remove(id);
+                                diagnostics.Add("Texture conversion failed for " + texture.name + ": " + error.Message);
+                                return true;
+                            }
+                        }
+                        value = Map("$asset", id);
                         return true;
                     }
                     if (reference is PhysicsMaterial physicsMaterial)

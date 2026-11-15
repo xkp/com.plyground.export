@@ -15,6 +15,144 @@ using UnityEngine;
 public partial class ModuleExporter
 {
     [Serializable]
+    private sealed class PreviewToolchainLocation
+    {
+        public string format;
+        public string root;
+        public string nodeExecutable;
+        public bool electronNode;
+    }
+
+    [Serializable]
+    private sealed class BundledPreviewTools
+    {
+        public string format;
+        public string sha256;
+    }
+
+    [Serializable]
+    private sealed class PackagedPreviewTools
+    {
+        public string format;
+        public string runtimeHash;
+    }
+
+    private static PreviewToolchainLocation previewToolchainLocation;
+
+    private static string ResolvePreviewToolRoot()
+    {
+        previewToolchainLocation = null;
+        if (Environment.GetEnvironmentVariable("PLYGROUND_PREVIEW_USE_BUNDLED") == "1")
+            return ResolveBundledPreviewToolRoot() ?? throw new FileNotFoundException(
+                "This exporter package does not contain Plythreejs Preview tools.");
+        string locationPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".plyground", "preview-toolchain.json");
+        if (File.Exists(locationPath))
+        {
+            try
+            {
+                var location = JsonUtility.FromJson<PreviewToolchainLocation>(File.ReadAllText(locationPath));
+                if (location?.format == "plyground.preview.toolchain-location/v1"
+                    && PreviewToolExists(location.root)) previewToolchainLocation = location;
+            }
+            catch (Exception error) { UnityEngine.Debug.LogWarning("Could not read Plythreejs toolchain location: " + error.Message); }
+        }
+        string configured = Environment.GetEnvironmentVariable("PLYGROUND_PREVIEW_TOOL_ROOT");
+        if (PreviewToolExists(configured)) return configured;
+        if (previewToolchainLocation != null && DesktopPreviewMatchesBundle(previewToolchainLocation.root))
+            return previewToolchainLocation.root;
+        string bundled = ResolveBundledPreviewToolRoot();
+        if (bundled != null) return bundled;
+        if (previewToolchainLocation != null) return previewToolchainLocation.root;
+        throw new FileNotFoundException("Plythreejs Preview tools were not found in this exporter package. "
+            + "Update com.plyground.export to a package that includes the Preview tools.");
+    }
+
+    private static bool DesktopPreviewMatchesBundle(string desktopRoot)
+    {
+        string bundlePath = BundledPreviewManifestPath();
+        string desktopPath = Path.Combine(desktopRoot, "toolchain.json");
+        if (bundlePath == null || !File.Exists(desktopPath)) return false;
+        try
+        {
+            var bundle = JsonUtility.FromJson<BundledPreviewTools>(File.ReadAllText(bundlePath));
+            var desktop = JsonUtility.FromJson<PackagedPreviewTools>(File.ReadAllText(desktopPath));
+            return bundle?.format == "plyground.plythreejs-bundle/v1"
+                && desktop?.format == "plyground.preview.toolchain/v1"
+                && desktop.runtimeHash == "sha256:" + bundle.sha256;
+        }
+        catch (Exception) { return false; }
+    }
+
+    private static string BundledPreviewManifestPath()
+    {
+        var package = UnityEditor.PackageManager.PackageInfo.GetAllRegisteredPackages()
+            .FirstOrDefault(value => value.name == "com.plyground.export");
+        if (package == null || string.IsNullOrWhiteSpace(package.resolvedPath)) return null;
+        string manifestPath = Path.Combine(package.resolvedPath, "Tools~", "plythreejs", "bundle.json");
+        return File.Exists(manifestPath) ? manifestPath : null;
+    }
+
+    private static string ResolveBundledPreviewToolRoot()
+    {
+        string manifestPath = BundledPreviewManifestPath();
+        if (manifestPath == null) return null;
+        string bundledRoot = Path.GetDirectoryName(manifestPath);
+        var manifest = JsonUtility.FromJson<BundledPreviewTools>(File.ReadAllText(manifestPath));
+        if (manifest?.format != "plyground.plythreejs-bundle/v1"
+            || !Regex.IsMatch(manifest.sha256 ?? "", "^[a-f0-9]{64}$"))
+            throw new InvalidDataException("The bundled Plythreejs manifest is invalid.");
+        string cacheRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Plyground", "PreviewTools", manifest.sha256);
+        string toolRoot = Path.Combine(cacheRoot, "plythreejs");
+        string marker = Path.Combine(cacheRoot, "ready.txt");
+        if (File.Exists(marker) && PreviewToolExists(toolRoot)
+            && File.Exists(Path.Combine(toolRoot, "unity-runtime", "node_modules", "three", "package.json")))
+            return toolRoot;
+        if (Directory.Exists(cacheRoot)) Directory.Delete(cacheRoot, true);
+        CopyPreviewTools(bundledRoot, toolRoot);
+        InstallPreviewNodeDependencies(Path.Combine(toolRoot, "unity-runtime"));
+        File.WriteAllText(marker, manifest.sha256);
+        return toolRoot;
+    }
+
+    private static void CopyPreviewTools(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (string file in Directory.GetFiles(source))
+            File.Copy(file, Path.Combine(destination, Path.GetFileName(file)));
+        foreach (string directory in Directory.GetDirectories(source))
+            CopyPreviewTools(directory, Path.Combine(destination, Path.GetFileName(directory)));
+    }
+
+    private static void InstallPreviewNodeDependencies(string runtimeRoot)
+    {
+        bool windows = Application.platform == RuntimePlatform.WindowsEditor;
+        using (var process = new Process())
+        {
+            process.StartInfo.FileName = windows ? "cmd.exe" : "npm";
+            process.StartInfo.Arguments = windows ? "/d /s /c npm ci --omit=dev" : "ci --omit=dev";
+            process.StartInfo.WorkingDirectory = runtimeRoot;
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.CreateNoWindow = true;
+            process.StartInfo.RedirectStandardOutput = true;
+            process.StartInfo.RedirectStandardError = true;
+            process.Start();
+            var stderrTask = System.Threading.Tasks.Task.Run(() => process.StandardError.ReadToEnd());
+            string stdout = process.StandardOutput.ReadToEnd();
+            string stderr = stderrTask.GetAwaiter().GetResult();
+            process.WaitForExit();
+            if (process.ExitCode != 0)
+                throw new InvalidOperationException("Could not install bundled Plythreejs dependencies. "
+                    + "Install Node.js and npm, then retry.\n" + stderr + "\n" + stdout);
+        }
+    }
+
+    private static bool PreviewToolExists(string root) => !string.IsNullOrWhiteSpace(root)
+        && File.Exists(Path.Combine(root, "unity-runtime", "src", "preview-module-assets.js"))
+        && File.Exists(Path.Combine(root, "unity-runtime", "tools", "UnityTranspiler", "UnityTranspiler.csproj"));
+
+    [Serializable]
     private sealed class PreviewRuntimeReference
     {
         public string id = "plythreejs";
@@ -115,13 +253,12 @@ public partial class ModuleExporter
     // Unity -batchmode -executeMethod ModuleExporter.ExportPreviewDataBatch
     public static void ExportPreviewDataBatch()
     {
-        string toolRoot = Environment.GetEnvironmentVariable("PLYGROUND_PREVIEW_TOOL_ROOT");
+        string toolRoot = ResolvePreviewToolRoot();
         string output = Environment.GetEnvironmentVariable("PLYGROUND_PREVIEW_OUTPUT");
-        if (string.IsNullOrWhiteSpace(toolRoot) || string.IsNullOrWhiteSpace(output))
-            throw new InvalidOperationException("Set PLYGROUND_PREVIEW_TOOL_ROOT and PLYGROUND_PREVIEW_OUTPUT for batch export.");
+        if (string.IsNullOrWhiteSpace(output))
+            throw new InvalidOperationException("Set PLYGROUND_PREVIEW_OUTPUT for batch export.");
         string definition = Path.Combine(Application.dataPath, "module.bgm");
         if (!File.Exists(definition)) throw new FileNotFoundException("Module definition is missing.", definition);
-        EditorPrefs.SetString("Plyground.PreviewToolRoot", toolRoot);
         var window = CreateInstance<ModuleExporter>();
         try
         {
@@ -135,10 +272,10 @@ public partial class ModuleExporter
     {
         if (string.IsNullOrWhiteSpace(moduleId))
             throw new InvalidOperationException("Save the module before exporting Preview data so its module ID is stable.");
-        string toolRoot = EditorPrefs.GetString("Plyground.PreviewToolRoot", "").Trim();
+        string toolRoot = ResolvePreviewToolRoot();
         string transpiler = Path.Combine(toolRoot, "unity-runtime", "tools", "UnityTranspiler", "UnityTranspiler.csproj");
         if (!File.Exists(transpiler))
-            throw new FileNotFoundException("Set Plythreejs Root to a checkout containing unity-runtime/tools/UnityTranspiler.", transpiler);
+            throw new FileNotFoundException("The bundled Plythreejs transpiler is missing.", transpiler);
         string projectRoot = Directory.GetParent(Application.dataPath).FullName;
         string controllerSource = FindPreviewControllerSource(projectRoot);
         string outputDirectory = Path.GetDirectoryName(GetModuleFolder());
@@ -653,6 +790,24 @@ public partial class ModuleExporter
 
     private static void RunPreviewTool(string executable, params string[] arguments)
     {
+        if (executable == "dotnet" && arguments.Length >= 5 && arguments[0] == "run"
+            && arguments[1] == "--project" && arguments[3] == "--")
+        {
+            string published = Path.Combine(Path.GetDirectoryName(arguments[2]), "publish",
+                Application.platform == RuntimePlatform.WindowsEditor ? "UnityTranspiler.exe" : "UnityTranspiler");
+            if (File.Exists(published))
+            {
+                executable = published;
+                arguments = arguments.Skip(4).ToArray();
+            }
+        }
+        bool electronNode = false;
+        if (executable == "node" && previewToolchainLocation != null
+            && File.Exists(previewToolchainLocation.nodeExecutable))
+        {
+            executable = previewToolchainLocation.nodeExecutable;
+            electronNode = previewToolchainLocation.electronNode;
+        }
         using (var process = new Process())
         {
             process.StartInfo.FileName = executable;
@@ -661,6 +816,7 @@ public partial class ModuleExporter
             process.StartInfo.CreateNoWindow = true;
             process.StartInfo.RedirectStandardOutput = true;
             process.StartInfo.RedirectStandardError = true;
+            if (electronNode) process.StartInfo.EnvironmentVariables["ELECTRON_RUN_AS_NODE"] = "1";
             process.Start();
             var stderrTask = System.Threading.Tasks.Task.Run(() => process.StandardError.ReadToEnd());
             string stdout = process.StandardOutput.ReadToEnd();
