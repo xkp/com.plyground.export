@@ -85,6 +85,10 @@ static class ProjectTypeClosure
                 };
                 foreach (var member in members)
                 {
+                    // Nested types have their own closure pass when referenced. Scanning
+                    // their bodies here would treat editor-only nested callbacks as
+                    // runtime code of the containing type.
+                    if (member is BaseTypeDeclarationSyntax) continue;
                     if (!editorMode && member is MemberDeclarationSyntax declared
                         && EditorCodePolicy.IsEditorOnlyMember(declared)) continue;
                     foreach (var node in member.DescendantNodes())

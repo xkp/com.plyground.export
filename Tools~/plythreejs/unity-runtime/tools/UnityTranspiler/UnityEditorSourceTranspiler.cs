@@ -65,11 +65,16 @@ static class UnityEditorSourceTranspiler
             path: Path.GetRelativePath(project, path).Replace('\\', '/'))).ToArray();
         var tree = trees.First(item => string.Equals(item.FilePath, relative.Replace('\\', '/'),
             StringComparison.OrdinalIgnoreCase));
+        // Closure files include unrelated Editor tools. Check the requested
+        // controller's imports here; selected dependency members are checked
+        // semantically by Emitter.EmitTypes below.
+        PreviewExcludedApis.RejectSyntax(tree);
         var compilation = CSharpCompilation.Create("PreviewEditorSource", trees, metadata,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics().Where(item => item.Severity == DiagnosticSeverity.Error).ToArray();
         var model = compilation.GetSemanticModel(tree);
-        var emitter = new Emitter(model, runtimeImport, project, editorMode: true);
+        var emitter = new Emitter(model, runtimeImport, project,
+            editorMode: true, annotateSource: true);
         var root = tree.GetCompilationUnitRoot();
         IReadOnlyList<BaseTypeDeclarationSyntax> selected = closure && errors.Length == 0
             ? ProjectTypeClosure.Resolve(compilation, root.DescendantNodes()

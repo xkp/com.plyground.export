@@ -10,7 +10,6 @@
     "materialize-preview": "node src/preview-build.js",
     "validate-preview": "node src/preview-validate.js",
     "prepare:ju3-clips": "node examples/prepare-ju3-clips.js",
-    "prepare:ju3-engine-compare": "node examples/ju3-engine-compare/prepare.js",
     "compare:ju3-parity": "node examples/compare-ju3-parity.js",
     "compare:ju3-shooting": "node examples/compare-ju3-shooting.js",
     "compare:ju3-shooting-matrix": "node examples/compare-ju3-shooting-matrix.js",
@@ -19,16 +18,18 @@
     "prepare:ju3-zombie-clips": "node examples/prepare-ju3-zombie-clips.js",
     "fixture": "node examples/prepare-fixture.js",
     "transpile:fixture": "node examples/transpile-fixture.js",
-    "serve": "node examples/serve.js"
+    "serve": "node examples/serve.js",
+    "test:preview:e2e": "node tools/run-preview-e2e.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.21.0",
     "@recast-navigation/three": "^0.43.1",
+    "fflate": "~0.8.3",
     "recast-navigation": "^0.43.1",
-    "three": "^0.180.0"
+    "terser": "5.51.4",
+    "three": "0.180.0"
   },
   "devDependencies": {
-    "@babylonjs/core": "^9.36.0",
-    "@babylonjs/loaders": "^9.36.0"
+    "playwright-core": "1.65.1"
   }
 }

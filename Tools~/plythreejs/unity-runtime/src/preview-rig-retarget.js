@@ -2,12 +2,27 @@ import { THREE } from './index.js';
 
 // The index keys are Unity HumanBodyBones values exported with the Animator.
 const sourceBones = {
-  1: 'LeftUpLeg', 2: 'RightUpLeg', 3: 'LeftLeg', 4: 'RightLeg',
-  5: 'LeftFoot', 6: 'RightFoot', 7: 'Spine', 8: 'Spine2',
-  9: 'Neck', 10: 'Head', 11: 'LeftShoulder', 12: 'RightShoulder',
-  13: 'LeftArm', 14: 'RightArm', 15: 'LeftForeArm', 16: 'RightForeArm',
-  17: 'LeftHand', 18: 'RightHand', 19: 'LeftToeBase', 20: 'RightToeBase',
+  1: ['LeftUpLeg', 'L_Thigh'], 2: ['RightUpLeg', 'R_Thigh'],
+  3: ['LeftLeg', 'L_Calf'], 4: ['RightLeg', 'R_Calf'],
+  5: ['LeftFoot', 'L_Foot'], 6: ['RightFoot', 'R_Foot'],
+  7: ['Spine', 'Spine01'], 8: ['Spine2', 'Spine02'],
+  9: ['Neck', 'NeckTwist01'], 10: ['Head'],
+  11: ['LeftShoulder', 'L_Clavicle'], 12: ['RightShoulder', 'R_Clavicle'],
+  13: ['LeftArm', 'L_Upperarm'], 14: ['RightArm', 'R_Upperarm'],
+  15: ['LeftForeArm', 'L_Forearm'], 16: ['RightForeArm', 'R_Forearm'],
+  17: ['LeftHand', 'L_Hand'], 18: ['RightHand', 'R_Hand'],
+  19: ['LeftToeBase', 'L_ToeBase'], 20: ['RightToeBase', 'R_ToeBase'],
 };
+
+function findSourceBone(byName, aliases) {
+  for (const alias of aliases) {
+    for (const name of [alias, `mixamorig${alias}`, `mixamorig:${alias}`]) {
+      const bone = byName.get(name);
+      if (bone) return bone;
+    }
+  }
+  return null;
+}
 
 /** Bake source motion in world joint space into the target rig's local frames. */
 export function retargetPreviewClip(targetMesh, animator, imported, { name,
@@ -15,9 +30,9 @@ export function retargetPreviewClip(targetMesh, animator, imported, { name,
   if (!targetMesh?.isSkinnedMesh) throw new TypeError('Target must be a skinned mesh');
   const sourceByName = new Map(imported.skeleton.bones.map(bone => [bone.name, bone]));
   const targetByName = new Map(targetMesh.skeleton.bones.map(bone => [bone.name, bone]));
-  const pairs = Object.entries(sourceBones).map(([index, sourceName]) => ({
+  const pairs = Object.entries(sourceBones).map(([index, aliases]) => ({
     target: targetByName.get(animator.humanBones?.[index]?.gameObject?.name),
-    source: sourceByName.get(`mixamorig${sourceName}`),
+    source: findSourceBone(sourceByName, aliases),
   })).filter(pair => pair.target && pair.source);
   if (!pairs.length) throw new Error('Source and target rigs have no common humanoid bones');
 

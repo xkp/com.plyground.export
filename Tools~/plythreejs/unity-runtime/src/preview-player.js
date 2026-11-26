@@ -1,9 +1,10 @@
-import { Animator, AssetBundleLoader, Camera, Component, Object as UnityObject,
-  Physics, PhysicsSystem, ScriptableObject,
-  PlygroundItem, THREE, UnityRuntime } from './index.js';
+import { Animator, Application, AssetBundleLoader, BrowserCanvasUI, BrowserToolkitUI, Camera, Component, LODGroup, Object as UnityObject,
+  Input, Physics, PhysicsSystem, QualitySettings, ScriptableObject,
+  PlygroundItem, Screen, THREE, UnityRuntime } from './index.js';
 import { createPreviewBrowserInput, withPreviewInterpolatedPose } from './preview-browser.js';
 import { bindPreviewClothingToBody, installPreviewHumanoidAnimation } from './preview-humanoid-animation.js';
 import { PreviewControllerAnimation, installPreviewControllerAnimation } from './preview-controller-animation.js';
+import { fetchHumanoidGzipJson } from './humanoid-raw-curve-clip.js';
 import { registerPreviewGameplayMessages } from './preview-gameplay-messages.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
@@ -36,6 +37,11 @@ try {
     fetch('./bundle.json').then(response => { if (!response.ok) throw new Error('Missing scene bundle'); return response.json(); }),
     fetch('./modules.json').then(response => { if (!response.ok) throw new Error('Missing module registry'); return response.json(); })
   ]);
+  if (bundle.qualitySettings) QualitySettings.Configure(bundle.qualitySettings);
+  if (bundle.inputBindings) Input.ConfigureBindings({ ...bundle.inputBindings, replace: true });
+  if (bundle.buildTags) Application.SetBuildTags(bundle.buildTags);
+  Application.ConfigureIdentity(bundle.applicationIdentity
+    ?? { unityVersion: bundle.sourceUnityVersion ?? '' });
   const types = { 'Plyground.Pipeline.Runtime.PlygroundItem': PlygroundItem };
   for (const module of moduleRecords) {
     const source = await import(new URL(module.codeEntry, new URL('../../', import.meta.url)));
@@ -52,6 +58,14 @@ try {
   const scriptableObjects = Object.fromEntries(Object.entries(types)
     .filter(([, type]) => typeof type === 'function' && type.prototype instanceof ScriptableObject));
   const runtime = new UnityRuntime();
+  runtime._onCompatibilityFinding = finding => {
+    const count = runtime.compatibilityFindings.length;
+    status.hidden = false;
+    status.textContent = `Preview compatibility: ${count} finding${count === 1 ? '' : 's'}. `
+      + `${finding.api}${finding.gameObject ? ` on ${finding.gameObject}` : ''}: ${finding.detail}`;
+  };
+  runtime._renderer = renderer;
+  for (const phase of [4, 2, 3, 1]) runtime.runRuntimeInitializers(types, phase);
   runtime.scene.background = new THREE.Color(0x8bb9d4);
   const environmentGenerator = new THREE.PMREMGenerator(renderer);
   const roomEnvironment = new RoomEnvironment();
@@ -69,7 +83,9 @@ try {
   const physics = await PhysicsSystem.create(runtime);
   const loaded = await new AssetBundleLoader(runtime, { components, scriptableObjects, types,
     assetConcurrency: 6 })
-    .load(bundle, { baseUrl: new URL('./', location.href).href });
+    .load(bundle, { baseUrl: new URL('./', location.href).href,
+      loadingPolicy: 'scene' });
+  runtime.runRuntimeInitializers(types, 0);
   const juType = types['JUTPS.JUCharacterController'];
   const groundMask = ['Default', 'Terrain', 'Walls'].reduce((mask, name) =>
     mask | (Number.isInteger(bundle.layers?.[name]) ? 1 << bundle.layers[name] : 0), 0);
@@ -96,8 +112,26 @@ try {
     const response = await fetch(animationUrl);
     if (!response.ok) throw new Error(`Missing Preview animation data: ${module.animationEntry}`);
     const animation = await response.json();
-    if (animation.format === 'plyground.preview.humanoid-controllers/v1')
-      installPreviewControllerAnimation(loaded.roots, animation);
+    if (animation.format === 'plyground.preview.humanoid-controllers/v1') {
+      let rawData = null;
+      if (animation.rawMotionEntry && animation.calibrationEntry
+        && animation.controllers?.some(controller =>
+          controller.rawReadyClips?.length)) {
+        try {
+          const [rawMotion, calibrations] = await Promise.all([
+            fetchHumanoidGzipJson(new URL(animation.rawMotionEntry, animationUrl)),
+            fetchHumanoidGzipJson(new URL(animation.calibrationEntry, animationUrl)),
+          ]);
+          if (rawMotion.format !== 'plyground.preview.humanoid-curves/v1'
+            || calibrations.format !== 'plyground.preview.avatar-calibrations/v1')
+            throw new Error('Unexpected Humanoid raw data format');
+          rawData = { rawMotion, calibrations };
+        } catch (error) {
+          console.error('Preview raw Humanoid motion unavailable; animated poses cannot be built without these assets.', error);
+        }
+      }
+      installPreviewControllerAnimation(loaded.roots, animation, rawData);
+    }
     else await installPreviewHumanoidAnimation(loaded.roots, animation, types,
       { baseUrl: animationUrl });
   }
@@ -122,6 +156,7 @@ try {
     asset.kind === 'prefab' && asset.root?.components?.some(component =>
       component.type === 'JUTPS.CameraSystems.TPSCameraController'));
   if (cameraAsset) {
+    await loaded.preloadAsset(cameraAsset.id);
     const cameraRoot = UnityObject.Instantiate(loaded.assets.get(cameraAsset.id));
     const controller = cameraRoot.GetComponent(cameraType);
     controller.TargetToFollow = player.GetComponent(juType)?.HumanoidSpine ?? player.transform;
@@ -138,7 +173,7 @@ try {
       && !playerController.IsDead && !playerHealth?.IsDead;
     reticle.style.display = visible ? 'block' : 'none';
     if (!visible) return;
-    const ray = camera.ScreenPointToRay(new THREE.Vector3(innerWidth / 2, innerHeight / 2, 0));
+    const ray = camera.ScreenPointToRay(new THREE.Vector3(Screen.width / 2, Screen.height / 2, 0));
     Physics.Raycast(ray, aimHit, 500, weapon.RaycastingLayers);
     const target = aimHit.value.collider?.gameObject;
     const zombie = zombieType && target?.GetComponentInParent(zombieType);
@@ -178,21 +213,32 @@ try {
     fallbackCamera.lookAt(currentLook);
   }
   const resize = () => {
-    renderer.setSize(innerWidth, innerHeight);
-    fallbackCamera.aspect = innerWidth / innerHeight;
+    const width = Screen._requestedResolution?.width ?? innerWidth;
+    const height = Screen._requestedResolution?.height ?? innerHeight;
+    renderer.setSize(width, height, false);
+    Screen._ConfigureViewport(width, height);
+    fallbackCamera.aspect = width / height;
     fallbackCamera.updateProjectionMatrix();
-    Camera.main?.SetViewport(innerWidth, innerHeight);
+    Camera.main?.SetViewport(width, height);
   };
+  Screen._BindRenderSurface(resize);
   addEventListener('resize', resize);
   resize();
   runtime.addSystem(browserInput);
+  const browserUI = runtime.addSystem(new BrowserCanvasUI(document.body));
+  const browserToolkitUI = runtime.addSystem(new BrowserToolkitUI(document.body));
+  browserInput.addUIRoot(browserUI.root);
+  browserInput.addUIRoot(browserToolkitUI.root);
   // Local validation can inspect the materialized Unity objects without
   // reaching into the renderer or changing transpiled gameplay code.
-  window.__plygroundPreview = { runtime, loaded, player, types, moduleRecords };
-  status.hidden = true;
+  window.__plygroundPreview = { runtime, loaded, player, types, moduleRecords,
+    screenResolutionDiagnostics: Screen._resolutionDiagnostics,
+    uiDiagnostics: browserUI.diagnostics,
+    toolkitDiagnostics: browserToolkitUI.diagnostics };
+  if (runtime.compatibilityFindings.length === 0) status.hidden = true;
   runtime.start({ render: scene => {
     const activeCamera = Camera.main;
-    activeCamera?.SetViewport(innerWidth, innerHeight);
+    activeCamera?.SetViewport(Screen.width, Screen.height);
     if (activeCamera) activeCamera.useUnityRenderSpace = true;
     updateAimReticle(activeCamera);
     withPreviewInterpolatedPose(physics, player, () => {
@@ -200,6 +246,7 @@ try {
         activeCamera.Render(renderer, scene);
       } else {
         followPlayer();
+        LODGroup.UpdateForCamera(fallbackCamera, runtime);
         renderer.render(scene, fallbackCamera);
       }
     });

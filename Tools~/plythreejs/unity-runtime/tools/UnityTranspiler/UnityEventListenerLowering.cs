@@ -18,7 +18,7 @@ sealed class UnityEventListenerLowering : ISystemLowering
             || invocation.ArgumentList.Arguments.Count != 1)
             return null;
         ExpressionSyntax callback = invocation.ArgumentList.Arguments[0].Expression;
-        if (callback is LambdaExpressionSyntax) return null;
+        if (callback is LambdaExpressionSyntax or AnonymousMethodExpressionSyntax) return null;
         if (model.GetSymbolInfo(callback).Symbol is not IMethodSymbol method) return null;
         ExpressionSyntax? receiver = callback switch
         {

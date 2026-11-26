@@ -182,6 +182,8 @@ public partial class ModuleExporter
     private sealed class PreviewEntry
     {
         public string entry;
+        public string browserEntry;
+        public string sizes;
         public string controller;
         public string revision;
         public string sourceRevision;
@@ -328,6 +330,7 @@ public partial class ModuleExporter
             foreach (var reference in referencedTypes?.references ?? new PreviewTypeReference[0])
             {
                 if (!string.IsNullOrWhiteSpace(reference?.assembly)
+                    && !reference.type.StartsWith("JUTPSEditor.", StringComparison.Ordinal)
                     && assemblyDefinitions.TryGetValue(reference.assembly, out string definition))
                 {
                     if (reference.assembly.EndsWith(".Editor", StringComparison.OrdinalIgnoreCase)
@@ -358,6 +361,7 @@ public partial class ModuleExporter
                 foreach (var dependency in dependencies?.references ?? new PreviewTypeReference[0])
                 {
                     if (assemblyDefinitions.TryGetValue(dependency.assembly ?? "", out string definition)
+                        && !dependency.type.StartsWith("JUTPSEditor.", StringComparison.Ordinal)
                         && IsPreviewEditorType(definition, dependency.type, projectRoot))
                         editorSources.Add((definition, dependency.type));
                 }
@@ -386,7 +390,8 @@ public partial class ModuleExporter
             var defaultRoots = groups.Where(group => group.Key == null)
                 .SelectMany(group => group.Select(source => source.typeName))
                 .Concat((referencedTypes?.references ?? new PreviewTypeReference[0])
-                    .Where(reference => reference.assembly == "Assembly-CSharp")
+                    .Where(reference => reference.assembly == "Assembly-CSharp"
+                        && !reference.type.StartsWith("JUTPSEditor.", StringComparison.Ordinal))
                     .Select(reference => reference.type))
                 .Distinct(StringComparer.Ordinal).ToArray();
             if (defaultRoots.Length > 0)
@@ -405,6 +410,10 @@ public partial class ModuleExporter
                 string.Join("\n", entries) + "\n" + string.Join("\n", registrations)
                 + "\nexport const unityTypes = Object.assign({}, "
                 + string.Join(", ", registries) + ");\n");
+            string codeMinifier = Path.Combine(toolRoot, "unity-runtime", "src", "preview-minify-code.js");
+            if (!File.Exists(codeMinifier)) throw new FileNotFoundException("Preview code minifier is missing.", codeMinifier);
+            RunPreviewTool("node", codeMinifier, Path.Combine(preview, "code"),
+                Path.Combine(preview, "code-min"));
 
             EditorUtility.DisplayProgressBar("Export Preview Data", "Preparing assets and source snapshot", 0.75f);
             string itemMapPath = Path.Combine(staging, "item-prefabs.json");
@@ -424,6 +433,18 @@ public partial class ModuleExporter
             string animationPath = Path.Combine(preview, "animation", "humanoid-controllers.json");
             bool hasHumanoidAnimation = Plyground.Preview.Editor.PreviewHumanoidClipExporter.Export(
                 animationPath, catalogAssets, itemPrefabs.Select(value => value.prefab));
+            if (hasHumanoidAnimation)
+            {
+                string avatarCalibration = Path.Combine(preview,
+                    "animation", "avatar-calibrations.json.gz");
+                if (!File.Exists(avatarCalibration))
+                    throw new InvalidOperationException("Humanoid Preview requires Avatar calibration; sampled animation bones cannot be published.");
+                string selector = Path.Combine(toolRoot, "unity-runtime", "tools",
+                    "select-raw-humanoid-clips.mjs");
+                RunPreviewTool("node", selector, animationPath,
+                    Path.Combine(preview, "animation", "humanoid-curves.json.gz"),
+                    avatarCalibration);
+            }
             Directory.Delete(Path.GetDirectoryName(assetSource), true);
             File.Delete(itemMapPath);
             var sourcePaths = new HashSet<string>(runtimeSources.Where(value => value.path.EndsWith(".cs",
@@ -496,7 +517,9 @@ public partial class ModuleExporter
                 moduleId = moduleId,
                 moduleType = moduleType,
                 name = moduleName,
-                code = new PreviewEntry { entry = "Preview/code/module.mjs" },
+                code = new PreviewEntry { entry = "Preview/code/module.mjs",
+                    browserEntry = "Preview/code-min/module.mjs",
+                    sizes = "Preview/code-min/manifest.json" },
                 systemEditor = new PreviewEntry { entry = "Preview/editor/system.mjs",
                     revision = ComputePreviewFileRevision(systemEditorOutput),
                     sourceRevision = ComputePreviewRevision(Path.GetDirectoryName(systemEditorAsmdef)) },

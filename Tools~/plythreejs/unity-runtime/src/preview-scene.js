@@ -4,8 +4,10 @@ import { dirname, extname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { BUNDLE_FORMAT, BUNDLE_VERSION, validateManifest } from './asset-schema.js';
-import { AssetBundleLoader, AssetDatabase, Component, CSharpDictionary, JObject, JToken, Object as UnityObject, PlygroundItem, Quaternion, ScriptableObject, THREE, UnityRuntime, UnityType, Vector3 } from './index.js';
+import { legacyBindingsFromAxes } from './input-settings.js';
+import { AssetBundleLoader, AssetDatabase, Component, CSharpDictionary, Font, JObject, JToken, Object as UnityObject, PlygroundItem, Quaternion, ScriptableObject, THREE, TerrainData, UnityRuntime, UnityType, Vector3 } from './index.js';
 import { runPreviewImport, serializePreviewObject } from './preview-importer.js';
+import { orientUnityNormalMaps } from './preview-model-materials.js';
 
 function member(root, name) {
   if (typeof name !== 'string' || !name || isAbsolute(name) || /^[A-Za-z]:/.test(name)
@@ -37,7 +39,7 @@ export async function importPreparedModule(file, root, cache = new Map(), active
   // Only match import declarations and generated await-import expressions.
   // A bare `from "..."` can also occur inside transpiled gameplay strings.
   const specifiers = [
-    ...source.matchAll(/^\s*import\s+[^'"\n;]+\s+from\s*(['"])([^'"\n]+)\1/gm),
+    ...source.matchAll(/^\s*import\s*[^'"\n;]+?\s*from\s*(['"])([^'"\n]+)\1/gm),
     ...source.matchAll(/^\s*(?:const|let|var)\s+[\w$]+\s*=\s*await\s+import\s*\(\s*(['"])([^'"\n]+)\1\s*\)/gm),
   ];
   for (const match of specifiers) {
@@ -96,7 +98,8 @@ async function loadModulePrefabs(moduleBundle, codeFile, moduleRoot, bundleDirec
         globalThis.self ??= globalThis;
         const bytes = await readFile(member(bundleDirectory, asset.url));
         return new Promise((resolve, reject) => new GLTFLoader().parse(
-          bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '', resolve, reject));
+          bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '',
+          model => { orientUnityNormalMaps(model.scene ?? model); resolve(model); }, reject));
       }
       if (asset.kind === 'texture') {
         const texture = new THREE.Texture();
@@ -104,7 +107,17 @@ async function loadModulePrefabs(moduleBundle, codeFile, moduleRoot, bundleDirec
         return texture;
       }
       if (asset.kind === 'audio') return new ArrayBuffer(0);
+      if (asset.kind === 'uiFont') {
+        const font = new Font();
+        font.name = asset.name ?? '';
+        font.url = member(bundleDirectory, asset.url);
+        return font;
+      }
       if (asset.kind === 'navMesh') return new Uint8Array();
+      if (asset.kind === 'terrainData') {
+        const record = await json(member(bundleDirectory, asset.url));
+        return new TerrainData(record);
+      }
       throw new Error(`Unsupported Preview asset kind: ${asset.kind}`);
     }
   });
@@ -320,11 +333,18 @@ export async function assemblePreviewScene(projectRoot, project) {
   const modules = [];
   const diagnostics = [];
   const layers = {};
+  const renderingLayers = {};
+  let qualitySettings = null;
+  let renderSettings = null;
+  let moduleInputBindings = null;
+  let buildTags = null;
   const editorModules = [];
   const componentTypeNames = new Map();
   const editorAssets = new Map();
   const editorResources = new Map();
   const sceneResources = new Map();
+  const sceneAssetBundles = new Map();
+  const sceneDescriptors = [];
   const legacyBuilders = [];
   const moduleIds = new Set();
   let systemEditorRevision = null;
@@ -342,12 +362,47 @@ export async function assemblePreviewScene(projectRoot, project) {
     const moduleRoot = resolve(dirname(manifestFile), '..');
     const moduleBundleFile = member(moduleRoot, manifest.assets.bundle);
     const moduleBundle = validateManifest(await json(moduleBundleFile), BUNDLE_FORMAT);
+    if (moduleBundle.renderSettings
+      && (!renderSettings || record.moduleId === build.selectedGame))
+      renderSettings = moduleBundle.renderSettings;
+    const exportedInput = moduleBundle.legacyAxes
+      ? legacyBindingsFromAxes(moduleBundle.legacyAxes) : moduleBundle.inputBindings;
+    if (exportedInput) {
+      for (const message of exportedInput.diagnostics ?? []) diagnostics.push({
+        severity: 'warning', phase: 'input', message: `${record.moduleId}: ${message}` });
+      const bindings = { buttons: exportedInput.buttons, axes: exportedInput.axes };
+      if (!moduleInputBindings || record.moduleId === build.selectedGame)
+        moduleInputBindings = bindings;
+      else if (JSON.stringify(moduleInputBindings) !== JSON.stringify(bindings))
+        diagnostics.push({ severity: 'warning', phase: 'input',
+          message: `${record.moduleId} has different input bindings; using the selected game bindings` });
+    }
+    if (moduleBundle.qualitySettings) {
+      if (qualitySettings && JSON.stringify(qualitySettings) !== JSON.stringify(moduleBundle.qualitySettings))
+        throw new Error('Preview modules disagree on Unity quality settings');
+      qualitySettings = moduleBundle.qualitySettings;
+    }
+    if (moduleBundle.buildTags) {
+      if (buildTags && JSON.stringify(buildTags) !== JSON.stringify(moduleBundle.buildTags))
+        throw new Error('Preview modules disagree on Unity build tags');
+      buildTags = moduleBundle.buildTags;
+    }
     for (const [name, index] of Object.entries(moduleBundle.layers ?? {})) {
       if (layers[name] !== undefined && layers[name] !== index)
         throw new Error(`Preview modules disagree on Unity layer ${name}`);
       layers[name] = index;
     }
+    for (const [name, index] of Object.entries(moduleBundle.renderingLayers ?? {})) {
+      if (renderingLayers[name] !== undefined && renderingLayers[name] !== index
+        || Object.entries(renderingLayers).some(([existing, value]) =>
+          existing !== name && value === index))
+        throw new Error(`Preview modules disagree on Unity rendering layer ${name}`);
+      renderingLayers[name] = index;
+    }
     const bundleDirectory = dirname(moduleBundleFile);
+    for (const scene of moduleBundle.scenes ?? [])
+      sceneDescriptors.push({ ...scene, recordUrl:
+        relative(projectRoot, member(bundleDirectory, scene.recordUrl)).replaceAll('\\', '/') });
     if (manifest.editor?.entry) {
       if (!manifest.editor.controller) throw new Error(`Module ${manifest.moduleId} has no editor controller type`);
       const runtimeData = await loadModulePrefabs(moduleBundle, member(moduleRoot, manifest.code.entry), moduleRoot, bundleDirectory);
@@ -413,6 +468,17 @@ export async function assemblePreviewScene(projectRoot, project) {
       if (typeof builder.buildPreview !== 'function') throw new Error(`Module ${manifest.moduleId} has no buildPreview export`);
       legacyBuilders.push({ moduleId: manifest.moduleId, moduleBundle, builder });
     }
+    for (const [name, paths] of Object.entries(moduleBundle.assetBundles ?? {})) {
+      const key = name.replaceAll('\\', '/').toLowerCase();
+      if (!sceneAssetBundles.has(key)) sceneAssetBundles.set(key, { name, paths: new Map() });
+      const bundle = sceneAssetBundles.get(key);
+      for (const [path, id] of Object.entries(paths)) {
+        const normalized = path.replaceAll('\\', '/').toLowerCase();
+        if (bundle.paths.has(normalized) && bundle.paths.get(normalized).id !== id)
+          throw new Error(`Preview modules export different AssetBundle assets at ${name}/${path}`);
+        bundle.paths.set(normalized, { path, id });
+      }
+    }
     for (const asset of moduleBundle.assets) {
       if (assets.some(existing => existing.id === asset.id)) throw new Error(`Duplicate preview asset id: ${asset.id}`);
       if (asset.url) {
@@ -422,7 +488,8 @@ export async function assemblePreviewScene(projectRoot, project) {
     }
     modules.push({ moduleId: manifest.moduleId, revision: manifest.revision,
       ...(record.staticAssetBaseUrl ? { staticAssetBaseUrl: record.staticAssetBaseUrl } : {}),
-      codeEntry: relative(projectRoot, member(moduleRoot, manifest.code.entry)).replaceAll('\\', '/'),
+      codeEntry: relative(projectRoot, member(moduleRoot,
+        manifest.code.browserEntry ?? manifest.code.entry)).replaceAll('\\', '/'),
       ...(manifest.previewAnimation?.entry ? { animationEntry: relative(projectRoot,
         member(moduleRoot, manifest.previewAnimation.entry)).replaceAll('\\', '/') } : {}) });
     if (moduleBundle.previewDiagnostics?.length)
@@ -516,8 +583,29 @@ export async function assemblePreviewScene(projectRoot, project) {
       } });
   }
   if (!modules.length) throw new Error('Preview project has no game module');
+  const inputBindings = project.input?.legacyAxes
+    ? legacyBindingsFromAxes(project.input.legacyAxes) : null;
+  for (const message of inputBindings?.diagnostics ?? []) diagnostics.push({
+    severity: 'warning', phase: 'input', message });
+  for (const record of project.input?.actionAssets ?? []) {
+    if (typeof record?.id !== 'string' || !record.id)
+      throw new Error('Preview Input Action asset needs an ID');
+    const data = await json(member(projectRoot, record.path));
+    assets.push({ id: record.id, kind: 'inputActionAsset', name: record.name ?? data.name ?? '', data });
+  }
   const bundle = { format: BUNDLE_FORMAT, version: BUNDLE_VERSION, coordinateSystem: 'unity',
-    assets, layers, resources: Object.fromEntries(sceneResources), scene: { name: project.variationId, roots } };
+    assets, layers, renderingLayers: Object.keys(renderingLayers).length
+      ? renderingLayers : undefined, qualitySettings: qualitySettings ?? undefined,
+    renderSettings: renderSettings ?? undefined,
+    inputBindings: inputBindings ? { buttons: inputBindings.buttons,
+      axes: inputBindings.axes } : moduleInputBindings ?? undefined,
+    buildTags: buildTags ?? undefined,
+    resources: Object.fromEntries(sceneResources),
+    assetBundles: Object.fromEntries([...sceneAssetBundles.values()]
+      .map(bundle => [bundle.name, Object.fromEntries([...bundle.paths.values()]
+        .map(({ path, id }) => [path, id]))])),
+    ...(sceneDescriptors.length ? { scenes: sceneDescriptors } : {}),
+    scene: { name: project.variationId, roots } };
   const exportedClips = new Set(assets.filter(asset => asset.kind === 'animationClip'
     && asset.tracks?.length)
     .map(asset => asset.name?.toLowerCase()));

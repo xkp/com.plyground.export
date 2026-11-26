@@ -935,7 +935,7 @@ using System;
 
 	private static bool IsUniversalRenderPipelineProject()
 	{
-		var renderPipelineAsset = UnityEngine.Rendering.GraphicsSettings.renderPipelineAsset;
+		var renderPipelineAsset = UnityEngine.Rendering.GraphicsSettings.defaultRenderPipeline;
 		if (renderPipelineAsset == null)
 			return false;
 

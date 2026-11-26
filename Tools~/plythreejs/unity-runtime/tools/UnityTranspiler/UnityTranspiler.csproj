@@ -8,6 +8,44 @@
   <ItemGroup>
     <Compile Remove="PreviewUnityStubs.cs" />
     <None Include="PreviewUnityStubs.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewUIStubs.cs" />
+    <None Include="PreviewUIStubs.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewWebRequestStubs.cs" />
+    <None Include="PreviewWebRequestStubs.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewUiEnums.cs" />
+    <None Include="PreviewUiEnums.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewUiNestedEnums.cs" />
+    <None Include="PreviewUiNestedEnums.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewColorPaletteStubs.cs" />
+    <None Include="PreviewColorPaletteStubs.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewPlatformEnums.cs" />
+    <None Include="PreviewPlatformEnums.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewKeyCode.cs" />
+    <None Include="PreviewKeyCode.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewTextureEnums.cs" />
+    <None Include="PreviewTextureEnums.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewTextureApiStubs.cs" />
+    <None Include="PreviewTextureApiStubs.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewImageConversionStubs.cs" />
+    <None Include="PreviewImageConversionStubs.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewParticleApiStubs.cs" />
+    <None Include="PreviewParticleApiStubs.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewRemainingEnums.cs" />
+    <None Include="PreviewRemainingEnums.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewRenderingEnums.cs" />
+    <None Include="PreviewRenderingEnums.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewOtherEnums.cs" />
+    <None Include="PreviewOtherEnums.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewSimpleStructs.cs" />
+    <None Include="PreviewSimpleStructs.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewMeshLayout.cs" />
+    <None Include="PreviewMeshLayout.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewSortingMetadata.cs" />
+    <None Include="PreviewSortingMetadata.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewEditorMetadataAttributes.cs" />
+    <None Include="PreviewEditorMetadataAttributes.cs" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="PreviewLinkerMetadataAttributes.cs" />
+    <None Include="PreviewLinkerMetadataAttributes.cs" CopyToOutputDirectory="PreserveNewest" />
     <Reference Include="Microsoft.CodeAnalysis">
       <HintPath>$(MSBuildSDKsPath)/../Roslyn/bincore/Microsoft.CodeAnalysis.dll</HintPath>
     </Reference>

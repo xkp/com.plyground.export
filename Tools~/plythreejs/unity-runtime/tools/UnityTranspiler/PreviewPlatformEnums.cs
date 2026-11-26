@@ -1,0 +1,272 @@
+// Generated from audits/core-platform-enums-unity-reference.json.
+namespace UnityEngine
+{
+    public enum RuntimePlatform
+    {
+        OSXEditor = 0,
+        OSXPlayer = 1,
+        WindowsPlayer = 2,
+        OSXWebPlayer = 3,
+        OSXDashboardPlayer = 4,
+        WindowsWebPlayer = 5,
+        WindowsEditor = 7,
+        IPhonePlayer = 8,
+        PS3 = 9,
+        XBOX360 = 10,
+        Android = 11,
+        NaCl = 12,
+        LinuxPlayer = 13,
+        FlashPlayer = 15,
+        LinuxEditor = 16,
+        WebGLPlayer = 17,
+        MetroPlayerX86 = 18,
+        WSAPlayerX86 = 18,
+        MetroPlayerX64 = 19,
+        WSAPlayerX64 = 19,
+        MetroPlayerARM = 20,
+        WSAPlayerARM = 20,
+        WP8Player = 21,
+        BB10Player = 22,
+        BlackBerryPlayer = 22,
+        TizenPlayer = 23,
+        PSP2 = 24,
+        PS4 = 25,
+        PSM = 26,
+        XboxOne = 27,
+        SamsungTVPlayer = 28,
+        WiiU = 30,
+        tvOS = 31,
+        Switch = 32,
+        Lumin = 33,
+        Stadia = 34,
+        LinuxHeadlessSimulation = 35,
+        GameCoreXboxSeries = 36,
+        GameCoreXboxOne = 37,
+        PS5 = 38,
+        EmbeddedLinuxArm64 = 39,
+        EmbeddedLinuxArm32 = 40,
+        EmbeddedLinuxX64 = 41,
+        EmbeddedLinuxX86 = 42,
+        LinuxServer = 43,
+        WindowsServer = 44,
+        OSXServer = 45,
+        QNXArm32 = 46,
+        QNXArm64 = 47,
+        QNXX64 = 48,
+        QNXX86 = 49,
+        VisionOS = 50,
+        Switch2 = 51,
+        KeplerArm64 = 52,
+        KeplerX64 = 53,
+        CloudRendering = -1,
+        GameCoreScarlett = -1,
+    }
+    public enum SystemLanguage
+    {
+        Afrikaans = 0,
+        Arabic = 1,
+        Basque = 2,
+        Belarusian = 3,
+        Bulgarian = 4,
+        Catalan = 5,
+        Chinese = 6,
+        Czech = 7,
+        Danish = 8,
+        Dutch = 9,
+        English = 10,
+        Estonian = 11,
+        Faroese = 12,
+        Finnish = 13,
+        French = 14,
+        German = 15,
+        Greek = 16,
+        Hebrew = 17,
+        Hungarian = 18,
+        Hugarian = 18,
+        Icelandic = 19,
+        Indonesian = 20,
+        Italian = 21,
+        Japanese = 22,
+        Korean = 23,
+        Latvian = 24,
+        Lithuanian = 25,
+        Norwegian = 26,
+        Polish = 27,
+        Portuguese = 28,
+        Romanian = 29,
+        Russian = 30,
+        SerboCroatian = 31,
+        Slovak = 32,
+        Slovenian = 33,
+        Spanish = 34,
+        Swedish = 35,
+        Thai = 36,
+        Turkish = 37,
+        Ukrainian = 38,
+        Vietnamese = 39,
+        ChineseSimplified = 40,
+        ChineseTraditional = 41,
+        Hindi = 42,
+        Unknown = 43,
+    }
+    public enum QualityLevel
+    {
+        Fastest = 0,
+        Fast = 1,
+        Simple = 2,
+        Good = 3,
+        Beautiful = 4,
+        Fantastic = 5,
+    }
+    public enum ColorSpace
+    {
+        Gamma = 0,
+        Linear = 1,
+        Uninitialized = -1,
+    }
+    public enum HideFlags
+    {
+        None = 0,
+        HideInHierarchy = 1,
+        HideInInspector = 2,
+        DontSaveInEditor = 4,
+        NotEditable = 8,
+        DontSaveInBuild = 16,
+        DontUnloadUnusedAsset = 32,
+        DontSave = 52,
+        HideAndDontSave = 61,
+    }
+    public enum ScreenOrientation
+    {
+        Unknown = 0,
+        Portrait = 1,
+        PortraitUpsideDown = 2,
+        LandscapeLeft = 3,
+        Landscape = 3,
+        LandscapeRight = 4,
+        AutoRotation = 5,
+    }
+    public enum LogType
+    {
+        Error = 0,
+        Assert = 1,
+        Warning = 2,
+        Log = 3,
+        Exception = 4,
+    }
+    public enum SkinWeights
+    {
+        None = 0,
+        OneBone = 1,
+        TwoBones = 2,
+        FourBones = 4,
+        Unlimited = 255,
+    }
+    public enum AudioType
+    {
+        UNKNOWN = 0,
+        ACC = 1,
+        AIFF = 2,
+        IT = 10,
+        MOD = 12,
+        MPEG = 13,
+        OGGVORBIS = 14,
+        S3M = 17,
+        WAV = 20,
+        XM = 21,
+        XMA = 22,
+        VAG = 23,
+        AUDIOQUEUE = 24,
+    }
+    public enum TerrainQualityOverrides
+    {
+        None = 0,
+        PixelError = 1,
+        BasemapDistance = 2,
+        DetailDensity = 4,
+        DetailDistance = 8,
+        TreeDistance = 16,
+        BillboardStart = 32,
+        FadeLength = 64,
+        MaxTrees = 128,
+    }
+    public enum CompressionLevel
+    {
+        None = 0,
+        Fastest = 1,
+        Fast = 2,
+        Normal = 3,
+        High = 4,
+        Maximum = 5,
+    }
+    public enum ApplicationInstallMode
+    {
+        Unknown = 0,
+        Store = 1,
+        DeveloperBuild = 2,
+        Adhoc = 3,
+        Enterprise = 4,
+        Editor = 5,
+    }
+    public enum BatteryStatus
+    {
+        Unknown = 0,
+        Charging = 1,
+        Discharging = 2,
+        NotCharging = 3,
+        Full = 4,
+    }
+    public enum OperatingSystemFamily
+    {
+        Other = 0,
+        MacOSX = 1,
+        Windows = 2,
+        Linux = 3,
+    }
+    public enum ThreadPriority
+    {
+        Low = 0,
+        BelowNormal = 1,
+        Normal = 2,
+        High = 4,
+    }
+    public enum FullScreenMode
+    {
+        ExclusiveFullScreen = 0,
+        FullScreenWindow = 1,
+        MaximizedWindow = 2,
+        Windowed = 3,
+    }
+    public enum ShadowResolution
+    {
+        Low = 0,
+        Medium = 1,
+        High = 2,
+        VeryHigh = 3,
+    }
+    public enum ShadowQuality
+    {
+        Disable = 0,
+        HardOnly = 1,
+        All = 2,
+    }
+    public enum RenderingPath
+    {
+        VertexLit = 0,
+        Forward = 1,
+        DeferredLighting = 2,
+        DeferredShading = 3,
+        UsePlayerSettings = -1,
+    }
+    public enum ShadowProjection
+    {
+        CloseFit = 0,
+        StableFit = 1,
+    }
+    public enum AnisotropicFiltering
+    {
+        Disable = 0,
+        Enable = 1,
+        ForceEnable = 2,
+    }
+}

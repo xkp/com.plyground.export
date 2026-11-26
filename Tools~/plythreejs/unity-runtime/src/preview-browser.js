@@ -1,9 +1,10 @@
-import { BrowserInput, Cursor } from './index.js';
+import { BrowserInput, Cursor, Screen } from './index.js';
 
 /** Browser controls used by every generated Preview, including JU scenes. */
 export function createPreviewBrowserInput(canvas, target = globalThis.window) {
   Cursor.ConfigureBrowser({ pointerLock: true, hide: true, pointerTarget: canvas });
-  return new BrowserInput(target, { pointerTarget: canvas });
+  return new BrowserInput(target, { pointerTarget: canvas,
+    coordinateSize: () => ({ width: Screen.width, height: Screen.height }) });
 }
 
 /** Render a dynamic actor at its interpolated physics pose without changing simulation state. */

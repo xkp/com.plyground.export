@@ -23,6 +23,7 @@ sealed class SystemLoweringRegistry
         {
             handlers.Add(new AssetDatabaseLowering(unityProjectRoot));
             handlers.Add(new PrefabUtilityLowering());
+            handlers.Add(new AssetImporterLowering());
         }
     }
 
@@ -62,6 +63,11 @@ sealed class AssetDatabaseLowering(string projectRoot) : ISystemLowering
         {
             runtimeLookup = true;
             return "AssetDatabase.Refresh()";
+        }
+        if (symbol.Name == "GetAssetPath" && invocation.ArgumentList.Arguments.Count == 1)
+        {
+            runtimeLookup = true;
+            return $"AssetDatabase.GetAssetPath({emitExpression(invocation.ArgumentList.Arguments[0].Expression)})";
         }
         if (symbol.Name is "FindAssets" or "GUIDToAssetPath" or "LoadAllAssetsAtPath"
             && invocation.ArgumentList.Arguments.Count == 1)
@@ -107,13 +113,16 @@ sealed class AssetDatabaseLowering(string projectRoot) : ISystemLowering
             throw Unsupported(invocation, $"Asset GUID {guid} is shared by {existing.Path} and {normalized}");
         if (!assets.ContainsKey(guid))
         {
-            string content;
-            try { content = File.ReadAllText(fullPath, new UTF8Encoding(false, true)); }
+            byte[] bytes;
+            try {
+                File.ReadAllText(fullPath, new UTF8Encoding(false, true));
+                bytes = File.ReadAllBytes(fullPath);
+            }
             catch (DecoderFallbackException)
             {
                 throw Unsupported(invocation, $"TextAsset is not valid UTF-8: {unityPath}");
             }
-            assets.Add(guid, new PreparedTextAsset(guid, normalized, content));
+            assets.Add(guid, new PreparedTextAsset(guid, normalized, bytes));
         }
         return $"preparedAssets.get({JsonSerializer.Serialize(guid)})";
     }
@@ -129,7 +138,7 @@ sealed class AssetDatabaseLowering(string projectRoot) : ISystemLowering
             kind = "text",
         }));
         string entries = string.Join(",\n", records.Select(asset =>
-            $"  [{JsonSerializer.Serialize(asset.Id)}, new TextAsset({JsonSerializer.Serialize(asset.Text)}, "
+            $"  [{JsonSerializer.Serialize(asset.Id)}, TextAsset.FromBase64({JsonSerializer.Serialize(Convert.ToBase64String(asset.Bytes))}, "
             + $"{JsonSerializer.Serialize(Path.GetFileNameWithoutExtension(asset.Path))})]"));
         return $"export const preparedAssetManifest = {manifest};\n"
             + $"export const preparedAssets = new Map([\n{entries}\n]);\n\n";
@@ -142,7 +151,7 @@ sealed class AssetDatabaseLowering(string projectRoot) : ISystemLowering
             + $"{span.StartLinePosition.Character + 1}: {message}");
     }
 
-    private sealed record PreparedTextAsset(string Id, string Path, string Text);
+    private sealed record PreparedTextAsset(string Id, string Path, byte[] Bytes);
 }
 
 sealed class PrefabUtilityLowering : ISystemLowering
@@ -154,12 +163,31 @@ sealed class PrefabUtilityLowering : ISystemLowering
         SemanticModel model, Func<ExpressionSyntax, string> emitExpression)
     {
         if (symbol.ContainingType.ToDisplayString() != "UnityEditor.PrefabUtility") return null;
-        if (symbol.Name is not ("InstantiatePrefab" or "UnpackPrefabInstance" or "SaveAsPrefabAsset")
+        if (symbol.Name is not ("InstantiatePrefab" or "UnpackPrefabInstance" or "SaveAsPrefabAsset" or "GetCorrespondingObjectFromSource")
             || symbol.Name == "InstantiatePrefab" && invocation.ArgumentList.Arguments.Count is < 1 or > 2
             || symbol.Name == "UnpackPrefabInstance" && invocation.ArgumentList.Arguments.Count != 3
-            || symbol.Name == "SaveAsPrefabAsset" && invocation.ArgumentList.Arguments.Count != 2)
+            || symbol.Name == "SaveAsPrefabAsset" && invocation.ArgumentList.Arguments.Count != 2
+            || symbol.Name == "GetCorrespondingObjectFromSource" && invocation.ArgumentList.Arguments.Count != 1)
             throw new InvalidOperationException($"{invocation.GetLocation().GetLineSpan()}: PrefabUtility.{symbol.Name} is not supported by Preview");
         used = true;
         return $"PrefabUtility.{symbol.Name}({string.Join(", ", invocation.ArgumentList.Arguments.Select(argument => emitExpression(argument.Expression)))})";
+    }
+}
+
+sealed class AssetImporterLowering : ISystemLowering
+{
+    private bool used;
+    public IEnumerable<string> RuntimeImports => used ? ["ModelImporter"] : [];
+    public string EmitPrelude() => "";
+    public string? TryLower(IMethodSymbol symbol, InvocationExpressionSyntax invocation,
+        SemanticModel model, Func<ExpressionSyntax, string> emitExpression)
+    {
+        if (symbol.ContainingType.ToDisplayString() != "UnityEditor.AssetImporter") return null;
+        if (symbol.Name == "SaveAndReimport" && invocation.ArgumentList.Arguments.Count == 0)
+            return null;
+        if (symbol.Name != "GetAtPath" || invocation.ArgumentList.Arguments.Count != 1)
+            throw new InvalidOperationException($"{invocation.GetLocation().GetLineSpan()}: AssetImporter.{symbol.Name} is not supported by Preview");
+        used = true;
+        return $"ModelImporter.GetAtPath({emitExpression(invocation.ArgumentList.Arguments[0].Expression)})";
     }
 }

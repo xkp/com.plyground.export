@@ -1,5 +1,16 @@
-import { Animator, MonoBehaviour, Object as UnityObject, SkinnedMeshRenderer, THREE, Time,
+import { Animator, Camera, MonoBehaviour, Object as UnityObject, Quaternion, SkinnedMeshRenderer, THREE, Time,
   applyAnimatorRootMotion, hasMovingRoot } from './index.js';
+import { assessCalibratedHumanoidClip,
+  buildCalibratedHumanoidClip,
+  PREVIEW_HUMANOID_LIMITS } from './humanoid-calibrated-clip.js';
+import { applyHumanoidMuscleCorrections,
+  sampleHumanoidEvaluatedBody } from './humanoid-evaluated-body.js';
+import { humanoidFootGoalRotation,
+  sampleHumanoidFootGoals, sampleHumanoidRawClip,
+  sampleHumanoidRootTrajectory } from './humanoid-raw-curve-clip.js';
+import { humanoidRootDisplacement, localHumanoidBodyPosition,
+  normalizeHumanoidRootCurves } from './humanoid-root-curves.js';
+import { rigWorldTransforms } from './humanoid-mass-center.js';
 
 const bodyPart = {
   0: 'Root', 1: 'LeftLeg', 2: 'RightLeg', 3: 'LeftLeg', 4: 'RightLeg',
@@ -13,7 +24,13 @@ const bodyPart = {
 for (let index = 24; index <= 38; index++) bodyPart[index] = 'LeftFingers';
 for (let index = 39; index <= 53; index++) bodyPart[index] = 'RightFingers';
 
-function sampleRotation(clip, record, time) {
+function sampleFraction(clip, kind, low, high, time, fraction) {
+  const cutoff = clip[kind]?.find(value =>
+    value > clip.times[low] && value <= clip.times[high]);
+  return cutoff == null ? fraction : time < cutoff ? 0 : 1;
+}
+
+export function sampleRotation(clip, record, time) {
   if (!record || !clip.times?.length) return null;
   if (!(clip.duration > 0) || clip.times.length === 1
     || clip.times.at(-1) <= clip.times[0])
@@ -28,10 +45,13 @@ function sampleRotation(clip, record, time) {
   if (high === low) return a;
   const b = new THREE.Quaternion().fromArray(record.rotations, high * 4);
   const span = clip.times[high] - clip.times[low];
-  return a.slerp(b, span > 0 ? THREE.MathUtils.clamp((t - clip.times[low]) / span, 0, 1) : 0);
+  const fraction = span > 0 ? THREE.MathUtils.clamp(
+    (t - clip.times[low]) / span, 0, 1) : 0;
+  return a.slerp(b, sampleFraction(clip, 'stepRotationTimes',
+    low, high, t, fraction));
 }
 
-function samplePosition(clip, record, time) {
+export function samplePosition(clip, record, time) {
   if (!record?.positions?.length || !record.restPosition?.length || !clip.times?.length)
     return null;
   if (!(clip.duration > 0) || clip.times.length === 1
@@ -47,7 +67,10 @@ function samplePosition(clip, record, time) {
   if (high === low) return a;
   const b = new THREE.Vector3().fromArray(record.positions, high * 3);
   const span = clip.times[high] - clip.times[low];
-  return a.lerp(b, span > 0 ? THREE.MathUtils.clamp((t - clip.times[low]) / span, 0, 1) : 0);
+  const fraction = span > 0 ? THREE.MathUtils.clamp(
+    (t - clip.times[low]) / span, 0, 1) : 0;
+  return a.lerp(b, sampleFraction(clip, 'stepPositionTimes',
+    low, high, t, fraction));
 }
 
 function included(layer, index) {
@@ -107,12 +130,17 @@ export function solveHandIK(hand, upper, lower, state, binding, avatarFrame) {
         upperLength + lowerLength - 1e-6);
       const direction = reach.normalize();
       const pole = elbow.clone().sub(shoulder);
+      pole.addScaledVector(direction, -pole.dot(direction));
+      if (pole.lengthSq() > 1e-10) pole.normalize();
       if (state.hintWeight > 0 && state.hintPosition) {
         const hint = new THREE.Vector3(state.hintPosition.x,
           state.hintPosition.y, state.hintPosition.z).sub(shoulder);
-        pole.lerp(hint, THREE.MathUtils.clamp(state.hintWeight, 0, 1));
+        hint.addScaledVector(direction, -hint.dot(direction));
+        if (hint.lengthSq() > 1e-10) {
+          hint.normalize();
+          pole.lerp(hint, THREE.MathUtils.clamp(state.hintWeight, 0, 1));
+        }
       }
-      pole.addScaledVector(direction, -pole.dot(direction));
       if (pole.lengthSq() < 1e-10) {
         pole.copy(elbow).sub(shoulder).cross(direction).cross(direction).negate();
         if (pole.lengthSq() < 1e-10) pole.set(0, 1, 0)
@@ -159,12 +187,40 @@ export function solveHandIK(hand, upper, lower, state, binding, avatarFrame) {
   }
 }
 
+// Measured against Unity Play Mode for the JU TPS mannequin in the five-weapon
+// shooting trace. Unity's Humanoid IK goal uses an Avatar hand frame, while the
+// browser skin uses the imported RightHand bone frame.
+const juMannequinRightHandFrame = [0.723401, -0.045939, -0.083280, 0.683846];
+const juMannequinAvatarId =
+  'GlobalObjectId_V1-1-aeb4f7aff45f24d4f9216ed5c1602b3f-9000000-0';
+const juMannequinHandPath =
+  'RootBone/Hips/Spine/Spine1/RightShoulder/RightArm/RightForeArm/RightHand';
+const calibratedClipsByRecord = new WeakMap();
+
+function knownHandFrame(record, mesh) {
+  if (record.sourceAvatarId !== juMannequinAvatarId) return null;
+  const hand = mesh.skeleton.bones.find(bone => bone.name === 'RightHand');
+  if (!hand) return null;
+  const path = [];
+  for (let node = hand; node; node = node.parent) {
+    path.unshift(node.name);
+    if (node.name === 'Armature') break;
+  }
+  return path.join('/').endsWith(juMannequinHandPath)
+    ? new THREE.Quaternion().fromArray(juMannequinRightHandFrame) : null;
+}
+
 /** The same exported Animator graph and Humanoid clips drive every Preview actor. */
 export class PreviewControllerAnimation extends MonoBehaviour {
-  configure(animator, body, record) {
+  configure(animator, body, record, rawData = null) {
     this.animator = animator;
     this._animatorUpdateDriver = animator;
     this.body = body;
+    this.sharedCalibratedClips = calibratedClipsByRecord.get(record);
+    if (!this.sharedCalibratedClips) {
+      this.sharedCalibratedClips = new Map();
+      calibratedClipsByRecord.set(record, this.sharedCalibratedClips);
+    }
     this.poseSpace = record.poseSpace;
     this.ikHandFrames = {
       left: record.ikHandFrames?.left && new THREE.Quaternion().fromArray(record.ikHandFrames.left),
@@ -177,6 +233,34 @@ export class PreviewControllerAnimation extends MonoBehaviour {
         ...bone, restInverse: new THREE.Quaternion().fromArray(bone.restRotation).invert()
       }]))
     }]));
+    this.rawCalibration = rawData?.calibrations?.avatars.find(value =>
+      value.avatarId === record.sourceAvatarId) ?? null;
+    const rawController = rawData?.rawMotion?.controllers.find(value =>
+      value.assetId === record.assetId);
+    this.rawClips = this.rawCalibration && rawController
+      ? new Map(rawController.clips.filter(clip =>
+        record.rawReadyClips?.includes(clip.name)).map(clip =>
+        [clip.name.toLowerCase(), clip])) : new Map();
+    this.rawMuscleNames = rawData?.rawMotion?.muscleNames ?? null;
+    this.rawRootMotionFallback = new Set();
+    for (const [name, rawClip] of this.rawClips) {
+      const sampled = this.clips.get(name);
+      if (!sampled || hasMovingRoot(sampled)) continue;
+      const trajectory = sampleHumanoidRootTrajectory(rawClip, sampled.times,
+        this.rawCalibration.humanScale);
+      const positions = trajectory?.positions;
+      const last = positions?.length - 3;
+      if (last == null || Math.hypot(positions[last], positions[last + 2]) < 0.15) continue;
+      sampled.rootMotion = trajectory;
+      this.rawRootMotionFallback.add(name);
+    }
+    this.rawBodyReadyClips = new Set(record.rawBodyReadyClips?.map(name =>
+      name.toLowerCase()) ?? []);
+    this.rawMuscleReadyClips = new Set(record.rawMuscleReadyClips?.map(name =>
+      name.toLowerCase()) ?? []);
+    this.rawChecked = new Set();
+    if (record.clips.some(clip => !clip.bones?.length) && !this.rawClips.size)
+      console.error('Preview Humanoid raw motion unavailable; animation poses cannot be built for this controller.');
     const hasRootTrajectory = motion => {
       if (!motion) return false;
       if (motion.kind === 'clip') return hasMovingRoot(this.clips.get(motion.name.toLowerCase()));
@@ -191,29 +275,48 @@ export class PreviewControllerAnimation extends MonoBehaviour {
         && !hasRootTrajectory(state.motion)
     });
     const mesh = body.threeMesh;
+    const juMannequinFrame = knownHandFrame(record, mesh);
+    this.ikHandFrames.right ??= juMannequinFrame;
+    this.juMannequinGrip = Boolean(juMannequinFrame);
     const byName = new Map(mesh.skeleton.bones.map(bone => [bone.name, bone]));
+    const normalizedName = name => name?.replace(/[ _]+/g, '');
+    const byNormalizedName = new Map();
+    for (const bone of mesh.skeleton.bones) {
+      const key = normalizedName(bone.name);
+      if (byNormalizedName.has(key)) byNormalizedName.set(key, null);
+      else byNormalizedName.set(key, bone);
+    }
+    const skinBone = name => byName.get(name) ?? byNormalizedName.get(normalizedName(name));
     this.bindings = Object.entries(animator.humanBones ?? {}).map(([key, transform]) => ({
-      index: Number(key), bone: byName.get(transform?.gameObject?.name)
+      index: Number(key), bone: skinBone(transform?.gameObject?.name)
     })).filter(entry => entry.bone && this.clips.size);
     // Some Unity avatars map a humanoid slot to a rig control rather than a
     // skinned joint. Animator evaluation restores these controls each frame
     // before OnAnimatorIK/LateUpdate can add procedural motion.
     this.unboundHumanoidControls = [...new Set(Object.values(animator.humanBones ?? {})
-      .filter(transform => transform && !byName.has(transform.gameObject?.name)))]
+      .filter(transform => transform && !skinBone(transform.gameObject?.name)))]
       .map(transform => ({ transform, position: transform.localPosition,
         rotation: transform.localRotation, scale: transform.localScale }));
     restoreHumanoidFingerRoots(this.bindings);
     mesh.updateWorldMatrix(true, true);
     const rootInverse = mesh.getWorldQuaternion(new THREE.Quaternion()).invert();
+    const actorInverse = animator.gameObject.object3D
+      .getWorldQuaternion(new THREE.Quaternion()).invert();
     this.bindings.forEach(binding => {
       binding.rest = rootInverse.clone().multiply(binding.bone.getWorldQuaternion(new THREE.Quaternion()));
+      binding.actorRest = actorInverse.clone().multiply(
+        binding.bone.getWorldQuaternion(new THREE.Quaternion()));
       binding.restPosition = binding.bone.position.clone();
       let depth = 0;
       for (let node = binding.bone.parent; node; node = node.parent) depth++;
       binding.depth = depth;
     });
-    const neutral = [...this.clips.values()].find(clip => /\bneutral idle\b/i.test(clip.name))
+    let neutral = [...this.clips.values()].find(clip => /\bneutral idle\b/i.test(clip.name))
       ?? [...this.clips.values()].find(clip => /\bidle\b/i.test(clip.name));
+    if (neutral && !neutral.bones.length && this.rawClips.has(neutral.name.toLowerCase())) {
+      this.activateRawClip(neutral.name);
+      neutral = this.clips.get(neutral.name.toLowerCase());
+    }
     const bindingByIndex = new Map(this.bindings.map(binding => [binding.index, binding]));
     const armDown = (upperIndex, forearmIndex) => {
       const upper = bindingByIndex.get(upperIndex)?.bone;
@@ -245,6 +348,32 @@ export class PreviewControllerAnimation extends MonoBehaviour {
         if (ancestor) { binding.humanoidParent = ancestor; break; }
       }
     }
+    if (this.rawCalibration?.neutralRigBones?.length) {
+      const sourceWorld = rigWorldTransforms(this.rawCalibration.neutralRigBones);
+      const sourceByIndex = new Map(this.rawCalibration.neutralRigBones
+        .filter(bone => bone.index >= 0 && sourceWorld.has(bone.path))
+        .map(bone => [bone.index, sourceWorld.get(bone.path).rotation]));
+      for (const binding of this.bindings) {
+        binding.poseParent = binding.humanoidParent;
+        while (binding.poseParent && !sourceByIndex.has(binding.poseParent.index))
+          binding.poseParent = binding.poseParent.humanoidParent;
+        const index = binding.index;
+        const useIdle = (([11, 13, 15, 17].includes(index) || (index >= 24 && index <= 38))
+          && leftArmUsesIdle) || (([12, 14, 16, 18].includes(index)
+          || (index >= 39 && index <= 53)) && rightArmUsesIdle);
+        const reference = slot => useIdle && neutral?.bonesByIndex.get(slot)
+          ? sampleRotation(neutral, neutral.bonesByIndex.get(slot), 0)
+          : sourceByIndex.get(slot);
+        const source = reference(index);
+        if (!source) continue;
+        const parentSource = reference(binding.poseParent?.index)
+          ?? new THREE.Quaternion();
+        const parentTarget = binding.poseParent?.actorRest ?? new THREE.Quaternion();
+        const sourceLocal = parentSource.clone().invert().multiply(source);
+        const targetLocal = parentTarget.clone().invert().multiply(binding.actorRest);
+        binding.retargetLocal = targetLocal.multiply(sourceLocal.invert());
+      }
+    }
     this.byIndex = new Map(this.bindings.map(binding => [binding.index, binding.bone]));
     // Some imported avatars skin the pelvis, legs, and torso under separate
     // root bones while the Humanoid hips slot points at a Unity rig control.
@@ -265,6 +394,11 @@ export class PreviewControllerAnimation extends MonoBehaviour {
     this.clothingRenderers = this.gameObject.GetComponentsInChildren(SkinnedMeshRenderer, true)
       .filter(renderer => renderer._previewBoneBindings);
     this.zombieAI = this.gameObject._components.find(component => component.constructor.name === 'JU_AI_Zombie');
+    this.patrolAI = this.gameObject._components.find(component =>
+      component.constructor.name === 'JU_AI_PatrolCharacter');
+    this.smoothAIBodyOffset = Boolean(this.zombieAI || this.patrolAI);
+    this.aiBodyController = this.smoothAIBodyOffset && this.gameObject._components.find(
+      component => component.constructor.name === 'JUCharacterController');
     this.zombieHealth = this.zombieAI && this.gameObject._components
       .find(component => component.constructor.name === 'JUHealth');
     this.zombieController = this.zombieAI && this.gameObject._components
@@ -284,7 +418,11 @@ export class PreviewControllerAnimation extends MonoBehaviour {
     };
     this._latePoseSystem = { beforeFixedUpdate: restoreHumanoidControls,
       beforeUpdate: restoreHumanoidControls, afterLateUpdate: () => {
-      if (!this._active || !this.animator._active) return;
+      if (!this._active || !this.gameObject.activeInHierarchy) return;
+      // A JU ragdoll disables Animator while physics still moves the exported
+      // bone transforms. Keep the imported skin following those transforms.
+      if (this.animator.enabled && this.zombieAI && this.animator.updateMode === 1
+        && !this._poseSampledThisFrame) return;
       this.animator.ApplyImportedSkeletonOverrides();
       // Clothing LateUpdate ran before procedural scripts such as BodyLeanInert.
       // Copy the final body pose to every garment in the same render frame.
@@ -305,6 +443,131 @@ export class PreviewControllerAnimation extends MonoBehaviour {
 
   OnEnable() { this._registerLatePoseSystem(); }
   OnDestroy() { this._latePoseRuntime?.removeSystem(this._latePoseSystem); }
+
+  updateAnimatedFootGoals(outputs) {
+    const goals = [{ side: 'left', goal: 0, rotation: null, weight: 0, missing: false },
+      { side: 'right', goal: 1, rotation: null, weight: 0, missing: false }];
+    const actorRotation = this.animator.gameObject.object3D
+      .getWorldQuaternion(new THREE.Quaternion());
+    for (const entry of outputs[0]?.clips ?? []) {
+      if (!(entry.weight > 0)) continue;
+      const raw = this.rawClips.get(entry.name.toLowerCase());
+      if (!raw) { goals.forEach(goal => { goal.missing = true; }); continue; }
+      const time = entry.time ?? (this.animator._controllerRuntime.players[0]?.elapsed ?? 0)
+        * (entry.timeScale ?? 1);
+      let sampled;
+      try { sampled = sampleHumanoidFootGoals(raw, time); }
+      catch (error) {
+        console.error(`Preview animated foot goals unavailable for ${entry.name}.`, error);
+        goals.forEach(goal => { goal.missing = true; });
+        continue;
+      }
+      for (const goal of goals) {
+        if (!sampled[goal.side]) { goal.missing = true; continue; }
+        const rotation = humanoidFootGoalRotation(sampled.bodyRotation,
+          sampled[goal.side].rotation, actorRotation);
+        const next = goal.weight + entry.weight;
+        goal.rotation = goal.rotation
+          ? goal.rotation.slerp(rotation, entry.weight / next) : rotation;
+        goal.weight = next;
+      }
+    }
+    this.animator._ikAnimationRotations.clear();
+    for (const goal of goals)
+      if (!goal.missing && goal.rotation)
+        this.animator._ikAnimationRotations.set(goal.goal,
+          new Quaternion().copy(goal.rotation));
+  }
+
+  updateAnimatedBodyPosition(outputs) {
+    this.animator._animatedBodyPosition = null;
+    const scale = this.rawCalibration?.humanScale;
+    if (!(scale > 0) || !this.rawMuscleNames ||
+      (this.animator.avatarData?.id && this.animator.avatarData.id !== this.rawCalibration.avatarId))
+      return;
+    let local = new THREE.Vector3();
+    let total = 0;
+    for (const entry of outputs[0]?.clips ?? []) {
+      if (!(entry.weight > 0)) continue;
+      const clip = this.rawClips.get(entry.name.toLowerCase());
+      if (!clip) return;
+      const time = entry.time
+        ?? (this.animator._controllerRuntime.players[0]?.elapsed ?? 0)
+          * (entry.timeScale ?? 1);
+      try {
+        const raw = sampleHumanoidRawClip(clip, this.rawMuscleNames, time);
+        const normalized = normalizeHumanoidRootCurves(clip, raw.bodyPosition,
+          raw.bodyRotation, raw.initialPosition, raw.initialRotation);
+        const displacement = this.rawRootMotionFallback.has(entry.name.toLowerCase())
+          ? [(raw.bodyPosition[0] - raw.initialPosition[0]) * scale, 0,
+            (raw.bodyPosition[2] - raw.initialPosition[2]) * scale]
+          : humanoidRootDisplacement(clip, raw, scale);
+        const body = localHumanoidBodyPosition(normalized.bodyPosition,
+          displacement, scale);
+        local.addScaledVector(new THREE.Vector3().fromArray(body), entry.weight);
+        total += entry.weight;
+      } catch (error) {
+        console.warn(`Preview Animator.bodyPosition unavailable for ${entry.name}.`, error);
+        return;
+      }
+    }
+    if (!(total > 0)) return;
+    local.divideScalar(total).multiplyScalar(scale);
+    this.animator.gameObject.object3D.updateWorldMatrix(true, false);
+    this.animator._animatedBodyPosition = this.animator.gameObject.object3D.localToWorld(local);
+  }
+
+  activateRawClip(name) {
+    const key = name?.toLowerCase();
+    if (!key || this.rawChecked.has(key) || !this.rawClips.has(key)) return;
+    this.rawChecked.add(key);
+    const sampled = this.clips.get(key);
+    if (!sampled) return;
+    const cached = this.sharedCalibratedClips.get(key);
+    if (cached) { this.clips.set(key, cached); return; }
+    try {
+      const rawClip = this.rawClips.get(key);
+      const candidate = buildCalibratedHumanoidClip(rawClip,
+        this.rawMuscleNames, this.rawCalibration, sampled,
+        this.rawBodyReadyClips?.has(key) ? {
+          sampleBodyPose: time => sampleHumanoidEvaluatedBody(
+            rawClip.evaluatedBody, time),
+          sampleMuscles: this.rawMuscleReadyClips?.has(key)
+            ? (sample, _frame, time) => applyHumanoidMuscleCorrections(
+              rawClip.evaluatedBody, sample.muscles, time)
+            : undefined,
+        } : undefined);
+      if (this.rawRootMotionFallback.has(key)) {
+        const trajectory = sampled.rootMotion.positions;
+        const hips = candidate.bones.find(bone => bone.index === 0);
+        for (let frame = 0; frame < sampled.times.length; frame++)
+          for (let axis = 0; axis < 3; axis++) {
+            const offset = frame * 3 + axis;
+            if (hips?.positions) hips.positions[offset] -= trajectory[offset];
+            if (candidate.localHipsPositions)
+              candidate.localHipsPositions[offset] -= trajectory[offset];
+          }
+      }
+      if (!candidate.bones?.length || candidate.bones.some(bone =>
+        bone.rotations.some(value => !Number.isFinite(value))))
+        throw new TypeError('Raw Humanoid pose contains invalid rotations');
+      if (sampled.bones?.length) {
+        const assessment = assessCalibratedHumanoidClip(candidate, sampled,
+          PREVIEW_HUMANOID_LIMITS);
+        if (!assessment.accepted) {
+          console.warn(`Preview raw Humanoid ${name} exceeded the source Avatar bound; using sampled clip.`, assessment);
+          return;
+        }
+      }
+      candidate.bonesByIndex = new Map(candidate.bones.map(bone =>
+        [bone.index, { ...bone, restInverse: new THREE.Quaternion()
+          .fromArray(bone.restRotation).invert() }]));
+      this.clips.set(key, candidate);
+      this.sharedCalibratedClips.set(key, candidate);
+    } catch (error) {
+      console.error(`Preview raw Humanoid ${name} unavailable; animation pose will remain inactive.`, error);
+    }
+  }
 
   removeFinishedZombie() {
     if (!this.zombieAI || this.hasAutoDestroy || !this.zombieHealth) return false;
@@ -347,10 +610,46 @@ export class PreviewControllerAnimation extends MonoBehaviour {
   }
 
   Update() {
+    if (this.zombieAI && this.animator?.updateMode === 1) {
+      if (!this.animator.enabled || !this.animator._graphOutputs
+        || this.removeFinishedZombie()) return;
+      const outputs = this.animator._graphOutputs;
+      for (const layer of outputs) for (const entry of layer?.clips ?? [])
+        this.activateRawClip(entry.name);
+      this.advanceRootMotion(outputs, Time.deltaTime);
+      return;
+    }
+    this.updatePose(true);
+  }
+
+  LateUpdate() {
+    if (this.zombieAI && this.animator?.updateMode === 1) {
+      this._poseSampledThisFrame = this.shouldSampleZombiePose();
+      if (this._poseSampledThisFrame) this.updatePose(false);
+    }
+  }
+
+  shouldSampleZombiePose() {
+    const camera = this.previewCamera?.isActiveAndEnabled
+      ? this.previewCamera : (this.previewCamera = Camera.main);
+    if (!camera) return true;
+    const offset = this.gameObject.transform.position.sub(camera.transform.position);
+    const forward = offset.dot(camera.transform.forward);
+    if (forward < -2) return false;
+    const halfHeight = Math.max(0, forward)
+      * Math.tan(THREE.MathUtils.degToRad(camera.fieldOfView) / 2) + 2;
+    const aspect = camera.threeCamera?.aspect ?? 1.5;
+    return Math.abs(offset.dot(camera.transform.up)) <= halfHeight
+      && Math.abs(offset.dot(camera.transform.right)) <= halfHeight * aspect;
+  }
+
+  updatePose(includeMotion) {
     if (!this.animator.enabled || !this.animator._graphOutputs) return;
-    if (this.removeFinishedZombie()) return;
+    if (includeMotion && this.removeFinishedZombie()) return;
     const mesh = this.body.threeMesh;
     const outputs = this.animator._graphOutputs;
+    for (const layer of outputs) for (const entry of layer?.clips ?? [])
+      this.activateRawClip(entry.name);
     const graph = this.animator.controllerGraph;
     const rootRotation = mesh.getWorldQuaternion(new THREE.Quaternion());
     const dt = Time.deltaTime;
@@ -407,16 +706,19 @@ export class PreviewControllerAnimation extends MonoBehaviour {
           // Transfer motion in the source joint's rest frame. The sampled JU
           // avatar and the target avatar can have very different arm axes.
           let target;
-          if (this.poseSpace === 'actor') {
-            const sampledParent = clip.bonesByIndex.get(binding.humanoidParent?.index);
+          if ((clip.poseSpace ?? this.poseSpace) === 'actor') {
+            const parentBinding = binding.retargetLocal ? binding.poseParent
+              : binding.humanoidParent;
+            const sampledParent = clip.bonesByIndex.get(parentBinding?.index);
             const parentPose = sampledParent && sampleRotation(clip, sampledParent, clipTime);
             // The exported clip rotations are actor-space snapshots. Unity's
             // masked layers apply the joint motion relative to the animated
             // parent, including torso motion from layers outside an arm mask.
             const parentWorld = parentPose
-              ? binding.humanoidParent.bone.getWorldQuaternion(new THREE.Quaternion())
+              ? parentBinding.bone.getWorldQuaternion(new THREE.Quaternion())
               : this.animator.gameObject.object3D.getWorldQuaternion(new THREE.Quaternion());
             target = rootRotation.clone().invert().multiply(parentWorld);
+            if (binding.retargetLocal) target.multiply(binding.retargetLocal);
             if (parentPose) target.multiply(parentPose.invert());
             target.multiply(pose);
           } else target = binding.rest.clone()
@@ -427,9 +729,17 @@ export class PreviewControllerAnimation extends MonoBehaviour {
           if (desiredPosition) {
             const position = samplePosition(clip, source, clipTime);
             if (position) {
-              if (this.poseSpace === 'actor') {
+              if ((clip.poseSpace ?? this.poseSpace) === 'actor') {
                 this.animator.gameObject.object3D.updateWorldMatrix(true, false);
                 binding.bone.parent.updateWorldMatrix(true, false);
+                // Raw Humanoid hips positions use the source Avatar's actor
+                // scale. The scene may instantiate that Avatar at another
+                // scale (the Shooter player uses an Armature scale of 0.5).
+                // Match the target's authored rest height before mapping the
+                // actor-space position into the imported skeleton.
+                const sourceHeight = source.restPosition?.[1];
+                if (Math.abs(sourceHeight ?? 0) > 1e-5 && this.targetHipsHeight > 0)
+                  position.multiplyScalar(this.targetHipsHeight / sourceHeight);
                 position.applyMatrix4(this.animator.gameObject.object3D.matrixWorld);
                 binding.bone.parent.worldToLocal(position);
               } else position.sub(new THREE.Vector3().fromArray(source.restPosition))
@@ -451,33 +761,155 @@ export class PreviewControllerAnimation extends MonoBehaviour {
       if (desiredPosition) binding.bone.position.copy(desiredPosition);
       binding.bone.updateWorldMatrix(false, false);
     }
+    const driving = this.gameObject._components.find(component =>
+      component.constructor.name === 'DriveVehicles' && component.IsDriving
+      && !component.DisableCharacterOnEnter);
+    const targets = driving?.CurrentVehicleCharacterIK?.InverseKinematicTargetPositions;
+    const drivingHips = this.byIndex.get(0);
+    if (drivingHips && targets) {
+      // Unity's Humanoid vehicle IK can lower the body to put all four targets
+      // within limb reach. The browser's two-bone solver needs that shared
+      // body adjustment before it solves individual hands and feet.
+      let lowerBodyBy = 0;
+      for (const [upperIndex, lowerIndex, endIndex, targetName] of [
+        [13, 15, 17, 'LeftHandPositionIK'], [14, 16, 18, 'RightHandPositionIK'],
+        [1, 3, 5, 'LeftFootPositionIK'], [2, 4, 6, 'RightFootPositionIK']
+      ]) {
+        const upper = this.byIndex.get(upperIndex);
+        const lower = this.byIndex.get(lowerIndex);
+        const end = this.byIndex.get(endIndex);
+        const target = targets[targetName];
+        if (!upper || !lower || !end || !target) continue;
+        const shoulder = upper.getWorldPosition(new THREE.Vector3());
+        const elbow = lower.getWorldPosition(new THREE.Vector3());
+        const extremity = end.getWorldPosition(new THREE.Vector3());
+        const goal = target.position;
+        const reach = shoulder.distanceTo(elbow) + elbow.distanceTo(extremity) - 0.005;
+        const horizontalSq = (shoulder.x - goal.x) ** 2 + (shoulder.z - goal.z) ** 2;
+        if (horizontalSq >= reach ** 2) continue;
+        lowerBodyBy = Math.max(lowerBodyBy, shoulder.y - goal.y
+          - Math.sqrt(reach ** 2 - horizontalSq));
+      }
+      if (lowerBodyBy > 0.001) {
+        drivingHips.parent.updateWorldMatrix(true, false);
+        const lowered = drivingHips.getWorldPosition(new THREE.Vector3());
+        lowered.y -= Math.min(lowerBodyBy, 0.5);
+        drivingHips.position.copy(drivingHips.parent.worldToLocal(lowered));
+        drivingHips.updateWorldMatrix(false, true);
+      }
+    }
     mesh.updateWorldMatrix(true, true);
     this.animator.SyncImportedSkeletonPose();
     this.animator._ik.clear();
+    this.updateAnimatedFootGoals(outputs);
+    this.updateAnimatedBodyPosition(outputs);
+    const footFrame = (goal, index) => {
+      const animated = this.animator._ikAnimationRotations.get(goal);
+      const foot = this.byIndex.get(index);
+      if (!animated || !foot) return null;
+      const binding = this.importedBindings.get(foot);
+      return animated.clone().invert().multiply(
+        foot.getWorldQuaternion(new THREE.Quaternion()))
+        .multiply(binding?.offsetRotation ?? new THREE.Quaternion());
+    };
+    const leftFootFrame = footFrame(0, 5);
+    const rightFootFrame = footFrame(1, 6);
     this.animator._bodyPositionOverride = null;
-    for (const component of this.animator.gameObject._components)
-      if (component._active && typeof component.OnAnimatorIK === 'function') component.OnAnimatorIK(0);
-    const hips = this.byIndex.get(0);
-    if (hips && this.animator._bodyPositionOverride) {
-      const value = this.animator._bodyPositionOverride;
-      hips.parent.updateWorldMatrix(true, false);
-      hips.position.copy(hips.parent.worldToLocal(new THREE.Vector3(value.x, value.y, value.z)));
+    // A Fixed Animator's IK normally runs with a fixed timestep. Zombie poses
+    // are sampled once per render frame, so preserve that timestep for the
+    // callback even when rendering is slower than physics.
+    const runtime = this.gameObject._runtime;
+    const fixedIK = this.animator.updateMode === 1 && !Time.inFixedTimeStep && runtime;
+    const previousDelta = runtime?.time.deltaTime;
+    if (fixedIK) runtime.time.deltaTime = runtime.fixedDeltaTime;
+    try {
+      for (const component of this.animator.gameObject._components)
+        if (component._active && typeof component.OnAnimatorIK === 'function') component.OnAnimatorIK(0);
+    } finally {
+      if (fixedIK) runtime.time.deltaTime = previousDelta;
     }
-    solveHandIK(this.byIndex.get(17), this.byIndex.get(13), this.byIndex.get(15),
-      this.animator._ik.get(2), this.importedBindings.get(this.byIndex.get(17)),
-      this.ikHandFrames.left);
+    const hips = this.byIndex.get(0);
+    if (hips && (this.animator._bodyPositionOverride
+      || (this.smoothAIBodyOffset && this.animator.updateMode === 1
+        && Math.abs(this._renderedBodyOffsetY ?? 0) > 1e-6))) {
+      const value = this.animator._bodyPositionOverride;
+      const offset = value && this.animator._animatedBodyPosition
+        ? new THREE.Vector3(value.x, value.y, value.z).sub(this.animator._animatedBodyPosition)
+        : null;
+      hips.parent.updateWorldMatrix(true, false);
+      if (this.smoothAIBodyOffset && this.animator.updateMode === 1
+        && this.animator._animatedBodyPosition) {
+        // Foot placement can lose a cast for one rendered frame. Keep the
+        // visible AI body offset continuous while Fixed Animator IK catches up.
+        const previous = this._renderedBodyOffsetY ?? 0;
+        if (offset) {
+          this._lastValidBodyOffsetTime = runtime.time.time;
+          this._lastValidBodyOffsetRootY = this.gameObject.transform.position.y;
+        }
+        const holdGroundedAIOffset = !offset && this.aiBodyController?.IsGrounded
+          && runtime.time.time - (this._lastValidBodyOffsetTime ?? -Infinity) < 0.6
+          && Math.abs(this.gameObject.transform.position.y
+            - (this._lastValidBodyOffsetRootY ?? Infinity)) < 0.06;
+        const desiredY = offset?.y ?? (holdGroundedAIOffset ? previous : 0);
+        this._renderedBodyOffsetY = previous + THREE.MathUtils.clamp(
+          desiredY - previous, -0.06, 0.06);
+      }
+      const target = this.smoothAIBodyOffset && this.animator.updateMode === 1
+        && this.animator._animatedBodyPosition
+        ? hips.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(
+          offset?.x ?? 0, this._renderedBodyOffsetY, offset?.z ?? 0))
+        : offset ? hips.getWorldPosition(new THREE.Vector3()).add(offset)
+          : new THREE.Vector3(value.x, value.y, value.z);
+      hips.position.copy(hips.parent.worldToLocal(target));
+    }
     solveHandIK(this.byIndex.get(18), this.byIndex.get(14), this.byIndex.get(16),
       this.animator._ik.get(3), this.importedBindings.get(this.byIndex.get(18)),
       this.ikHandFrames.right);
+    // JU parents the opposite-hand grip to its right-hand weapon. Sampling the
+    // left goal before the right-hand IK moves that weapon leaves a stale world
+    // position, sometimes far outside the left arm's reach.
+    const juCharacter = this.juMannequinGrip && this.gameObject._components.find(
+      component => component.constructor.name === 'JUCharacterController');
+    const leftGoal = this.animator._ik.get(2);
+    const grip = juCharacter?.IsAiming && !juCharacter.HoldableItemInUseLeftHand
+      ? juCharacter.HoldableItemInUseRightHand?.OppositeHandPosition : null;
+    if (grip && leftGoal?.positionWeight > 0) {
+      const handBinding = this.importedBindings.get(this.byIndex.get(18));
+      if (handBinding) {
+        const { bone, transform, offsetPosition, offsetRotation } = handBinding;
+        bone.updateWorldMatrix(true, false);
+        transform.position = bone.localToWorld(offsetPosition.clone());
+        transform.rotation = bone.getWorldQuaternion(new THREE.Quaternion())
+          .multiply(offsetRotation);
+        handBinding.syncedPosition.copy(transform.position);
+        handBinding.syncedRotation.copy(transform.rotation);
+      }
+      leftGoal.position = grip.position;
+      leftGoal.rotation = grip.rotation;
+    }
+    solveHandIK(this.byIndex.get(17), this.byIndex.get(13), this.byIndex.get(15),
+      leftGoal, this.importedBindings.get(this.byIndex.get(17)),
+      this.ikHandFrames.left);
+    solveHandIK(this.byIndex.get(5), this.byIndex.get(1), this.byIndex.get(3),
+      this.animator._ik.get(0), this.importedBindings.get(this.byIndex.get(5)),
+      leftFootFrame);
+    solveHandIK(this.byIndex.get(6), this.byIndex.get(2), this.byIndex.get(4),
+      this.animator._ik.get(1), this.importedBindings.get(this.byIndex.get(6)),
+      rightFootFrame);
     mesh.updateWorldMatrix(true, true);
     this.animator.SyncImportedSkeletonPose();
+    if (includeMotion) this.advanceRootMotion(outputs, dt);
+  }
+
+  advanceRootMotion(outputs, dt) {
     const rootEntries = [];
     for (const entry of outputs[0]?.clips ?? []) {
       const clip = this.clips.get(entry.name.toLowerCase());
       if (!clip) continue;
       const toTime = entry.time ?? (this.animator._controllerRuntime.players[0]?.elapsed ?? 0)
         * (entry.timeScale ?? 1);
-      rootEntries.push({ clip, fromTime: Math.max(0, toTime - dt * (entry.timeScale ?? 1)),
+      rootEntries.push({ clip, fromTime: entry.previousTime
+        ?? Math.max(0, toTime - dt * (entry.timeScale ?? 1)),
         toTime, weight: entry.weight });
       this.dispatchClipEvents(0, clip, toTime);
     }
@@ -485,24 +917,30 @@ export class PreviewControllerAnimation extends MonoBehaviour {
   }
 }
 
-export function installPreviewControllerAnimation(roots, data) {
+export function installPreviewControllerAnimation(roots, data, rawData = null,
+  deferReconcile = false) {
   if (data?.format !== 'plyground.preview.humanoid-controllers/v1')
     throw new Error('Invalid Preview humanoid controller data');
   let count = 0;
   for (const root of roots) {
+    if (root.GetComponent(PreviewControllerAnimation)) continue;
     const animator = root.GetComponentInChildren(Animator, true);
     if (!animator?.controllerGraph?.layers?.length) continue;
     const matchesRig = controller => !controller.rigBones || Object.entries(controller.rigBones)
       .every(([index, name]) => animator.humanBones?.[index]?.gameObject?.name === name);
-    const record = data.controllers.find(controller => controller.assetId === animator.controllerAssetId
-      && matchesRig(controller))
-      ?? data.controllers.find(controller => matchesRig(controller) && controller.clips.some(clip =>
-        animator.controllerGraph.layers.some(layer => layer.states.some(state =>
-          state.motion?.name === clip.name))));
-    if (!record) continue;
+    const compatible = data.controllers.filter(matchesRig);
+    const record = compatible.find(controller =>
+      controller.assetId === animator.controllerAssetId)
+      ?? (!animator.controllerAssetId && compatible.length === 1 ? compatible[0] : null);
+    if (!record) {
+      console.warn(`Preview Humanoid controller data missing for ${root.name}: `
+        + `${animator.controllerAssetId ?? 'controller ID unavailable'}.`);
+      continue;
+    }
     const body = findBody(root, animator);
     if (!body) continue;
-    root.AddComponent(PreviewControllerAnimation).configure(animator, body, record);
+    root.AddComponent(PreviewControllerAnimation, { deferReconcile }).configure(animator, body,
+      record, rawData);
     count++;
   }
   return count;

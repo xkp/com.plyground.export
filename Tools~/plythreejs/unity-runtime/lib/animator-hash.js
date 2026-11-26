@@ -1,0 +1,1 @@
+const t=new Uint32Array(256);for(let n=0;n<256;n++){let e=n;for(let o=0;o<8;o++)e=e>>>1^(1&e?3988292384:0);t[n]=e>>>0}const r=new TextEncoder;export function animatorStringToHash(n){if(null==n)return 0;if("string"!=typeof n)throw new TypeError("Animator.StringToHash expects a string");let e=4294967295;for(const o of r.encode(n))e=t[255&(e^o)]^e>>>8;return 0|~e}

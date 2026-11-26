@@ -87,6 +87,10 @@ static class UnityProjectTranspiler
             editorAssembly || editorMode ? new[] { "UNITY_EDITOR" } : Array.Empty<string>());
         var trees = sources.Select(path => CSharpSyntaxTree.ParseText(File.ReadAllText(path),
             parseOptions, path: Path.GetRelativePath(project, path).Replace('\\', '/'))).ToArray();
+        // Editor assemblies can include unrelated host-only helpers and unused
+        // imports. Emitter checks the selected Preview types semantically.
+        if (!editorMode)
+            foreach (var tree in trees) PreviewExcludedApis.RejectSyntax(tree);
         var compilation = CSharpCompilation.Create(assemblyName, trees, references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
         var errors = compilation.GetDiagnostics().Where(item => item.Severity == DiagnosticSeverity.Error).ToArray();
@@ -95,7 +99,8 @@ static class UnityProjectTranspiler
                 + string.Join(Environment.NewLine, errors.Take(40))
                 + (errors.Length > 40 ? $"\n... {errors.Length - 40} further errors" : ""));
 
-        var emitter = new Emitter(compilation.GetSemanticModel(trees[0]), runtimeImport, project, editorMode);
+        var emitter = new Emitter(compilation.GetSemanticModel(trees[0]), runtimeImport, project,
+            editorMode, annotateSource: true);
         var roots = trees.Select(tree => tree.GetCompilationUnitRoot()).ToArray();
         if (scan)
         {

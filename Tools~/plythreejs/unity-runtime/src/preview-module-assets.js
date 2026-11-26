@@ -45,7 +45,8 @@ export async function preprocessPreviewModuleAssets(sourcePath, outputDirectory,
   // bundle and reference checks below still fail independently.
   if (allowApproximations) {
     const assetIds = new Set(source.assets.map(asset => asset.id));
-    for (const [kind, mapping] of [['AssetDatabase', source.assetPaths], ['Resources', source.resources]]) {
+    for (const [kind, mapping] of [['AssetDatabase', source.assetPaths], ['Resources', source.resources],
+      ...Object.entries(source.assetBundles ?? {}).map(([name, paths]) => [`AssetBundle ${name}`, paths])]) {
       for (const [path, id] of Object.entries(mapping ?? {})) {
         if (assetIds.has(id)) continue;
         delete mapping[path];

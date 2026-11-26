@@ -1,0 +1,1 @@
+export function orientUnityNormalMaps(a){a.traverse(a=>{if(a.isMesh)for(const r of Array.isArray(a.material)?a.material:[a.material])r?.normalMap&&r.userData?.unityNormalFlipY&&(r.normalScale.y*=-1,r.needsUpdate=!0)})}

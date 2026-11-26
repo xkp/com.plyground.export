@@ -17,7 +17,45 @@ export function compileUnityMesh(source) {
     if (!Array.isArray(values) || (values.length && values.length !== vertexCount * size)
       || !values.every(Number.isFinite)) throw new AssetFormatError(`Mesh ${name} are invalid`);
   }
+  for (const [name, size] of [['colors', 4], ['tangents', 4],
+    ['uvs2', 2], ['uvs3', 2], ['uvs4', 2], ['uvs5', 2], ['uvs6', 2],
+    ['uvs7', 2], ['uvs8', 2]]) {
+    const values = source[name];
+    if (values !== undefined && (!Array.isArray(values)
+      || (values.length && values.length !== vertexCount * size)
+      || !values.every(Number.isFinite))) {
+      throw new AssetFormatError(`Mesh ${name} are invalid`);
+    }
+  }
+  const uvFull = source.uvFull ?? {};
+  if (!uvFull || typeof uvFull !== 'object' || Array.isArray(uvFull))
+    throw new AssetFormatError('Mesh uvFull is invalid');
+  for (const [channel, entry] of Object.entries(uvFull)) {
+    const field = channel === '0' ? 'uvs' : `uvs${Number(channel) + 1}`;
+    if (!/^[0-7]$/.test(channel) || ![3, 4].includes(entry?.dimension)
+      || !Array.isArray(entry.values) || entry.values.length !== vertexCount * entry.dimension
+      || !entry.values.every(Number.isFinite) || source[field]?.length !== vertexCount * 2)
+      throw new AssetFormatError(`Mesh uvFull channel ${channel} is invalid`);
+  }
   if (!Array.isArray(materials)) throw new AssetFormatError('Mesh materials are invalid');
+  const blendShapes = source.blendShapes ?? [];
+  if (!Array.isArray(blendShapes)) throw new AssetFormatError('Mesh blend shapes are invalid');
+  const shapeNames = new Set();
+  for (const shape of blendShapes) {
+    if (typeof shape?.name !== 'string' || shapeNames.has(shape.name)
+      || !Array.isArray(shape.frames) || !shape.frames.length)
+      throw new AssetFormatError('Mesh blend shape names or frames are invalid');
+    shapeNames.add(shape.name);
+    let previousWeight = -Infinity;
+    for (const frame of shape.frames) {
+      if (!Number.isFinite(frame?.weight) || frame.weight <= previousWeight
+        || !['vertices', 'normals', 'tangents'].every(name =>
+          Array.isArray(frame[name]) && frame[name].length === vertexCount * 3
+          && frame[name].every(Number.isFinite)))
+        throw new AssetFormatError(`Mesh blend shape ${shape.name} frame is invalid`);
+      previousWeight = frame.weight;
+    }
+  }
 
   const chunks = [];
   const bufferViews = [];
@@ -37,13 +75,13 @@ export function compileUnityMesh(source) {
     values.forEach((value, index) => bytes.writeFloatLE(value, index * 4));
     const accessor = { bufferView: view(bytes, target), componentType: 5126,
       count: values.length / size, type: { 1: 'SCALAR', 2: 'VEC2', 3: 'VEC3', 4: 'VEC4', 16: 'MAT4' }[size] };
-    if (semantic === 'POSITION') {
+    if (semantic === 'POSITION' || semantic === 'MORPH_POSITION') {
       accessor.min = [Infinity, Infinity, Infinity];
       accessor.max = [-Infinity, -Infinity, -Infinity];
-      for (let index = 0; index < positions.length; index++) {
+      for (let index = 0; index < values.length; index++) {
         const axis = index % 3;
-        accessor.min[axis] = Math.min(accessor.min[axis], positions[index]);
-        accessor.max[axis] = Math.max(accessor.max[axis], positions[index]);
+        accessor.min[axis] = Math.min(accessor.min[axis], values[index]);
+        accessor.max[axis] = Math.max(accessor.max[axis], values[index]);
       }
     }
     if (semantic === 'TIME') {
@@ -56,6 +94,17 @@ export function compileUnityMesh(source) {
   const attributes = { POSITION: floatAccessor(positions, 3, 'POSITION') };
   if (normals.length) attributes.NORMAL = floatAccessor(normals, 3, 'NORMAL');
   if (uvs.length) attributes.TEXCOORD_0 = floatAccessor(uvs, 2, 'TEXCOORD_0');
+  for (const [name, semantic, size] of [['colors', 'COLOR_0', 4],
+    ['tangents', 'TANGENT', 4], ['uvs2', 'TEXCOORD_1', 2],
+    ['uvs3', 'TEXCOORD_2', 2], ['uvs4', 'TEXCOORD_3', 2],
+    ['uvs5', 'TEXCOORD_4', 2], ['uvs6', 'TEXCOORD_5', 2],
+    ['uvs7', 'TEXCOORD_6', 2], ['uvs8', 'TEXCOORD_7', 2]]) {
+    if (source[name]?.length) attributes[semantic] = floatAccessor(source[name], size, semantic);
+  }
+  for (const [channel, entry] of Object.entries(uvFull)) {
+    const semantic = `_UNITY_UV_${channel}`;
+    attributes[semantic] = floatAccessor(entry.values, entry.dimension, semantic);
+  }
   if (source.skin) {
     const { bones, joints, weights, inverseBindMatrices } = source.skin;
     if (!Array.isArray(bones) || !bones.length || bones.length > 65535
@@ -74,6 +123,11 @@ export function compileUnityMesh(source) {
     attributes.JOINTS_0 = accessors.length - 1;
     attributes.WEIGHTS_0 = floatAccessor(weights, 4, 'WEIGHTS');
   }
+  const morphFrames = blendShapes.flatMap(shape => shape.frames.map(frame => ({ shape, frame })));
+  const morphTargets = morphFrames.map(({ frame }) => ({
+    POSITION: floatAccessor(frame.vertices, 3, 'MORPH_POSITION'),
+    NORMAL: floatAccessor(frame.normals, 3, 'MORPH_NORMAL'),
+  }));
 
   const images = [];
   const textures = [];
@@ -94,11 +148,92 @@ export function compileUnityMesh(source) {
         extras: { unityTextureId: material.textureId ?? null } });
       textures.push({ source: images.length - 1 });
       pbr.baseColorTexture = { index: textures.length - 1 };
+      const scale = material.textureScale ?? [1, 1];
+      const offset = material.textureOffset ?? [0, 0];
+      if (![scale, offset].every(values => Array.isArray(values) && values.length === 2
+        && values.every(Number.isFinite))) throw new AssetFormatError('Material texture transform is invalid');
+      if (scale[0] !== 1 || scale[1] !== 1 || offset[0] !== 0 || offset[1] !== 0) {
+        pbr.baseColorTexture.extensions = { KHR_texture_transform: {
+          scale,
+          offset: [offset[0], 1 - scale[1] - offset[1]],
+        } };
+      }
+    }
+    if (material.metallicRoughnessTexturePng) {
+      const png = Buffer.from(material.metallicRoughnessTexturePng, 'base64');
+      if (png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a')
+        throw new AssetFormatError('Material metallic/roughness texture is not PNG');
+      images.push({ bufferView: view(png), mimeType: 'image/png',
+        extras: { unityTextureId: material.metallicRoughnessTextureId ?? null } });
+      textures.push({ source: images.length - 1 });
+      const scale = material.metallicRoughnessTextureScale ?? [1, 1];
+      const offset = material.metallicRoughnessTextureOffset ?? [0, 0];
+      if (![scale, offset].every(values => Array.isArray(values) && values.length === 2
+        && values.every(Number.isFinite)))
+        throw new AssetFormatError('Material metallic/roughness texture transform is invalid');
+      pbr.metallicRoughnessTexture = { index: textures.length - 1 };
+      if (scale[0] !== 1 || scale[1] !== 1 || offset[0] !== 0 || offset[1] !== 0)
+        pbr.metallicRoughnessTexture.extensions = { KHR_texture_transform: {
+          scale, offset: [offset[0], 1 - scale[1] - offset[1]],
+        } };
     }
     const result = { name: material.name ?? '', pbrMetallicRoughness: pbr,
       alphaMode: material.alphaMode ?? (color[3] < 1 ? 'BLEND' : 'OPAQUE'),
       doubleSided: Boolean(material.doubleSided),
-      extras: { unityMaterialId: material.id ?? null } };
+      extras: { unityMaterialId: material.id ?? null,
+        unityShaderGuid: material.shaderGuid ?? null,
+        unityShaderName: material.shaderName ?? null,
+        previewMaterialModel: material.previewMaterialModel ?? 'urp-lit-v1',
+        shaderCompatibility: material.shaderCompatibility ?? 'legacy-fallback',
+        shaderAdapter: material.shaderAdapter ?? null,
+        shaderTarget: material.shaderTarget ?? null,
+        urpSurfaceMode: material.urpSurfaceMode ?? null,
+        urpBlendMode: material.urpBlendMode ?? null } };
+    if (material.normalTexturePng) {
+      if (!source.tangents?.length) throw new AssetFormatError(
+        `Normal-mapped material needs mesh tangents: ${material.name ?? ''}`);
+      const png = Buffer.from(material.normalTexturePng, 'base64');
+      if (png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a')
+        throw new AssetFormatError('Material normal texture is not PNG');
+      images.push({ bufferView: view(png), mimeType: 'image/png',
+        extras: { unityTextureId: material.normalTextureId ?? null } });
+      textures.push({ source: images.length - 1 });
+      const scale = material.normalTextureScale ?? [1, 1];
+      const offset = material.normalTextureOffset ?? [0, 0];
+      if (![scale, offset].every(values => Array.isArray(values) && values.length === 2
+        && values.every(Number.isFinite)))
+        throw new AssetFormatError('Material normal texture transform is invalid');
+      result.normalTexture = { index: textures.length - 1,
+        scale: Number.isFinite(material.normalScale) ? material.normalScale : 1 };
+      if (scale[0] !== 1 || scale[1] !== 1 || offset[0] !== 0 || offset[1] !== 0)
+        result.normalTexture.extensions = { KHR_texture_transform: {
+          scale, offset: [offset[0], 1 - scale[1] - offset[1]],
+        } };
+      // The source UV V coordinate is flipped for glTF. Reverse the green
+      // tangent-space axis at load while keeping the exported Unity tangents.
+      result.extras.unityNormalFlipY = true;
+    }
+    if (material.occlusionTexturePng) {
+      const png = Buffer.from(material.occlusionTexturePng, 'base64');
+      if (png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a')
+        throw new AssetFormatError('Material occlusion texture is not PNG');
+      images.push({ bufferView: view(png), mimeType: 'image/png',
+        extras: { unityTextureId: material.occlusionTextureId ?? null } });
+      textures.push({ source: images.length - 1 });
+      const scale = material.occlusionTextureScale ?? [1, 1];
+      const offset = material.occlusionTextureOffset ?? [0, 0];
+      if (![scale, offset].every(values => Array.isArray(values) && values.length === 2
+        && values.every(Number.isFinite)))
+        throw new AssetFormatError('Material occlusion texture transform is invalid');
+      if (!Number.isFinite(material.occlusionStrength ?? 1))
+        throw new AssetFormatError('Material occlusion strength is invalid');
+      result.occlusionTexture = { index: textures.length - 1,
+        strength: clamp01(material.occlusionStrength ?? 1) };
+      if (scale[0] !== 1 || scale[1] !== 1 || offset[0] !== 0 || offset[1] !== 0)
+        result.occlusionTexture.extensions = { KHR_texture_transform: {
+          scale, offset: [offset[0], 1 - scale[1] - offset[1]],
+        } };
+    }
     if (!['OPAQUE', 'MASK', 'BLEND'].includes(result.alphaMode)) {
       throw new AssetFormatError('Material alpha mode is invalid');
     }
@@ -106,7 +241,10 @@ export function compileUnityMesh(source) {
     if (material.emissive) {
       if (!Array.isArray(material.emissive) || material.emissive.length !== 3
         || !material.emissive.every(Number.isFinite)) throw new AssetFormatError('Material emission is invalid');
-      result.emissiveFactor = material.emissive.map(clamp01);
+      const strength = Math.max(1, ...material.emissive);
+      result.emissiveFactor = material.emissive.map(channel => clamp01(channel / strength));
+      if (strength > 1) result.extensions = { ...result.extensions,
+        KHR_materials_emissive_strength: { emissiveStrength: strength } };
     }
     return result;
   });
@@ -126,12 +264,24 @@ export function compileUnityMesh(source) {
       count: indices.length, type: 'SCALAR' });
     const material = submesh.material >= 0 && submesh.material < gltfMaterials.length
       ? submesh.material : 0;
-    return { attributes, indices: accessors.length - 1, material, mode: 4 };
+    return { attributes, indices: accessors.length - 1, material, mode: 4,
+      ...(morphTargets.length ? { targets: morphTargets,
+        extras: { unityBlendShapes: blendShapes } } : {}) };
   });
   const gltf = { asset: { version: '2.0', generator: 'unity-three-runtime' },
     scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0 }],
-    meshes: [{ primitives, extras: { unityMeshId: source.meshId ?? null } }],
+    meshes: [{ primitives, extras: { unityMeshId: source.meshId ?? null,
+      ...(morphTargets.length ? { targetNames: morphFrames.map(({ shape, frame }) =>
+        `${shape.name}@${frame.weight}`), unityBlendShapes: blendShapes } : {}) } }],
     materials: gltfMaterials, accessors, bufferViews, buffers: [{ byteLength }] };
+  if (gltfMaterials.some(material => material.extensions?.KHR_materials_emissive_strength))
+    gltf.extensionsUsed = [...(gltf.extensionsUsed ?? []), 'KHR_materials_emissive_strength'];
+  if (gltfMaterials.some(material => material.pbrMetallicRoughness.baseColorTexture
+    ?.extensions?.KHR_texture_transform || material.pbrMetallicRoughness.metallicRoughnessTexture
+    ?.extensions?.KHR_texture_transform || material.normalTexture
+    ?.extensions?.KHR_texture_transform || material.occlusionTexture
+    ?.extensions?.KHR_texture_transform)) gltf.extensionsUsed = [
+      ...(gltf.extensionsUsed ?? []), 'KHR_texture_transform'];
   if (source.skin) {
     const { bones, inverseBindMatrices } = source.skin;
     for (const [index, bone] of bones.entries()) {

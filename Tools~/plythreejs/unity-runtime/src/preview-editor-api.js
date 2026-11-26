@@ -49,9 +49,23 @@ export class AssetDatabase {
   static Register(path, asset) {
     this.#assets.set(String(path).replaceAll('\\', '/').toLowerCase(), asset);
   }
+  static GetAssetPath(asset) {
+    for (const [path, value] of this.#assets)
+      if (value === asset || value instanceof GameObject && value._components.includes(asset)) return path;
+    return '';
+  }
+}
+
+export class ModelImporter {
+  constructor(path) { this.path = path; this.globalScale = 1; }
+  static GetAtPath(path) { return new ModelImporter(path); }
+  SaveAndReimport() {
+    console.warn('Preview cannot reimport a Unity model in the browser; model scale changes require a new exported asset.');
+  }
 }
 
 export class PrefabUtility {
+  static GetCorrespondingObjectFromSource(object) { return object; }
   static UnpackPrefabInstance() { /* Preview prefab instances are already mutable. */ }
   static SaveAsPrefabAsset(object, path) {
     if (!(object instanceof GameObject)) throw new TypeError('PrefabUtility.SaveAsPrefabAsset expects a GameObject');

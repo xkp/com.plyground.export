@@ -13,7 +13,9 @@ const bundleDestination = path.resolve(packageRoot, 'Tools~', 'plythreejs');
 if (path.dirname(path.dirname(bundleDestination)) !== packageRoot)
   throw new Error('Unexpected Plythreejs bundle destination');
 for (const name of ['package.json', 'package-lock.json', 'src/preview-module-assets.js',
-  'tools/UnityTranspiler/UnityTranspiler.csproj']) {
+  'lib/manifest.json',
+  'tools/UnityTranspiler/UnityTranspiler.csproj',
+  'tools/select-raw-humanoid-clips.mjs']) {
   if (!fs.existsSync(path.join(source, name))) throw new Error(`Missing Plythreejs source: ${name}`);
 }
 
@@ -33,7 +35,8 @@ function copyTree(relative) {
 }
 
 fs.rmSync(bundleDestination, { recursive: true, force: true });
-for (const name of ['package.json', 'package-lock.json', 'src']) copyTree(name);
+for (const name of ['package.json', 'package-lock.json', 'src', 'lib']) copyTree(name);
+copyTree('tools/select-raw-humanoid-clips.mjs');
 for (const name of fs.readdirSync(path.join(source, 'tools', 'UnityTranspiler')).sort()) {
   if (/\.(?:cs|csproj)$/.test(name)) copyTree(path.join('tools', 'UnityTranspiler', name));
 }

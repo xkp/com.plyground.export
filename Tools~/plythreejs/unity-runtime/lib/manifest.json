@@ -1,0 +1,1125 @@
+{
+  "format": "plyground.preview.runtime-lib/v1",
+  "minifier": {
+    "name": "terser",
+    "version": "5.51.4"
+  },
+  "revision": "sha256:2d9512945b333172a1237f849dbdaedccb3b39a05f4b85ec557dd6e5100830d8",
+  "files": [
+    {
+      "path": "ai-api-stubs.js",
+      "readable": {
+        "bytes": 15110,
+        "gzipBytes": 2596,
+        "sha256": "ab71ec34dfd16370f5c529f79d946bde05cdff4bf364692a84dd13a99b3f447f"
+      },
+      "browser": {
+        "bytes": 13040,
+        "gzipBytes": 2361,
+        "sha256": "8e729dfcce7a2a6041c9fd902a876544398d80d6e7dbb2b8ddacf121581025ef"
+      }
+    },
+    {
+      "path": "animator-graph.js",
+      "readable": {
+        "bytes": 25112,
+        "gzipBytes": 6351,
+        "sha256": "a0d73721143a58a83a7ec12bb627e6dc717ef59c08e09b2902a971791dc62808"
+      },
+      "browser": {
+        "bytes": 13389,
+        "gzipBytes": 4036,
+        "sha256": "e40749209b79c5dba763a31d1134501308dc71a718ea7c544d2456cb1e134563"
+      }
+    },
+    {
+      "path": "animator-hash.js",
+      "readable": {
+        "bytes": 670,
+        "gzipBytes": 388,
+        "sha256": "b8e210358f8b987ad3ee509f165119e3a6b0998d0c6c32e6f763bfdf23d80385"
+      },
+      "browser": {
+        "bytes": 364,
+        "gzipBytes": 277,
+        "sha256": "a35eeb70fd6d884eb24f179b06d51d49e11e2f9b8ab8fce068dcbf3f3aa553f9"
+      }
+    },
+    {
+      "path": "asset-preload.js",
+      "readable": {
+        "bytes": 3146,
+        "gzipBytes": 1019,
+        "sha256": "ab027d1ba236166a6e9322e6b02b93976a53e45944324f71b7b1392bce0d36ee"
+      },
+      "browser": {
+        "bytes": 1565,
+        "gzipBytes": 672,
+        "sha256": "f0595f44a5acdfe93e016a0aa5db9c3c21a9ff0f2a42a1f508346d64a5012351"
+      }
+    },
+    {
+      "path": "asset-schema.js",
+      "readable": {
+        "bytes": 27971,
+        "gzipBytes": 5881,
+        "sha256": "1806ef4b6fffbd80c48e5eebab6d22922187aa280949253d7932e599b0c45bdd"
+      },
+      "browser": {
+        "bytes": 19384,
+        "gzipBytes": 4835,
+        "sha256": "f666ff3cee06112933547239190542e836acfd0e5f60649c0342e6ad62977d20"
+      }
+    },
+    {
+      "path": "assets.js",
+      "readable": {
+        "bytes": 56081,
+        "gzipBytes": 13057,
+        "sha256": "fb47dbb3f098c5a28488d08d75c666465652fad9abd1d37c8c673d9f9f2eaa2b"
+      },
+      "browser": {
+        "bytes": 32065,
+        "gzipBytes": 10306,
+        "sha256": "c8b6623f7e7356b338a2f4d395a7f10a7bbc9323acd5e900b8f7f1c9e10712ec"
+      }
+    },
+    {
+      "path": "audio-asset-api-stubs.js",
+      "readable": {
+        "bytes": 41706,
+        "gzipBytes": 4800,
+        "sha256": "a94b37ff99c1c28895db1018a1e0b6bb048cc7494cb2e69e2ca8e830d660996e"
+      },
+      "browser": {
+        "bytes": 40153,
+        "gzipBytes": 4715,
+        "sha256": "798299330f2d2cadaa696af827d3987e66b5b3145c9de91513942c00841ed108"
+      }
+    },
+    {
+      "path": "collections.js",
+      "readable": {
+        "bytes": 5129,
+        "gzipBytes": 1392,
+        "sha256": "1961933f38a29acce4adfa53f1f4ee64d1728e14b25009ac0a4519216b87fa8c"
+      },
+      "browser": {
+        "bytes": 3055,
+        "gzipBytes": 1022,
+        "sha256": "7f6d3295ef676b0ab1c8251a85b606d0955755c39ee63e48fba99f82f9b08d68"
+      }
+    },
+    {
+      "path": "color-palette.js",
+      "readable": {
+        "bytes": 11058,
+        "gzipBytes": 2989,
+        "sha256": "c0efb8714870e919e4f3520641f5e0bf0e60a4a510f41983151902004d1da90d"
+      },
+      "browser": {
+        "bytes": 9040,
+        "gzipBytes": 2831,
+        "sha256": "c893925c35371c5b8ffefffc6bca4a168eba597875e746d0b1fee326a5dd1572"
+      }
+    },
+    {
+      "path": "core-awaitable.js",
+      "readable": {
+        "bytes": 4448,
+        "gzipBytes": 1144,
+        "sha256": "143ca99a684feaabb7ba120d47bac807670f81f39c8c57de5228cef6b8cd1fd8"
+      },
+      "browser": {
+        "bytes": 3093,
+        "gzipBytes": 969,
+        "sha256": "b5c68177475f4298f519fa4df9dd6140074cdbd5cdd6c8ab826cd43cd35a0275"
+      }
+    },
+    {
+      "path": "core-hash128.js",
+      "readable": {
+        "bytes": 5290,
+        "gzipBytes": 1622,
+        "sha256": "b536ae8bec4883cebe58122eec5028815e4f629d09e34bdf1e2085ef6c1dd03e"
+      },
+      "browser": {
+        "bytes": 3225,
+        "gzipBytes": 1279,
+        "sha256": "8097b7c2fb7d6a9a92f1ebac0592e1f626ee5a9ca1c570a143f4d085e120f730"
+      }
+    },
+    {
+      "path": "core-line-utility.js",
+      "readable": {
+        "bytes": 1915,
+        "gzipBytes": 709,
+        "sha256": "48447a15d75ca7e48015e42e289aa1aa9682804573f8ee83f38249be0f3480b7"
+      },
+      "browser": {
+        "bytes": 951,
+        "gzipBytes": 513,
+        "sha256": "27dae49f3fb131b2cef9b8bf0815a08dde65b4ce5a86586b37ecdad45f0632b0"
+      }
+    },
+    {
+      "path": "core-other-enums.js",
+      "readable": {
+        "bytes": 7102,
+        "gzipBytes": 2093,
+        "sha256": "89226597991ad752950efe44539200eb4f7f0c7c695efff2582536941ade5190"
+      },
+      "browser": {
+        "bytes": 4437,
+        "gzipBytes": 1850,
+        "sha256": "89fa02e1f709cb952380c09bfb4cef018c05e423f19cc9f549b946f2ca18f2f9"
+      }
+    },
+    {
+      "path": "core-platform-enums.js",
+      "readable": {
+        "bytes": 4856,
+        "gzipBytes": 1816,
+        "sha256": "27d3c9ec689f90cd865d004c456dd705ac9d1ac23021aab02beb415a66c10392"
+      },
+      "browser": {
+        "bytes": 3490,
+        "gzipBytes": 1646,
+        "sha256": "08874ed321b249ce440e46453c49981fca5f1984ec14eb1b129699d11f2c8cdc"
+      }
+    },
+    {
+      "path": "core-property-name.js",
+      "readable": {
+        "bytes": 1592,
+        "gzipBytes": 657,
+        "sha256": "c87e0ba447f39d30264dba9651541fcc0aabb17cf14d6ac7739991978a4fadf9"
+      },
+      "browser": {
+        "bytes": 1055,
+        "gzipBytes": 534,
+        "sha256": "41d37b2221a606a76087ff53c01f131e13f244c275edc91753a940aa610ad274"
+      }
+    },
+    {
+      "path": "core-remaining-enums.js",
+      "readable": {
+        "bytes": 9747,
+        "gzipBytes": 2758,
+        "sha256": "7ef0d00e24685462df65acd2bfb4cdaa5ff8d48cae503d5423a8621e1f53292b"
+      },
+      "browser": {
+        "bytes": 7339,
+        "gzipBytes": 2532,
+        "sha256": "7d28ec3a811951f6337f51d6982a09a7e477697209c31eb1664ae48635fcf60d"
+      }
+    },
+    {
+      "path": "core-rendering-enums.js",
+      "readable": {
+        "bytes": 18569,
+        "gzipBytes": 5431,
+        "sha256": "0b46a400d19d20affa9d865a21210c05f1d5e49c8049db4775749e0aec1271ba"
+      },
+      "browser": {
+        "bytes": 13057,
+        "gzipBytes": 5009,
+        "sha256": "f70709f24c1c7cea330213430ca0c91db24c791ebb0078b2fe3894fca68f4f01"
+      }
+    },
+    {
+      "path": "core-shader.js",
+      "readable": {
+        "bytes": 1112,
+        "gzipBytes": 505,
+        "sha256": "017f4cbf630e5d2fc781277be7227048bdda4fa1f9255b025deb2862b8065877"
+      },
+      "browser": {
+        "bytes": 621,
+        "gzipBytes": 345,
+        "sha256": "c45f3a466047e11473f109bee870fe72c8f2f6913470b32ac0ef20237ec8da78"
+      }
+    },
+    {
+      "path": "core-simple-structs.js",
+      "readable": {
+        "bytes": 3276,
+        "gzipBytes": 831,
+        "sha256": "147f2be0695fac0d537b209e598dd417a49c46b4d9602286a8cc72acb957bfb7"
+      },
+      "browser": {
+        "bytes": 2353,
+        "gzipBytes": 690,
+        "sha256": "455bc0f0b0605d68c69e0f2be2ea520a0754033213ce99b5b2acb28f65b26f5e"
+      }
+    },
+    {
+      "path": "core-sprite-values.js",
+      "readable": {
+        "bytes": 2185,
+        "gzipBytes": 793,
+        "sha256": "0924e9b6f110a2b29ca4d59521e1191129c6b325948b874a642f9191dab10644"
+      },
+      "browser": {
+        "bytes": 1435,
+        "gzipBytes": 667,
+        "sha256": "e15bfe9490e8e1f2978721b17084db803e5284d86f421a36213ce08b39121af0"
+      }
+    },
+    {
+      "path": "core-texture-enums.js",
+      "readable": {
+        "bytes": 3243,
+        "gzipBytes": 1199,
+        "sha256": "d211ab965fbedef3c04cee3f847ebe76cae162cf4e4f93678b6295924c8adbec"
+      },
+      "browser": {
+        "bytes": 2282,
+        "gzipBytes": 1029,
+        "sha256": "74b912cf85ae68462aa8b5c1278ecf241b7935094c14e15f43537ae2c964ca7c"
+      }
+    },
+    {
+      "path": "events.js",
+      "readable": {
+        "bytes": 11245,
+        "gzipBytes": 3351,
+        "sha256": "a5784589b8609bbcf5a5b77c048a3644b2ec309193151bc6f206f1e7fafa6ff1"
+      },
+      "browser": {
+        "bytes": 6253,
+        "gzipBytes": 2371,
+        "sha256": "b3cc93b135bfafb8bbea5cf2e2b87e5d6fb13bb0ffb748079ff01349b1d60bbe"
+      }
+    },
+    {
+      "path": "humanoid-avatar-calibration.js",
+      "readable": {
+        "bytes": 10062,
+        "gzipBytes": 2843,
+        "sha256": "fbf18218a803ffe012ccf7a39b7f6cfae32cec7064a957e69b668aa4aa21a318"
+      },
+      "browser": {
+        "bytes": 5132,
+        "gzipBytes": 1949,
+        "sha256": "ae80f670ea3c7d958f3c045cc0dc34bc2ccd66af9253037a5cd71a38dea78fd5"
+      }
+    },
+    {
+      "path": "humanoid-calibrated-clip.js",
+      "readable": {
+        "bytes": 6220,
+        "gzipBytes": 1859,
+        "sha256": "a8ad3a13994a8bd77af7ac41e2a398b4a4818cb81f1ba5964efe044533621f8a"
+      },
+      "browser": {
+        "bytes": 3381,
+        "gzipBytes": 1379,
+        "sha256": "b140281164ec203e851519f45be837943f7f151f55b82470e107ed6446e8e902"
+      }
+    },
+    {
+      "path": "humanoid-evaluated-body.js",
+      "readable": {
+        "bytes": 2255,
+        "gzipBytes": 764,
+        "sha256": "759e38dc53aae43bca2f8256a5bb4e20d8d7b35e75802a48d1bada30822b35ce"
+      },
+      "browser": {
+        "bytes": 1284,
+        "gzipBytes": 555,
+        "sha256": "ec1f209872743a110fa8bab3a6590cfdf4e9d9d934cb3a603b479c7e9012518f"
+      }
+    },
+    {
+      "path": "humanoid-mass-center.js",
+      "readable": {
+        "bytes": 8150,
+        "gzipBytes": 2198,
+        "sha256": "a9a4467435cae10ac1bd9d0bb7bd982c4d2108f0b62dd836ef82b0566c4d0e95"
+      },
+      "browser": {
+        "bytes": 4217,
+        "gzipBytes": 1560,
+        "sha256": "8e5bc22f765d29ec0f54317d76320a0966d0feca27267e25b659aea0c68f249c"
+      }
+    },
+    {
+      "path": "humanoid-mass-weight-fit.js",
+      "readable": {
+        "bytes": 4428,
+        "gzipBytes": 1495,
+        "sha256": "bd1c052013e026f07e59ce6b490f07a4f0cd10cd3b9d71aad2da7e8870b28196"
+      },
+      "browser": {
+        "bytes": 2302,
+        "gzipBytes": 1067,
+        "sha256": "171cb9f3c7cc4b69a05bd2e8de2a48ce20ca217e002bd533e739f997d732e5cd"
+      }
+    },
+    {
+      "path": "humanoid-muscle-clip.js",
+      "readable": {
+        "bytes": 1573,
+        "gzipBytes": 662,
+        "sha256": "a0b0d98e4e4aaa92978500a89161a20aa141ab1a13ed49c88ec5d855ac93bea4"
+      },
+      "browser": {
+        "bytes": 809,
+        "gzipBytes": 456,
+        "sha256": "0093d22e8d824094e3e08e378d78184c7b31b5868414ce58f2db582253cad828"
+      }
+    },
+    {
+      "path": "humanoid-pose-corrections.js",
+      "readable": {
+        "bytes": 5256,
+        "gzipBytes": 1583,
+        "sha256": "47b1789231e64411c6e1a6c8814cdbe835ea4a0177fc725eccf7be2472e8c748"
+      },
+      "browser": {
+        "bytes": 2698,
+        "gzipBytes": 1093,
+        "sha256": "dd7d095386891a670df9266502f32720e48f5f369b25ef84bb13d653926277d6"
+      }
+    },
+    {
+      "path": "humanoid-raw-curve-clip.js",
+      "readable": {
+        "bytes": 7535,
+        "gzipBytes": 2435,
+        "sha256": "00d4827cd8fae2e0c5a3906854f7990503f9baff75d0607a5e9a0bafd6172a30"
+      },
+      "browser": {
+        "bytes": 4063,
+        "gzipBytes": 1625,
+        "sha256": "77ba7918c9c59a1552033a8dc1c7d64145f2a00ddf20b231635d096f9338da58"
+      }
+    },
+    {
+      "path": "humanoid-root-curves.js",
+      "readable": {
+        "bytes": 1675,
+        "gzipBytes": 668,
+        "sha256": "bcdca90661671c6121e4cafb7686d9b7cc72eefda8f7e664eed9b79011830a84"
+      },
+      "browser": {
+        "bytes": 811,
+        "gzipBytes": 417,
+        "sha256": "0a6c36461aa308450a1d795a1e5d3a3d612cde0dba78b633e54ef152e0398b37"
+      }
+    },
+    {
+      "path": "image-conversion-api.js",
+      "readable": {
+        "bytes": 1453,
+        "gzipBytes": 554,
+        "sha256": "b9fbf94d0697a4c549a9557a1c162e7c609b73107c2c998ab70962f9bdb2efd0"
+      },
+      "browser": {
+        "bytes": 1056,
+        "gzipBytes": 428,
+        "sha256": "6d60e254dc7b6bcc0f20be140ccbc15f649ede970ded95e57b0670e0075c7eaf"
+      }
+    },
+    {
+      "path": "index.js",
+      "readable": {
+        "bytes": 1041058,
+        "gzipBytes": 221169,
+        "sha256": "ef6cc141a61f88f818dc9843bbcbd2fbd5d7725329391557c705331e8c33c666"
+      },
+      "browser": {
+        "bytes": 687970,
+        "gzipBytes": 174659,
+        "sha256": "efbdbd9d13703d752ddcc19abf67291b92db86d62fb6f1c8fb10bcc7c973a1af"
+      }
+    },
+    {
+      "path": "input-actions.js",
+      "readable": {
+        "bytes": 31205,
+        "gzipBytes": 7672,
+        "sha256": "e7d510c31ab5ff43c9dd74c7a1470f863222e4838c301937a934bdf82e989922"
+      },
+      "browser": {
+        "bytes": 19337,
+        "gzipBytes": 5918,
+        "sha256": "3e8810b2e067cb5ef950482423c8aa33295b4160cde85ccfe1a3defdcddd1ba4"
+      }
+    },
+    {
+      "path": "input-settings.js",
+      "readable": {
+        "bytes": 5199,
+        "gzipBytes": 1572,
+        "sha256": "1c38050d43c360661a1c24a64b26d7425ef6683c7479f215014458ca22764305"
+      },
+      "browser": {
+        "bytes": 3099,
+        "gzipBytes": 1197,
+        "sha256": "f1ea006649b84bcda8adb46053f6b055c682cb3366e0dd6c5e3e095ea04bc928"
+      }
+    },
+    {
+      "path": "input.js",
+      "readable": {
+        "bytes": 39291,
+        "gzipBytes": 9343,
+        "sha256": "dc91caba49652428f2fca41a34eb58e109d74e7ac30bf3da701ef59b7591aa02"
+      },
+      "browser": {
+        "bytes": 25027,
+        "gzipBytes": 7428,
+        "sha256": "c6d4e9c25f7f2aa5e92b73e9af9531811ac6fbdff43adf839777d5aeaebdffed"
+      }
+    },
+    {
+      "path": "key-code.js",
+      "readable": {
+        "bytes": 7377,
+        "gzipBytes": 2054,
+        "sha256": "d373ecce2e9d90f8a3b8b34731963e7d20209eb619f14125d7871ca6f15cc182"
+      },
+      "browser": {
+        "bytes": 5535,
+        "gzipBytes": 1790,
+        "sha256": "d3b1246ff47c200a6ddb65d7b800fa9d90e8a9ac6f68c353b8962ada5bc6e8d9"
+      }
+    },
+    {
+      "path": "math.js",
+      "readable": {
+        "bytes": 64925,
+        "gzipBytes": 13114,
+        "sha256": "ae15ec51508d879927203fe93a90e942013b49d86c7d05708210c54311275e67"
+      },
+      "browser": {
+        "bytes": 41799,
+        "gzipBytes": 9843,
+        "sha256": "fe0af4ae7d9a8fb16d11f307e67579f3bd970a5ee593af6a7c0ad61462bb5556"
+      }
+    },
+    {
+      "path": "navigation.js",
+      "readable": {
+        "bytes": 17270,
+        "gzipBytes": 4703,
+        "sha256": "e19f7bb3322fb3fc81984fd32ae247d4b8f3f8eac3ed43eb8ce925a9a36bb0ba"
+      },
+      "browser": {
+        "bytes": 9456,
+        "gzipBytes": 3585,
+        "sha256": "8d341f356708c41527c7aedb6babc51892895d2d4c27923427ebad9a3fd87bbf"
+      }
+    },
+    {
+      "path": "particle-api-bridge.js",
+      "readable": {
+        "bytes": 5881,
+        "gzipBytes": 1589,
+        "sha256": "970a2e68529c3408731e04b2faf31d3393b514eb2c4bece0f6eb58fa41bce51b"
+      },
+      "browser": {
+        "bytes": 4015,
+        "gzipBytes": 1275,
+        "sha256": "98c6407de2f820128b2cd4f7836691f8d6d06b482ca8537880a825192f00702b"
+      }
+    },
+    {
+      "path": "particle-api-stubs.js",
+      "readable": {
+        "bytes": 69649,
+        "gzipBytes": 8222,
+        "sha256": "fc7e397568c5e5258b53800e8259a5da68aa3a26b50931f88531fae888815486"
+      },
+      "browser": {
+        "bytes": 66806,
+        "gzipBytes": 8055,
+        "sha256": "88b92161b076862bab392c6a97bbe9e4c6475955f0fb24a2e0336644cf6ff6b5"
+      }
+    },
+    {
+      "path": "physics-api-stubs.js",
+      "readable": {
+        "bytes": 71655,
+        "gzipBytes": 7452,
+        "sha256": "4cea1df55ffbbbb2ad07c6f045a580e3ed27737699d69519962bbf964708bbc1"
+      },
+      "browser": {
+        "bytes": 69253,
+        "gzipBytes": 7255,
+        "sha256": "9a159bb49cdbb34ab32e65be4e8a24426634ddffbe0e5e5a28ff76c1d9ccb06e"
+      }
+    },
+    {
+      "path": "playables.js",
+      "readable": {
+        "bytes": 23402,
+        "gzipBytes": 4940,
+        "sha256": "9a0848d04f90578b6ec60a9076150fa38594f0439b15156302cdcc5051817406"
+      },
+      "browser": {
+        "bytes": 15846,
+        "gzipBytes": 4117,
+        "sha256": "6f7b49f016040022b6250ce0223d6f5ee88d7b5098ce4da515af83bc7c00601f"
+      }
+    },
+    {
+      "path": "pools.js",
+      "readable": {
+        "bytes": 6317,
+        "gzipBytes": 1391,
+        "sha256": "216617d126433d94b06882c323c8bfa7e54d7234aa62aa546c820cadb2349bdb"
+      },
+      "browser": {
+        "bytes": 3832,
+        "gzipBytes": 1157,
+        "sha256": "8a97a2d62c53ee3e5a571410f35d1c46047513c846fb5d58002d3148aa2715a6"
+      }
+    },
+    {
+      "path": "preprocess.js",
+      "readable": {
+        "bytes": 11133,
+        "gzipBytes": 3387,
+        "sha256": "0b1a7367aeb67b71202cfa64542c94d6d29eaf0cafc6c4cab473d588c35a176c"
+      },
+      "browser": {
+        "bytes": 6972,
+        "gzipBytes": 2820,
+        "sha256": "8d15dbe2b19b2f54a82a8776746afc9f7f8552440c738871566527238848ce2a"
+      }
+    },
+    {
+      "path": "preview-api-coverage.js",
+      "readable": {
+        "bytes": 3601,
+        "gzipBytes": 1468,
+        "sha256": "d771db8358a6b094b3bbbbbe1ec2d89955f16fe015b18ffbe9c5b97148931e7d"
+      },
+      "browser": {
+        "bytes": 2245,
+        "gzipBytes": 1162,
+        "sha256": "d01dbc1048bcecc203a46dcf33620df4853485725d94bb59bce70957b2f052c1"
+      }
+    },
+    {
+      "path": "preview-browser.js",
+      "readable": {
+        "bytes": 1046,
+        "gzipBytes": 480,
+        "sha256": "052d2a93810fc2e8d634712ffd628b900dc6b9e4e9a74070c45e8cc0a4e58ddf"
+      },
+      "browser": {
+        "bytes": 586,
+        "gzipBytes": 321,
+        "sha256": "e90c3ae7e5e6a39201bb10f5331e5c9114feb5c847d3243680d1f7d673061288"
+      }
+    },
+    {
+      "path": "preview-build.js",
+      "readable": {
+        "bytes": 14090,
+        "gzipBytes": 4449,
+        "sha256": "55fb5f54adbe8ccb72257bc640766734458f0f5fa4d5b05894f9c6de82398e2d"
+      },
+      "browser": {
+        "bytes": 9020,
+        "gzipBytes": 3578,
+        "sha256": "c84d895b55c7980896748b8c7346d710688a0f8fc99e3ab1d65c513717a77b40"
+      }
+    },
+    {
+      "path": "preview-controller-animation.js",
+      "readable": {
+        "bytes": 49587,
+        "gzipBytes": 12294,
+        "sha256": "776edd0c8e0ade3949db8eea16570e3585deeaa0b9a17f750619e0d7e69ad5c4"
+      },
+      "browser": {
+        "bytes": 27503,
+        "gzipBytes": 8201,
+        "sha256": "05d8aaf75ef3d9976f43d9471d4c7e2dcb40d33fb9f45b6734332f58e1536b36"
+      }
+    },
+    {
+      "path": "preview-editor-api.js",
+      "readable": {
+        "bytes": 4149,
+        "gzipBytes": 1468,
+        "sha256": "48ddea6ad731c7267e25e31c3b64636e80e6a230147a91d9451dd984ce01f805"
+      },
+      "browser": {
+        "bytes": 2350,
+        "gzipBytes": 1024,
+        "sha256": "19a4cd8c54366e8c70e4e57d76874246bf62e617ba2fa490e497b5b149a4c1fa"
+      }
+    },
+    {
+      "path": "preview-exclusions.js",
+      "readable": {
+        "bytes": 12586,
+        "gzipBytes": 2535,
+        "sha256": "c4966657c2690dd0dbc322db17d102e3dfa8cb1f81f787ed2a45c4cb4e15637a"
+      },
+      "browser": {
+        "bytes": 11169,
+        "gzipBytes": 2441,
+        "sha256": "0fee36ff962ac80f2cbdf4b21c8ea3c12cbb802cdc8d7f70147f795993469d73"
+      }
+    },
+    {
+      "path": "preview-gameplay-messages.js",
+      "readable": {
+        "bytes": 1439,
+        "gzipBytes": 646,
+        "sha256": "379c6c0c3d68da68e28bc87e8c306228a62daa60126e6eec8f53cf296a6000bb"
+      },
+      "browser": {
+        "bytes": 789,
+        "gzipBytes": 447,
+        "sha256": "413ddf89e663346b1792d50bf6fa071e3a0d1a76548915fb81412ae59e65c1dd"
+      }
+    },
+    {
+      "path": "preview-humanoid-animation.js",
+      "readable": {
+        "bytes": 23668,
+        "gzipBytes": 6479,
+        "sha256": "7130f59a22717f27abc542c3fc851931c6932221cca325c3a2a28c165ae2d2d3"
+      },
+      "browser": {
+        "bytes": 13786,
+        "gzipBytes": 4463,
+        "sha256": "ed5ea50380509ff6366fcde71b26b5d2d0f0d430bf7b90e1491d32fbe35bbbac"
+      }
+    },
+    {
+      "path": "preview-importer.js",
+      "readable": {
+        "bytes": 12864,
+        "gzipBytes": 3439,
+        "sha256": "b1fddfce7e6648f219c8fabf8f80978716cd1d4a5dce76f64f56ce2d37827f22"
+      },
+      "browser": {
+        "bytes": 7507,
+        "gzipBytes": 2739,
+        "sha256": "918901b13b435d06ccc11880e830e92f2340d9e7df7e4f348ae08b6df1a518f0"
+      }
+    },
+    {
+      "path": "preview-malbers-gravity.js",
+      "readable": {
+        "bytes": 2271,
+        "gzipBytes": 922,
+        "sha256": "af4c28b80186113414bf139b65524bf0b2f3a43a18cd764a669ae92617beb579"
+      },
+      "browser": {
+        "bytes": 1036,
+        "gzipBytes": 566,
+        "sha256": "234e911b642de3633a423a48913e7009837b8bf5ccc6a9206a664d4f6b9da46e"
+      }
+    },
+    {
+      "path": "preview-minify-code.js",
+      "readable": {
+        "bytes": 3400,
+        "gzipBytes": 1406,
+        "sha256": "e9272058fb6933fde87f96638e418aa09637b30ea4b72830aa8e33eb77bd53f7"
+      },
+      "browser": {
+        "bytes": 2301,
+        "gzipBytes": 1155,
+        "sha256": "a694ce9b0f9777b2abb6556bbe2d7d5963d887984b957ac2cbe24f9ca001352c"
+      }
+    },
+    {
+      "path": "preview-minify-code.test.js",
+      "readable": {
+        "bytes": 1467,
+        "gzipBytes": 639,
+        "sha256": "d8b936f76d0ecb5ff234da93070a5f1b58c83cf56a466de79ee970163e023bc3"
+      },
+      "browser": {
+        "bytes": 1086,
+        "gzipBytes": 580,
+        "sha256": "2ef0639f31b1510ebb5662b995b127fe32014392daa5b1b4e4878bd5fa8d6310"
+      }
+    },
+    {
+      "path": "preview-model-materials.js",
+      "readable": {
+        "bytes": 467,
+        "gzipBytes": 287,
+        "sha256": "1d42e16a8ea1f814e3bc7b3695f783811a8dd6bb986af351beddb165c6e9160e"
+      },
+      "browser": {
+        "bytes": 219,
+        "gzipBytes": 181,
+        "sha256": "6e4415baf82e41d7c7800cf24bb84ddfd8e6a6de26d2d2634e900505c78d1ef4"
+      }
+    },
+    {
+      "path": "preview-module-assets.js",
+      "readable": {
+        "bytes": 5444,
+        "gzipBytes": 1999,
+        "sha256": "910d67820572d17c958316a99ee1061cb5e42ebc45dccfe44a6779556ffdd394"
+      },
+      "browser": {
+        "bytes": 3137,
+        "gzipBytes": 1462,
+        "sha256": "7d32943d2c90c9f9250beb6a7be76c195c243e14e157afa20521b006e41dd00c"
+      }
+    },
+    {
+      "path": "preview-navigation.js",
+      "readable": {
+        "bytes": 6535,
+        "gzipBytes": 2284,
+        "sha256": "2554841650e3ca8d1c00b55ecdb8f51f494889d3cd260013491286b3bef46bf7"
+      },
+      "browser": {
+        "bytes": 4028,
+        "gzipBytes": 1761,
+        "sha256": "1fd60e5ea3984bde3bf8e0ffc28635bbea2ef302b6f2134eb17804df280297c4"
+      }
+    },
+    {
+      "path": "preview-player.js",
+      "readable": {
+        "bytes": 14368,
+        "gzipBytes": 4590,
+        "sha256": "1a8c6a4015ab6b582fd5e306274d930365738f1455d96a00f60f87d5ac5fdd5e"
+      },
+      "browser": {
+        "bytes": 8680,
+        "gzipBytes": 3741,
+        "sha256": "4e261d33dbf6dbdb64d7bc06e2a727c9f752d3d5c8144095624ed86b3a30191b"
+      }
+    },
+    {
+      "path": "preview-resource-links.js",
+      "readable": {
+        "bytes": 1264,
+        "gzipBytes": 568,
+        "sha256": "8f679a2f170a297dd4ce568de59df6923c9703fa10e53b95c48b26cd2b4e0c3e"
+      },
+      "browser": {
+        "bytes": 794,
+        "gzipBytes": 432,
+        "sha256": "9dd8e575779c60d1bf178a7d43c5a0e2b162cbc8aaa4ec44af6a94ca4ee2bcec"
+      }
+    },
+    {
+      "path": "preview-resource-links.test.js",
+      "readable": {
+        "bytes": 1192,
+        "gzipBytes": 501,
+        "sha256": "0e7ed78ce2dd33babb6d6385516ead599360565036d9e64b778aaa3834baa76a"
+      },
+      "browser": {
+        "bytes": 905,
+        "gzipBytes": 443,
+        "sha256": "1c65e260da6b1d3bde3a422d53171b5fb965a909e30e86784da11b5765cf909f"
+      }
+    },
+    {
+      "path": "preview-rig-retarget.js",
+      "readable": {
+        "bytes": 4537,
+        "gzipBytes": 1578,
+        "sha256": "89540a99d5103a4515dcd794c888fcaf8b9ccd385fec4deacf3c426ea5eb0c91"
+      },
+      "browser": {
+        "bytes": 2665,
+        "gzipBytes": 1164,
+        "sha256": "06ed074d456bf13fa482c8630181292671441984d861aa89e63fb691fa9a3988"
+      }
+    },
+    {
+      "path": "preview-save.js",
+      "readable": {
+        "bytes": 6589,
+        "gzipBytes": 2112,
+        "sha256": "eb30fccb033083dbe4b92661bf3a1a26488d0c4aff0819d4410b6365899740ed"
+      },
+      "browser": {
+        "bytes": 4091,
+        "gzipBytes": 1583,
+        "sha256": "62dd31f273879b708cabfd57323e79962c7e5ac72c9cb00b36ba89b7abbbbac5"
+      }
+    },
+    {
+      "path": "preview-scene.js",
+      "readable": {
+        "bytes": 36064,
+        "gzipBytes": 9393,
+        "sha256": "6919be71f4c18c5937291fd9d03f2659b2aa2657b61ef69a84baaba271ac434e"
+      },
+      "browser": {
+        "bytes": 20263,
+        "gzipBytes": 6967,
+        "sha256": "26ac1f78b967f358881254e90c129888334d3fc1c742ab6553b1f8c504c89e7d"
+      }
+    },
+    {
+      "path": "preview-spline-architect.js",
+      "readable": {
+        "bytes": 14942,
+        "gzipBytes": 4263,
+        "sha256": "ef5ce934e3f59e50c0070637c099dad7337651ac902a9a0422f9919f5ecf609d"
+      },
+      "browser": {
+        "bytes": 9491,
+        "gzipBytes": 3296,
+        "sha256": "4a9a825c0bd2eaaf5c7bf5d8dbb4e6b62f64b19a0988172f9d3019b9e694ddc1"
+      }
+    },
+    {
+      "path": "preview-validate.js",
+      "readable": {
+        "bytes": 4152,
+        "gzipBytes": 1559,
+        "sha256": "e7aad247790182d3293b90b9f0b47821c8e0f98702209fcc5d0406bc52017706"
+      },
+      "browser": {
+        "bytes": 2827,
+        "gzipBytes": 1308,
+        "sha256": "e11c58b0a18ea97b4e30cf639c22624ae9c1f9c9abbf9b6e9e0a8264167886f9"
+      }
+    },
+    {
+      "path": "preview-variation.js",
+      "readable": {
+        "bytes": 8058,
+        "gzipBytes": 2577,
+        "sha256": "4173842df5e8aa01789a5fbc376bcb415a8b649eb71a27ba39799fef8d55c6c5"
+      },
+      "browser": {
+        "bytes": 5155,
+        "gzipBytes": 2072,
+        "sha256": "d6ce310d861c3324a9b12fc96a846891ed050ffaccb8d92183f43bef737e4861"
+      }
+    },
+    {
+      "path": "root-motion.js",
+      "readable": {
+        "bytes": 4021,
+        "gzipBytes": 1291,
+        "sha256": "c0b53be6cc6854ec25528a3ac73dadaad6fe2d9f5695d12790f4ccc446aaadc3"
+      },
+      "browser": {
+        "bytes": 2083,
+        "gzipBytes": 912,
+        "sha256": "52a18e914f74e3b2c4fc03af1680d8357ffb4d376c9250cc379373c20a450362"
+      }
+    },
+    {
+      "path": "source-animation.js",
+      "readable": {
+        "bytes": 3753,
+        "gzipBytes": 1409,
+        "sha256": "dfa6288f22f0582a6652a8a979f2adf15961dbf27be30ff03f9246bfce47d9b9"
+      },
+      "browser": {
+        "bytes": 2361,
+        "gzipBytes": 1079,
+        "sha256": "c83b8211c50e8259d7afd5df5b1891bc1b1d90951adced7fb008ed9c47887ee7"
+      }
+    },
+    {
+      "path": "spookyhash-v2.js",
+      "readable": {
+        "bytes": 3803,
+        "gzipBytes": 1234,
+        "sha256": "f658704c30f74094c6335956001a1530db656c8e90e691916359a458e4178826"
+      },
+      "browser": {
+        "bytes": 2064,
+        "gzipBytes": 923,
+        "sha256": "6de47d2cd243d77d1f827d2f40acba8b92bc95a252215502a38e2a0516950fa9"
+      }
+    },
+    {
+      "path": "standalone-player.js",
+      "readable": {
+        "bytes": 13198,
+        "gzipBytes": 4102,
+        "sha256": "c7e4db319ac61d712835eba22b4db9af681cfb234d899eaf975f7af1d500c582"
+      },
+      "browser": {
+        "bytes": 8016,
+        "gzipBytes": 3329,
+        "sha256": "73664845293b709418f8b235344d5f90b8cf74512552c82b4e5380d3a3569949"
+      }
+    },
+    {
+      "path": "terrain-material.js",
+      "readable": {
+        "bytes": 3649,
+        "gzipBytes": 1303,
+        "sha256": "710b34c019c65229a36d041244f7cb5c7a83c76a201b4fb053a0671d261ea590"
+      },
+      "browser": {
+        "bytes": 2229,
+        "gzipBytes": 1013,
+        "sha256": "7ec5558a9efc5fe0d9e21718e4ea838a84ae05399fc8da010424cdabed1e3f0f"
+      }
+    },
+    {
+      "path": "terrain.js",
+      "readable": {
+        "bytes": 5485,
+        "gzipBytes": 1497,
+        "sha256": "27febf7f5446cad46d440194fd55244d98cc47f133772b734c9ee9c3104113f3"
+      },
+      "browser": {
+        "bytes": 3193,
+        "gzipBytes": 1116,
+        "sha256": "5e05ae596444f18e06d864159cfd6303002b6f7dc9b9d53fbc58dfa9e58d70b5"
+      }
+    },
+    {
+      "path": "texture-api-stubs.js",
+      "readable": {
+        "bytes": 18011,
+        "gzipBytes": 2295,
+        "sha256": "a8570a15960f8788a4c759c44218c297de36b4acf11bda8a766d1ef8d7725448"
+      },
+      "browser": {
+        "bytes": 10982,
+        "gzipBytes": 1961,
+        "sha256": "ec391578fba50888520d90b6dede2380e9fefb84984913b012d09f528bae1bbd"
+      }
+    },
+    {
+      "path": "tmp-text.js",
+      "readable": {
+        "bytes": 12737,
+        "gzipBytes": 3391,
+        "sha256": "b5985d8585afbec922cb03e3df66b6f87a6c5f09464304a9632384ff4df5753e"
+      },
+      "browser": {
+        "bytes": 6377,
+        "gzipBytes": 2517,
+        "sha256": "1c46a7757261dfe4353ff58593f07955a47760a176ef32ef15c296b5ed59fb66"
+      }
+    },
+    {
+      "path": "ui-enums.js",
+      "readable": {
+        "bytes": 6853,
+        "gzipBytes": 2131,
+        "sha256": "dbfff5e9e045bad5eee7df8fe684490853559e0f254059b319753d6503c309df"
+      },
+      "browser": {
+        "bytes": 5090,
+        "gzipBytes": 1946,
+        "sha256": "4aba13dbaf2b2d62e0790765603545e8f3c01d7cb7237e74918b431e66884daa"
+      }
+    },
+    {
+      "path": "ui-layout.js",
+      "readable": {
+        "bytes": 14130,
+        "gzipBytes": 3075,
+        "sha256": "ce95daa59a91a86cf7aaebdbad81282a0e3e6d10c33d0198190b78726754276a"
+      },
+      "browser": {
+        "bytes": 6723,
+        "gzipBytes": 2242,
+        "sha256": "ab0c86e526fec64a757ddb757fc285cedb259e72e1c3b8ed4f3c7b2c623b3d5d"
+      }
+    },
+    {
+      "path": "ui-nested-enums.js",
+      "readable": {
+        "bytes": 3016,
+        "gzipBytes": 870,
+        "sha256": "d14c23eed8f316966daef47b27bfb7d6ef2d95931c8b805776c828b7b47c3d07"
+      },
+      "browser": {
+        "bytes": 2127,
+        "gzipBytes": 785,
+        "sha256": "14e090f6c987588f2ac1f60b0339f0387e64c0edbe32d96254f205aec5f364d6"
+      }
+    },
+    {
+      "path": "ui-toolkit.js",
+      "readable": {
+        "bytes": 132859,
+        "gzipBytes": 28639,
+        "sha256": "6ee2a5abc6ae16dbabcc04c165998f767e5a9eca6e6f2cb7a29e85b111c57fa6"
+      },
+      "browser": {
+        "bytes": 77364,
+        "gzipBytes": 22082,
+        "sha256": "25d6233836274fe3cec7ac3af9aba2e36fba1114ff24330365f591ffb46822ed"
+      }
+    },
+    {
+      "path": "ui.js",
+      "readable": {
+        "bytes": 87477,
+        "gzipBytes": 19483,
+        "sha256": "eb7f326c3c19387f0ad877887054302751f735075e12115f15145fd0d9285419"
+      },
+      "browser": {
+        "bytes": 50112,
+        "gzipBytes": 15022,
+        "sha256": "1082eef9dd666626efafa03f7ac2bd8cef1de3c20f4f49d447a138369284189b"
+      }
+    },
+    {
+      "path": "unity-json.js",
+      "readable": {
+        "bytes": 2787,
+        "gzipBytes": 1015,
+        "sha256": "38f678eac6e2a45761bc952e2de142916ca0bcdb0fa510fc4843dcb56fca5dfd"
+      },
+      "browser": {
+        "bytes": 1665,
+        "gzipBytes": 707,
+        "sha256": "c4b7957d28bfb69a085cc37a0083f0f5b6a417c55a259f4e849655d4247c68b8"
+      }
+    },
+    {
+      "path": "unity-mesh.js",
+      "readable": {
+        "bytes": 19668,
+        "gzipBytes": 4856,
+        "sha256": "e4e3b17eccd5565fcde74693a8c4923ee2b4d7e0d81dc0a66c5f8ccba7079c71"
+      },
+      "browser": {
+        "bytes": 11780,
+        "gzipBytes": 3851,
+        "sha256": "840410c278f48ed0099c5e1d1b107447daf0aa96273f44d326ec74bb6da76e0f"
+      }
+    },
+    {
+      "path": "unity-web-request.js",
+      "readable": {
+        "bytes": 11380,
+        "gzipBytes": 2918,
+        "sha256": "763063cf0b7978de9aedc4d44725f1b2ca59bb7f9a5f2b15f4ec59c6c6c83018"
+      },
+      "browser": {
+        "bytes": 8078,
+        "gzipBytes": 2448,
+        "sha256": "33d2edc4db352ac8e3e7e835eee9d0500331c13fed0148a0f0e9367a3732a7c4"
+      }
+    }
+  ],
+  "totals": {
+    "readable": {
+      "bytes": 2280139,
+      "gzipBytes": 510496
+    },
+    "browser": {
+      "bytes": 1508223,
+      "gzipBytes": 403137
+    }
+  }
+}

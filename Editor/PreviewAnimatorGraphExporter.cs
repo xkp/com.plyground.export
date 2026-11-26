@@ -25,7 +25,8 @@ namespace Plyground.Preview.Editor
             if (!(motion is BlendTree tree))
                 return Map("kind", "clip", "name", motion.name,
                     "assetPath", AssetDatabase.GetAssetPath(motion),
-                    "duration", motion is AnimationClip clip ? clip.length : 0f);
+                    "duration", motion is AnimationClip clip ? clip.length : 0f,
+                    "loop", motion is AnimationClip loopingClip && loopingClip.isLooping);
             var children = new List<object>();
             foreach (var child in tree.children)
                 children.Add(Map("motion", MotionRecord(child.motion), "threshold", child.threshold,
@@ -37,7 +38,8 @@ namespace Plyground.Preview.Editor
                 "parameterY", tree.blendParameterY, "children", children);
         }
 
-        private static List<object> Transitions(AnimatorStateTransition[] transitions)
+        private static List<object> Transitions(AnimatorStateTransition[] transitions,
+            Dictionary<AnimatorState, string> paths)
         {
             var result = new List<object>();
             foreach (var transition in transitions)
@@ -51,10 +53,18 @@ namespace Plyground.Preview.Editor
                         ? transition.destinationStateMachine.defaultState?.name : null;
                 if (destination == null) continue;
                 result.Add(Map("destination", destination,
+                    "destinationPath", transition.destinationState != null
+                        ? paths.GetValueOrDefault(transition.destinationState)
+                        : transition.destinationStateMachine?.defaultState != null
+                            ? paths.GetValueOrDefault(transition.destinationStateMachine.defaultState)
+                            : null,
                     "duration", transition.duration,
                     "fixedDuration", transition.hasFixedDuration,
                     "hasExitTime", transition.hasExitTime,
                     "exitTime", transition.exitTime,
+                    "offset", transition.offset,
+                    "interruptionSource", transition.interruptionSource.ToString(),
+                    "orderedInterruption", transition.orderedInterruption,
                     "canTransitionToSelf", transition.canTransitionToSelf,
                     "conditions", conditions));
             }
@@ -83,19 +93,36 @@ namespace Plyground.Preview.Editor
             return result;
         }
 
-        private static void States(AnimatorStateMachine machine, List<object> output)
+        private static void Paths(AnimatorStateMachine machine,
+            Dictionary<AnimatorState, string> paths, string path)
+        {
+            foreach (var child in machine.states)
+                paths[child.state] = path + "." + child.state.name;
+            foreach (var child in machine.stateMachines)
+                Paths(child.stateMachine, paths, path + "." + child.stateMachine.name);
+        }
+
+        private static void States(AnimatorStateMachine machine, List<object> output,
+            string path, Dictionary<AnimatorState, string> paths)
         {
             foreach (var child in machine.states)
             {
                 var state = child.state;
+                var fullPath = path + "." + state.name;
                 output.Add(Map("name", state.name, "speed", state.speed,
+                    "iKOnFeet", state.iKOnFeet,
+                    "fullPath", fullPath,
+                    "shortNameHash", Animator.StringToHash(state.name),
+                    "fullPathHash", Animator.StringToHash(fullPath),
+                    "tag", state.tag, "tagHash", Animator.StringToHash(state.tag ?? ""),
                     "motion", MotionRecord(state.motion),
-                    "transitions", Transitions(state.transitions),
+                    "transitions", Transitions(state.transitions, paths),
                     "behaviours", Behaviours(state)));
             }
-            foreach (var child in machine.stateMachines) States(child.stateMachine, output);
+            foreach (var child in machine.stateMachines)
+                States(child.stateMachine, output, path + "." + child.stateMachine.name,
+                    paths);
         }
-
         public static object Export(AnimatorController controller)
         {
             var parameters = new List<object>();
@@ -108,7 +135,9 @@ namespace Plyground.Preview.Editor
             {
                 var layer = controller.layers[index];
                 var states = new List<object>();
-                States(layer.stateMachine, states);
+                var paths = new Dictionary<AnimatorState, string>();
+                Paths(layer.stateMachine, paths, layer.name);
+                States(layer.stateMachine, states, layer.name, paths);
                 var mask = new List<object>();
                 if (layer.avatarMask != null)
                     foreach (AvatarMaskBodyPart part in Enum.GetValues(typeof(AvatarMaskBodyPart)))
@@ -116,8 +145,11 @@ namespace Plyground.Preview.Editor
                 layers.Add(Map("name", layer.name, "index", index,
                     "defaultWeight", layer.defaultWeight, "humanoidMask", mask,
                     "defaultState", layer.stateMachine.defaultState?.name,
+                    "defaultStatePath", layer.stateMachine.defaultState != null
+                        ? paths.GetValueOrDefault(layer.stateMachine.defaultState) : null,
                     "states", states,
-                    "anyStateTransitions", Transitions(layer.stateMachine.anyStateTransitions)));
+                    "anyStateTransitions", Transitions(layer.stateMachine.anyStateTransitions,
+                        paths)));
             }
             return Map("name", controller.name, "parameters", parameters, "layers", layers);
         }

@@ -55,7 +55,7 @@ export function hasMovingRoot(clip, epsilon = 1e-4) {
 }
 
 /** Feed exported clip deltas to Unity-named Animator and OnAnimatorMove APIs. */
-export function applyAnimatorRootMotion(animator, entries) {
+export function applyAnimatorRootMotion(animator, entries, onError = null) {
   const position = new Vector3();
   const rotation = new Quaternion();
   let weight = 0;
@@ -69,10 +69,13 @@ export function applyAnimatorRootMotion(animator, entries) {
   animator.deltaPosition.copy(position.applyQuaternion(
     animator.gameObject.object3D.getWorldQuaternion(new Quaternion())));
   animator.deltaRotation.copy(rotation);
-  if (weight === 0) return;
   const handlers = animator.gameObject._components.filter(component =>
     component._active && typeof component.OnAnimatorMove === 'function');
-  if (handlers.length) for (const component of handlers) component.OnAnimatorMove();
+  if (handlers.length) for (const component of handlers) {
+    if (!onError) component.OnAnimatorMove();
+    else try { component.OnAnimatorMove(); }
+      catch (error) { onError(component, error); }
+  }
   else if (animator.applyRootMotion) {
     animator.transform.position = animator.transform.position.add(animator.deltaPosition);
     animator.transform.rotation = animator.transform.rotation.multiply(animator.deltaRotation);

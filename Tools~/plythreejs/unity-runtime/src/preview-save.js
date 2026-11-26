@@ -14,6 +14,26 @@ const write = (path, bytes) => {
   if (target) target.setItem(fileKey(path), value);
   else memoryFiles.set(fileKey(path), value);
 };
+export class PreviewFileInfo {
+  constructor(path) {
+    this.FullName = String(path);
+    this.Name = this.FullName.replaceAll('\\', '/').split('/').at(-1) ?? '';
+    this.LastWriteTime = new Date();
+  }
+}
+export class PreviewDirectoryInfo {
+  constructor(path) { this.FullName = String(path).replaceAll('\\', '/'); }
+  GetFiles(pattern = '*') {
+    const prefix = fileKey(`${this.FullName.replace(/\/$/, '')}/`);
+    const keys = new Set([...memoryFiles.keys()]);
+    const target = storage();
+    if (target) for (let i = 0; i < target.length; i++) keys.add(target.key(i));
+    const suffix = String(pattern).startsWith('*') ? String(pattern).slice(1) : null;
+    return [...keys].filter(key => key?.startsWith(prefix))
+      .map(key => new PreviewFileInfo(key.slice('plythreejs:save:'.length)))
+      .filter(file => suffix == null ? file.Name === pattern : file.Name.endsWith(suffix));
+  }
+}
 
 export class PreviewFileStream {
   constructor(path) { this.path = path; this.bytes = []; }
@@ -46,11 +66,28 @@ export class PreviewArray {
   static Copy(source, destination, count) {
     for (let index = 0; index < count; index++) destination[index] = source[index];
   }
+  static Clear(values, start, count) {
+    for (let index = start; index < start + count; index++) {
+      const value = values[index];
+      values[index] = typeof value === 'number' ? 0
+        : typeof value === 'boolean' ? false
+          : value?.constructor?.__unityValueType ? new value.constructor()
+            : value?.constructor?.name === 'RaycastHit' ? new value.constructor() : null;
+    }
+  }
   static Reverse(values) { values.reverse(); }
   static IndexOf(values, value) { return values.indexOf(value); }
 }
 
 export class PreviewConvert {
+  static ToBase64String(bytes) {
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  }
+  static FromBase64String(value) {
+    return Uint8Array.from(atob(String(value)), character => character.charCodeAt(0));
+  }
   static ChangeType(value, type) {
     if (type === Number) return Number(value);
     if (type === String) return String(value);
@@ -63,6 +100,7 @@ export class PreviewMath {
   static Min(a, b) { return Math.min(a, b); }
   static Max(a, b) { return Math.max(a, b); }
   static Abs(value) { return Math.abs(value); }
+  static Clamp(value, min, max) { return Math.min(Math.max(value, min), max); }
 }
 
 export class PreviewAesManaged {
@@ -83,8 +121,9 @@ export class PreviewCryptoStream {
 }
 
 export class PreviewMemoryStream {
-  constructor(bytes) { this.bytes = bytes; }
+  constructor(bytes = new Uint8Array()) { this.bytes = bytes; }
   ReadAllBytes() { return this.bytes; }
+  GetBuffer() { return this.bytes; }
   Dispose() {}
 }
 
