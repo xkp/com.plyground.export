@@ -18269,7 +18269,9 @@ export class LineRenderer extends Renderer {
   _updateGeometry() {
     if (!this.threeMesh || !this.gameObject) return;
     this.threeMesh.material.color.copy(this.sharedMaterial?.color ?? new THREE.Color(1, 1, 1));
-    this.threeMesh.material.transparent = Boolean(this.sharedMaterial?.transparent);
+    this.threeMesh.material.transparent = Boolean(this.sharedMaterial?.transparent)
+      || this._startColor.a < 1 || this._endColor.a < 1
+      || Boolean(this._colorGradient?.alphaKeys?.some(key => key.alpha < 1));
     this.threeMesh.material.opacity = this.sharedMaterial?.opacity ?? 1;
     const geometry = new THREE.BufferGeometry();
     const drawablePositions = this._drawablePositions();
@@ -18301,7 +18303,7 @@ export class LineRenderer extends Renderer {
           const point = points[i].clone().addScaledVector(u, Math.cos(angle) * radius)
             .addScaledVector(v, Math.sin(angle) * radius);
           vertices.push(point.x, point.y, point.z);
-          colors.push(color.r, color.g, color.b);
+          colors.push(color.r, color.g, color.b, color.a);
           if (i > 0) {
             const a = (i - 1) * sides + side;
             const b = (i - 1) * sides + (side + 1) % sides;
@@ -18319,7 +18321,7 @@ export class LineRenderer extends Renderer {
         indices.push(a, c, b, b, c, d);
       }
       geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
       geometry.setIndex(indices);
       geometry.computeBoundingSphere();
     }
@@ -18338,6 +18340,7 @@ export class TrailRenderer extends LineRenderer {
     this._sampleTimes = [];
     this._visibleFlags = [];
     this._emissionAnchor = null;
+    this._emissionAnchorTime = null;
     this._autodestruct = false;
     this._autodestructEmptyFrame = false;
     this._everHadPositions = false;
@@ -18347,7 +18350,10 @@ export class TrailRenderer extends LineRenderer {
   get emitting() { return this._emitting; }
   set emitting(value) {
     this._emitting = Boolean(value);
-    if (!this._emitting) this._emissionAnchor = null;
+    if (!this._emitting) {
+      this._emissionAnchor = null;
+      this._emissionAnchorTime = null;
+    }
   }
   get time() { return this._time; }
   set time(value) {
@@ -18414,26 +18420,47 @@ export class TrailRenderer extends LineRenderer {
     this._sampleTimes.length = 0;
     this._visibleFlags.length = 0;
     this._emissionAnchor = null;
+    this._emissionAnchorTime = null;
     this._autodestructEmptyFrame = false;
     this._updateGeometry();
   }
   LateUpdate() {
+    if (this._emitting && this.transform) {
+      const position = this.transform.position;
+      if (!this._emissionAnchor) {
+        this._emissionAnchor = position.clone();
+        this._emissionAnchorTime = Time.time;
+      }
+      else if (this._emissionAnchor.distanceTo(position) >= this._minVertexDistance) {
+        if (!this._visibleFlags.some(Boolean)) {
+          this.AddPosition(this._emissionAnchor);
+          this._sampleTimes[this._sampleTimes.length - 1] = this._emissionAnchorTime;
+        }
+        this.AddPosition(position);
+        this._emissionAnchor = position.clone();
+        this._emissionAnchorTime = Time.time;
+      }
+    }
     const cutoff = Time.time - this._time;
     let expired = 0;
-    while (expired < this._sampleTimes.length && this._sampleTimes[expired] < cutoff)
+    while (expired + 1 < this._sampleTimes.length && this._sampleTimes[expired + 1] <= cutoff)
       expired++;
     if (expired) {
       this._positions.splice(0, expired);
       this._sampleTimes.splice(0, expired);
       this._visibleFlags.splice(0, expired);
     }
-    if (this._emitting && this.transform) {
-      const position = this.transform.position;
-      if (!this._emissionAnchor) this._emissionAnchor = position.clone();
-      else if (this._emissionAnchor.distanceTo(position) >= this._minVertexDistance) {
-        if (!this._visibleFlags.some(Boolean)) this.AddPosition(this._emissionAnchor);
-        this.AddPosition(position);
-        this._emissionAnchor = position.clone();
+    if (this._sampleTimes.length && this._sampleTimes[0] < cutoff) {
+      if (this._sampleTimes.length === 1) {
+        this._positions.length = 0;
+        this._sampleTimes.length = 0;
+        this._visibleFlags.length = 0;
+      } else {
+        const span = this._sampleTimes[1] - this._sampleTimes[0];
+        const fraction = span > 0 ? Math.max(0, Math.min(1,
+          (cutoff - this._sampleTimes[0]) / span)) : 1;
+        this._positions[0] = Vector3.Lerp(this._positions[0], this._positions[1], fraction);
+        this._sampleTimes[0] = cutoff;
       }
     }
     if (this._autodestruct && !this._emitting && this._everHadPositions
@@ -19304,8 +19331,8 @@ export class Animator extends Behaviour {
         const transform = transforms.get(bone.name) ?? normalized.get(normalizedName(bone.name));
         bone.updateWorldMatrix(true, false);
         transform.object3D.updateWorldMatrix(true, false);
-        return { bone, transform, syncedPosition: new Vector3(),
-          syncedRotation: new Quaternion(),
+        return { bone, transform, syncedLocalPosition: new Vector3(),
+          syncedLocalRotation: new Quaternion(),
           offsetPosition: preserveOffset
             ? bone.worldToLocal(transform.position) : new Vector3(),
           offsetRotation: preserveOffset
@@ -19331,25 +19358,29 @@ export class Animator extends Behaviour {
       transform.position = bone.localToWorld(this._importedBonePosition.copy(offsetPosition));
       transform.rotation = bone.getWorldQuaternion(this._importedBoneRotation)
         .multiply(offsetRotation);
-      binding.syncedPosition.copy(transform.position);
-      binding.syncedRotation.copy(transform.rotation);
+      binding.syncedLocalPosition.copy(transform.localPosition);
+      binding.syncedLocalRotation.copy(transform.localRotation);
     }
   }
   /** Apply procedural Unity Transform edits made after the imported animation pose. */
   ApplyImportedSkeletonOverrides() {
     for (const binding of this._importedBoneBindings) {
       const { bone, transform, offsetPosition, offsetRotation,
-        syncedPosition, syncedRotation } = binding;
-      const position = transform.position;
-      const rotation = transform.rotation;
-      if (position.distanceToSquared(syncedPosition) < 1e-10
-        && Math.abs(rotation.dot(syncedRotation)) > 1 - 1e-8) continue;
-      const boneRotation = rotation.multiply(offsetRotation.clone().invert());
-      const bonePosition = position.sub(offsetPosition.clone().applyQuaternion(boneRotation));
+        syncedLocalPosition, syncedLocalRotation } = binding;
+      const positionChanged = transform.localPosition.distanceToSquared(syncedLocalPosition) >= 1e-10;
+      const rotationChanged = Math.abs(transform.localRotation.dot(syncedLocalRotation)) <= 1 - 1e-8;
+      if (!positionChanged && !rotationChanged) continue;
       bone.parent.updateWorldMatrix(true, false);
-      bone.position.copy(bone.parent.worldToLocal(bonePosition));
-      bone.quaternion.copy(bone.parent.getWorldQuaternion(new Quaternion()).invert()
-        .multiply(boneRotation));
+      const boneRotation = rotationChanged
+        ? transform.rotation.multiply(offsetRotation.clone().invert())
+        : bone.getWorldQuaternion(new Quaternion());
+      if (positionChanged) {
+        const bonePosition = transform.position.sub(
+          offsetPosition.clone().applyQuaternion(boneRotation));
+        bone.position.copy(bone.parent.worldToLocal(bonePosition));
+      }
+      if (rotationChanged) bone.quaternion.copy(
+        bone.parent.getWorldQuaternion(new Quaternion()).invert().multiply(boneRotation));
       bone.updateWorldMatrix(false, false);
     }
   }

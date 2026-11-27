@@ -184,6 +184,10 @@ export async function buildPreview(request, { copyRuntime = true } = {}) {
     && !(await lstat(inside(outputRoot, module.avatarCalibrationEntry)).catch(() => null))?.isFile())
     throw new Error(`Preview module Avatar calibration is missing: ${module.avatarCalibrationEntry}`);
   const startup = startupAssetIds(bundle, { includeResources: false });
+  const prefabComponentTypes = node => [
+    ...(node.components ?? []).map(component => component.type),
+    ...(node.children ?? []).flatMap(prefabComponentTypes),
+  ];
   const prefabDependencies = new Map(bundle.assets.filter(asset => asset.kind === 'prefab')
     .map(asset => [asset.id, [...assetDependencyIds(bundle, asset.id)]
       .filter(id => id !== asset.id)]));
@@ -196,6 +200,7 @@ export async function buildPreview(request, { copyRuntime = true } = {}) {
     await writeFile(join(outputRoot, 'catalog', `${hash}.json`), json);
     bundle.assets[index] = { id: asset.id, kind: 'prefab',
       recordUrl: `catalog/${hash}.json`,
+      componentTypes: [...new Set(prefabComponentTypes(asset.root))],
       dependencies: prefabDependencies.get(asset.id) };
   }
   validateManifest(bundle, BUNDLE_FORMAT);

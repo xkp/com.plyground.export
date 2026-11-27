@@ -1,4 +1,4 @@
-import { AnimationCurve, Behaviour, Camera, CSharpDictionary, Color, Component, GameObject, InputAction, LayerMask, Light, LineRenderer, TrailRenderer, ManagedReferenceUtility, Quaternion, RaycastHit, RectTransform, Renderer, Rigidbody, Transform, UnityEvent, Vector2, Vector3 } from './index.js';
+import { AnimationCurve, Animator, Behaviour, Camera, CSharpDictionary, Color, Component, GameObject, InputAction, LayerMask, Light, LineRenderer, TrailRenderer, ManagedReferenceUtility, Quaternion, RaycastHit, RectTransform, Renderer, Rigidbody, Transform, UnityEvent, Vector2, Vector3 } from './index.js';
 
 function values(vector, keys) { return keys.map(key => vector[key]); }
 
@@ -106,7 +106,11 @@ export function serializePreviewObject(object, id, typeNames = new Map()) {
           referenceFields.has(name)); }
         catch (error) { throw new Error(`Cannot serialize ${component.constructor.name}.${name}: ${error.message}`, { cause: error }); }
       }
+      if (component instanceof Animator && component.avatarData?.id)
+        properties.avatarData = serializeValue(component.avatarData, typeNames, managedReferences);
       if (component instanceof Rigidbody) {
+        properties.mass = component.mass;
+        properties.linearDamping = component.linearDamping;
         properties.constraints = component.constraints;
         properties.angularDamping = component.angularDamping;
         properties.collisionDetectionMode = component.collisionDetectionMode;

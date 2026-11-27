@@ -166,8 +166,9 @@ try {
   if (player && juType) player.tag = 'Player';
   const cameraType = types['JUTPS.CameraSystems.TPSCameraController'];
   const cameraAsset = cameraType && player && !Camera.main && bundle.assets.find(asset =>
-    asset.kind === 'prefab' && asset.root?.components?.some(component =>
-      component.type === 'JUTPS.CameraSystems.TPSCameraController'));
+    asset.kind === 'prefab' && (asset.componentTypes?.includes('JUTPS.CameraSystems.TPSCameraController')
+      || asset.root?.components?.some(component =>
+        component.type === 'JUTPS.CameraSystems.TPSCameraController')));
   if (cameraAsset) {
     await loaded.preloadAsset(cameraAsset.id);
     const cameraRoot = UnityObject.Instantiate(loaded.assets.get(cameraAsset.id));
@@ -196,6 +197,24 @@ try {
     reticle.style.color = onZombie ? '#ff5252' : 'white';
     reticle.dataset.target = onZombie ? 'zombie' : '';
   };
+  // Without an exported Unity camera, keep the view's heading independent of
+  // the character's turn. JU moves relative to the camera, not the actor.
+  const fallbackHeading = new THREE.Quaternion();
+  if (player) {
+    const forward = player.transform.forward;
+    fallbackHeading.setFromAxisAngle(new THREE.Vector3(0, 1, 0),
+      Math.atan2(forward.x, forward.z));
+  }
+  const syncFallbackOrientation = () => {
+    if (!Camera.main) playerController?.SetForwardOrientation?.(fallbackHeading.clone());
+  };
+  syncFallbackOrientation();
+  canvas.addEventListener('mousemove', event => {
+    if (Camera.main || document.pointerLockElement !== canvas) return;
+    fallbackHeading.multiply(new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0, 1, 0), -event.movementX * 0.0025));
+    syncFallbackOrientation();
+  });
   const followOffset = new THREE.Vector3(0, 3, -6);
   const followLook = new THREE.Vector3(0, 1.5, 0);
   const playerPosition = new THREE.Vector3();
@@ -207,8 +226,7 @@ try {
     if (!player) return;
     player.object3D.updateWorldMatrix(true, false);
     const position = player.object3D.getWorldPosition(playerPosition);
-    const rotation = player.object3D.getWorldQuaternion(new THREE.Quaternion());
-    desiredPosition.copy(followOffset).applyQuaternion(rotation).add(position);
+    desiredPosition.copy(followOffset).applyQuaternion(fallbackHeading).add(position);
     desiredLook.copy(followLook).add(position);
     const now = performance.now();
     const blend = 1 - Math.exp(-8 * Math.min((now - lastRender) / 1000, 0.1));
@@ -220,8 +238,7 @@ try {
   if (player) {
     player.object3D.updateWorldMatrix(true, false);
     const position = player.object3D.getWorldPosition(new THREE.Vector3());
-    const rotation = player.object3D.getWorldQuaternion(new THREE.Quaternion());
-    fallbackCamera.position.copy(followOffset).applyQuaternion(rotation).add(position);
+    fallbackCamera.position.copy(followOffset).applyQuaternion(fallbackHeading).add(position);
     currentLook.copy(followLook).add(position);
     fallbackCamera.lookAt(currentLook);
   }

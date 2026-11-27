@@ -440,9 +440,11 @@ export async function assemblePreviewScene(projectRoot, project) {
           message: `${record.moduleId} has different input bindings; using the selected game bindings` });
     }
     if (moduleBundle.qualitySettings) {
-      if (qualitySettings && JSON.stringify(qualitySettings) !== JSON.stringify(moduleBundle.qualitySettings))
-        throw new Error('Preview modules disagree on Unity quality settings');
-      qualitySettings = moduleBundle.qualitySettings;
+      if (!qualitySettings || record.moduleId === build.selectedGame)
+        qualitySettings = moduleBundle.qualitySettings;
+      else if (JSON.stringify(qualitySettings) !== JSON.stringify(moduleBundle.qualitySettings))
+        diagnostics.push({ severity: 'warning', phase: 'quality',
+          message: `${record.moduleId} has different quality settings; using the selected game settings` });
     }
     if (moduleBundle.buildTags) {
       if (buildTags && JSON.stringify(buildTags) !== JSON.stringify(moduleBundle.buildTags))
@@ -542,7 +544,12 @@ export async function assemblePreviewScene(projectRoot, project) {
       }
     }
     for (const asset of moduleBundle.assets) {
-      if (assets.some(existing => existing.id === asset.id)) throw new Error(`Duplicate preview asset id: ${asset.id}`);
+      const existing = assets.find(value => value.id === asset.id);
+      if (existing) {
+        if (JSON.stringify(existing) !== JSON.stringify(asset))
+          throw new Error(`Preview modules export different assets with id ${asset.id}`);
+        continue;
+      }
       if (asset.url) {
         const source = member(bundleDirectory, asset.url);
         assets.push({ ...asset, url: relative(projectRoot, source).replaceAll('\\', '/') });

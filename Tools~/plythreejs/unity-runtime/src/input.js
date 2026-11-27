@@ -681,7 +681,11 @@ export class BrowserInput {
         const value = (pad.axes?.[source.axis] ?? 0) * (source.invert ? -1 : 1);
         if (Math.abs(value) >= source.dead && Math.abs(value) > Math.abs(analog)) analog = value;
       }
-      let pointer = 0;
+      // The browser writes these device deltas before Update. A legacy Unity
+      // axis with the same name may also bind a gamepad stick; its zero value
+      // must not erase the mouse input used by InputActions.
+      let pointer = name === 'Mouse X' || name === 'Mouse Y'
+        || name === 'Mouse ScrollWheel' ? Input.GetAxis(name) : 0;
       for (const source of binding.mouseAxes ?? []) {
         const value = Input.GetAxis(source.source) * source.sensitivity * (source.invert ? -1 : 1);
         if (Math.abs(value) > Math.abs(pointer)) pointer = value;

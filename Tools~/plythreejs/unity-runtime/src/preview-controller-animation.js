@@ -891,8 +891,8 @@ export class PreviewControllerAnimation extends MonoBehaviour {
         transform.position = bone.localToWorld(offsetPosition.clone());
         transform.rotation = bone.getWorldQuaternion(new THREE.Quaternion())
           .multiply(offsetRotation);
-        handBinding.syncedPosition.copy(transform.position);
-        handBinding.syncedRotation.copy(transform.rotation);
+        handBinding.syncedLocalPosition.copy(transform.localPosition);
+        handBinding.syncedLocalRotation.copy(transform.localRotation);
       }
       leftGoal.position = grip.position;
       leftGoal.rotation = grip.rotation;

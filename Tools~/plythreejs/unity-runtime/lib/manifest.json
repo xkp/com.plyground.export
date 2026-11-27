@@ -4,7 +4,7 @@
     "name": "terser",
     "version": "5.51.4"
   },
-  "revision": "sha256:cd6cc77459e6403418c256e8293351eb77e9d554bfe6995e63e38e29f862fd9d",
+  "revision": "sha256:1adef6b20e1536039721ccec430a46665a2a5d1c46b39201b894a2232033e4df",
   "files": [
     {
       "path": "ai-api-stubs.js",
@@ -425,14 +425,14 @@
     {
       "path": "index.js",
       "readable": {
-        "bytes": 1041475,
-        "gzipBytes": 221320,
-        "sha256": "0226ea8d57b3fb0af873fbdecc872186130573dc77f4825b954ce7e7c8dbe6d3"
+        "bytes": 1042826,
+        "gzipBytes": 221566,
+        "sha256": "c2f8b3ec4d677157e24a75c491132c74b9c09e153360a09cf268cd49fef671f4"
       },
       "browser": {
-        "bytes": 688124,
-        "gzipBytes": 174713,
-        "sha256": "99d8c3f237810e27b6dd096b7b7b9ff973cc21c9840e8af5cf5762bf239b14f0"
+        "bytes": 688956,
+        "gzipBytes": 174877,
+        "sha256": "13714d6cb2fdf6ccb9695e261df8bc7cd3b71c3bd7d8fe6fc11eda6e6500650e"
       }
     },
     {
@@ -464,14 +464,14 @@
     {
       "path": "input.js",
       "readable": {
-        "bytes": 39291,
-        "gzipBytes": 9343,
-        "sha256": "dc91caba49652428f2fca41a34eb58e109d74e7ac30bf3da701ef59b7591aa02"
+        "bytes": 39619,
+        "gzipBytes": 9472,
+        "sha256": "c3d4df7faf3545826dfc568c3defa4dcef4f971f3111dc1d72a68d1ea8c8800a"
       },
       "browser": {
-        "bytes": 25027,
-        "gzipBytes": 7428,
-        "sha256": "c6d4e9c25f7f2aa5e92b73e9af9531811ac6fbdff43adf839777d5aeaebdffed"
+        "bytes": 25098,
+        "gzipBytes": 7447,
+        "sha256": "dd36b56f7eb32aba42bce69f203a48e0b280aadd27890d62e57ee806b7bbd97a"
       }
     },
     {
@@ -633,27 +633,27 @@
     {
       "path": "preview-build.js",
       "readable": {
-        "bytes": 14730,
-        "gzipBytes": 4593,
-        "sha256": "7bad85c5c0702d4821dd7be3ed39c124cab55b9c9e8153c95bfc62e85a7bf924"
+        "bytes": 14976,
+        "gzipBytes": 4672,
+        "sha256": "5fadd3aa157068955852c9d56d564490db223f1dd3b631733b0392975ea8539d"
       },
       "browser": {
-        "bytes": 9453,
-        "gzipBytes": 3667,
-        "sha256": "8ca422f2c7d7332d1ffe2a7b88b60768864bb2dc8e761b67b0dd441f3b954170"
+        "bytes": 9624,
+        "gzipBytes": 3726,
+        "sha256": "9af82fae0848b165fd3ffab046307b9c457c53ddf2076e13813223a640dfc13a"
       }
     },
     {
       "path": "preview-controller-animation.js",
       "readable": {
-        "bytes": 50256,
-        "gzipBytes": 12424,
-        "sha256": "6f12f497e1c556e8a0141e32320bb5a51a292baa11cf82e541f5e6d721043c6d"
+        "bytes": 50276,
+        "gzipBytes": 12427,
+        "sha256": "2e438d3697cc8535fcb0e63a08a72f901a282dbeca8fcd09f92962329babe579"
       },
       "browser": {
-        "bytes": 27870,
-        "gzipBytes": 8296,
-        "sha256": "998e7765a59659a07e0115aeab5ea06f19e8148d7698fbba9573faa0d8b8cd27"
+        "bytes": 27890,
+        "gzipBytes": 8300,
+        "sha256": "40e520a6b053510343323eb96e21126ed10cae86184aaa74ebb3502cfb76554b"
       }
     },
     {
@@ -722,16 +722,29 @@
       }
     },
     {
-      "path": "preview-importer.js",
+      "path": "preview-importer-avatar.test.js",
       "readable": {
-        "bytes": 12864,
-        "gzipBytes": 3439,
-        "sha256": "b1fddfce7e6648f219c8fabf8f80978716cd1d4a5dce76f64f56ce2d37827f22"
+        "bytes": 1276,
+        "gzipBytes": 473,
+        "sha256": "d60195e510d17803f52c42edd881d2e33918c3e00f0e1b74f76858f0284f7f11"
       },
       "browser": {
-        "bytes": 7507,
-        "gzipBytes": 2739,
-        "sha256": "918901b13b435d06ccc11880e830e92f2340d9e7df7e4f348ae08b6df1a518f0"
+        "bytes": 877,
+        "gzipBytes": 424,
+        "sha256": "364a44043643bf76a02fffa6f085e6eb2e9418f98ff2293f9ba48979677bc6cf"
+      }
+    },
+    {
+      "path": "preview-importer.js",
+      "readable": {
+        "bytes": 13149,
+        "gzipBytes": 3498,
+        "sha256": "8fc11db8c05d65a20ac3bef7ca8aa08828667b5dd2ba16153c5b9f1333aa78ea"
+      },
+      "browser": {
+        "bytes": 7649,
+        "gzipBytes": 2782,
+        "sha256": "aadb531ab8ce3d2883d1e7143537b3f2287a9d61d83daa471dccba98c5393cc4"
       }
     },
     {
@@ -828,14 +841,14 @@
     {
       "path": "preview-player.js",
       "readable": {
-        "bytes": 15154,
-        "gzipBytes": 4747,
-        "sha256": "b7ee9cba2ff3918184ca010da302cf4c6f0404594b61a02610392656b19d8fd3"
+        "bytes": 15942,
+        "gzipBytes": 5015,
+        "sha256": "ea39902354cfb1f633c3d0ac36f34b84002f2dbc490fda82e952d8a62cf494ef"
       },
       "browser": {
-        "bytes": 9207,
-        "gzipBytes": 3868,
-        "sha256": "8cd88aa8bea62412e38c4b9fe9b8d9ff26e20ee10ff4d3b6f4702251140ed537"
+        "bytes": 9613,
+        "gzipBytes": 4035,
+        "sha256": "38b0bc0b06eb9b46bd11c9ee8d41bba54533738ebead6dd3c5d9d73d34e16504"
       }
     },
     {
@@ -906,14 +919,14 @@
     {
       "path": "preview-scene.js",
       "readable": {
-        "bytes": 40059,
-        "gzipBytes": 10628,
-        "sha256": "48a116ba942c893a66ec4de1329585fbc076fb55fa5ece59ccbefe1a0d7b4275"
+        "bytes": 40369,
+        "gzipBytes": 10680,
+        "sha256": "e96440cb0a70b63cdb037c51d28c03d4b6815bc7567e78d93163f066fab435f8"
       },
       "browser": {
-        "bytes": 22458,
-        "gzipBytes": 7810,
-        "sha256": "befbd9c7d48403de86ce2f69cd18f33fefb2b283831d135fb759ad2f97de8bd1"
+        "bytes": 22624,
+        "gzipBytes": 7850,
+        "sha256": "9ed4cb410a5256424662cbb652a40bd27dfff92aa405e16edd5c048ad286bcbb"
       }
     },
     {
@@ -1166,12 +1179,12 @@
   ],
   "totals": {
     "readable": {
-      "bytes": 2298504,
-      "gzipBytes": 517173
+      "bytes": 2303108,
+      "gzipBytes": 518482
     },
     "browser": {
-      "bytes": 1519542,
-      "gzipBytes": 408359
+      "bytes": 1522227,
+      "gzipBytes": 409279
     }
   }
 }
