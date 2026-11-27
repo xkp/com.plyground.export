@@ -106,6 +106,19 @@ try {
     }
     if (!controller.WhatIsGround?.value) controller.WhatIsGround.value = groundMask;
   }
+  const avatarCalibrations = new Map();
+  for (const module of moduleRecords) {
+    if (!module.avatarCalibrationEntry) continue;
+    const url = new URL(module.avatarCalibrationEntry, new URL('../../', import.meta.url));
+    const report = await fetchHumanoidGzipJson(url);
+    if (report.format !== 'plyground.preview.avatar-calibrations/v1')
+      throw new Error(`Invalid Preview Avatar calibration: ${module.avatarCalibrationEntry}`);
+    for (const avatar of report.avatars ?? []) {
+      if (avatarCalibrations.has(avatar.avatarId))
+        throw new Error(`Duplicate Preview Avatar calibration: ${avatar.avatarId}`);
+      avatarCalibrations.set(avatar.avatarId, avatar);
+    }
+  }
   for (const module of moduleRecords) {
     if (!module.animationEntry) continue;
     const animationUrl = new URL(module.animationEntry, new URL('../../', import.meta.url));
@@ -125,7 +138,7 @@ try {
           if (rawMotion.format !== 'plyground.preview.humanoid-curves/v1'
             || calibrations.format !== 'plyground.preview.avatar-calibrations/v1')
             throw new Error('Unexpected Humanoid raw data format');
-          rawData = { rawMotion, calibrations };
+          rawData = { rawMotion, calibrations, avatarCalibrations };
         } catch (error) {
           console.error('Preview raw Humanoid motion unavailable; animated poses cannot be built without these assets.', error);
         }
@@ -251,6 +264,7 @@ try {
       }
     });
   } });
+  window.dispatchEvent(new Event('plyground-preview-ready'));
 } catch (error) {
   status.hidden = false;
   status.textContent = `Preview failed: ${error.stack ?? error.message}`;

@@ -2298,6 +2298,10 @@ export class UnityType {
   }
   static InvokeInterface(target, name, args, parameterTypes) {
     if (target == null) throw new TypeError(`Interface target is null: ${name}`);
+    // Some published editor bundles dispatch LINQ extension calls through this
+    // helper. Arrays have no instance method, but retain the LINQ behavior.
+    if (name === 'FirstOrDefault' && Array.isArray(target))
+      return PreviewEnumerable.FirstOrDefault(target, args[0]);
     if (name === 'MoveNext' && typeof target.next === 'function') {
       const next = target.next();
       target.Current = next.value;
@@ -2610,8 +2614,11 @@ export class JToken {
       for (const name of globalThis.Object.getOwnPropertyNames(current))
         if (name !== 'constructor') names.set(name.toLowerCase(), name);
     }
-    for (const [name, item] of globalThis.Object.entries(value))
-      result[names.get(name.toLowerCase()) ?? name] = item;
+    for (const [name, item] of globalThis.Object.entries(value)) {
+      const property = names.get(name.toLowerCase()) ?? name;
+      result[property] = typeName === 'CharacterDescriptor' && property === 'Data'
+        ? JToken.Wrap(item) : item;
+    }
     return result;
   }  GetItem(key) { return JToken.Wrap(this._value?.[key]); }
   SelectToken(path) {

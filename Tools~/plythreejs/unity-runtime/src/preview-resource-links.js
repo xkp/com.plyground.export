@@ -16,6 +16,8 @@ export function linkModuleResources(bundle, modules) {
       ? new URL(path.slice(prefix.length), base).href : path;
     module.codeEntry = link(module.codeEntry);
     if (module.animationEntry) module.animationEntry = link(module.animationEntry);
+    if (module.avatarCalibrationEntry)
+      module.avatarCalibrationEntry = link(module.avatarCalibrationEntry);
     for (const asset of bundle.assets ?? []) if (asset.url) asset.url = link(asset.url);
     for (const scene of bundle.scenes ?? []) scene.recordUrl = link(scene.recordUrl);
     delete module.staticAssetBaseUrl;

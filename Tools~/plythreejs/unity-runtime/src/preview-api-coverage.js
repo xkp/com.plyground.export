@@ -20,7 +20,12 @@ export async function inspectPreviewApi(root) {
   async function visit(folder) {
     for (const entry of await readdir(folder, { withFileTypes: true })) {
       const file = join(folder, entry.name);
-      if (entry.isDirectory()) { await visit(file); continue; }
+      // Minified browser copies are checked through their readable code source.
+      // Their shortened local names can shadow runtime import aliases.
+      if (entry.isDirectory()) {
+        if (entry.name !== 'code-min') await visit(file);
+        continue;
+      }
       if (!entry.name.endsWith('.mjs')) continue;
       filesChecked++;
       const source = await readFile(file, 'utf8');

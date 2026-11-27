@@ -5,9 +5,10 @@ import { pathToFileURL } from 'node:url';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { BUNDLE_FORMAT, BUNDLE_VERSION, validateManifest } from './asset-schema.js';
 import { legacyBindingsFromAxes } from './input-settings.js';
-import { AssetBundleLoader, AssetDatabase, Component, CSharpDictionary, Font, JObject, JToken, Object as UnityObject, PlygroundItem, Quaternion, ScriptableObject, THREE, TerrainData, UnityRuntime, UnityType, Vector3 } from './index.js';
+import { AssetBundleLoader, AssetDatabase, Component, CSharpDictionary, Font, JObject, JToken, Object as UnityObject, PlygroundItem, Quaternion, ScriptableObject, THREE, TerrainData, Texture2D, TextureFormat, UnityRuntime, UnityType, Vector3 } from './index.js';
 import { runPreviewImport, serializePreviewObject } from './preview-importer.js';
 import { orientUnityNormalMaps } from './preview-model-materials.js';
+import { decodePreviewPng } from './preview-png.js';
 
 function member(root, name) {
   if (typeof name !== 'string' || !name || isAbsolute(name) || /^[A-Za-z]:/.test(name)
@@ -21,6 +22,61 @@ function member(root, name) {
 }
 
 async function json(file) { return JSON.parse((await readFile(file, 'utf8')).replace(/^\uFEFF/, '')); }
+
+// The materializer needs mesh geometry and Unity material metadata, but does
+// not render. Avoid browser image loaders when parsing a GLB under Node.
+export function headlessModelBytes(bytes) {
+  if (bytes.toString('ascii', 0, 4) !== 'glTF') return bytes;
+  if (bytes.toString('ascii', 16, 20) !== 'JSON') throw new Error('Invalid Preview GLB');
+  const jsonLength = bytes.readUInt32LE(12);
+  const gltf = JSON.parse(bytes.toString('utf8', 20, 20 + jsonLength));
+  for (const material of gltf.materials ?? []) {
+    if (material.pbrMetallicRoughness) {
+      delete material.pbrMetallicRoughness.baseColorTexture;
+      delete material.pbrMetallicRoughness.metallicRoughnessTexture;
+    }
+    delete material.normalTexture;
+    delete material.occlusionTexture;
+    delete material.emissiveTexture;
+  }
+  delete gltf.images;
+  delete gltf.textures;
+  delete gltf.samplers;
+  const jsonBytes = Buffer.from(JSON.stringify(gltf));
+  const paddedLength = (jsonBytes.length + 3) & ~3;
+  const binaryStart = 20 + jsonLength;
+  const result = Buffer.alloc(20 + paddedLength + bytes.length - binaryStart, 0x20);
+  bytes.copy(result, 0, 0, 20);
+  result.writeUInt32LE(result.length, 8);
+  result.writeUInt32LE(paddedLength, 12);
+  jsonBytes.copy(result, 20);
+  bytes.copy(result, 20 + paddedLength, binaryStart);
+  return result;
+}
+
+export async function headlessPreviewTexture(asset, bundleDirectory, runtime) {
+  if (!asset.textureReadable) {
+    const texture = new THREE.Texture();
+    texture.name = asset.name ?? '';
+    return texture;
+  }
+  const { width, height, rgba } = decodePreviewPng(await readFile(member(bundleDirectory, asset.url)));
+  if (asset.textureWidth !== width || asset.textureHeight !== height)
+    throw new Error(`Preview texture dimensions disagree with its metadata: ${asset.id}`);
+  const texture = new Texture2D(width, height, TextureFormat.RGBA32,
+    asset.textureMipCount ?? 1, asset.textureIsDataSRGB === false);
+  for (let y = 0; y < height; y++)
+    texture._bytes.set(rgba.subarray(y * width * 4, (y + 1) * width * 4),
+      (height - 1 - y) * width * 4);
+  texture.Apply(true);
+  texture._previewRuntime = runtime;
+  if (asset.textureFilterMode !== undefined) texture.filterMode = asset.textureFilterMode;
+  if (asset.textureWrapModeU !== undefined) texture.wrapModeU = asset.textureWrapModeU;
+  if (asset.textureWrapModeV !== undefined) texture.wrapModeV = asset.textureWrapModeV;
+  if (asset.textureAnisoLevel !== undefined) texture.anisoLevel = asset.textureAnisoLevel;
+  texture.name = asset.name ?? '';
+  return texture;
+}
 
 function vector(node, keys, fallback) {
   return keys.map((key, index) => {
@@ -36,6 +92,16 @@ export async function importPreparedModule(file, root, cache = new Map(), active
   if (active.has(file)) throw new Error(`Cyclic Preview module import: ${file}`);
   active.add(file);
   let source = await readFile(file, 'utf8');
+  // Older immutable module previews were transpiled with strict null comparisons
+  // after optional access. JavaScript returns undefined for a missing receiver,
+  // while the original C# expression evaluates to null.
+  source = source.replace(/(\b[\w$]+(?:\?\.[\w$]+)+)\s*(!==|===)\s*null\b/g,
+    (_, value, operator) => `${value} ${operator === '!==' ? '!=' : '=='} null`);
+  // Older SDK transpilation omitted the CharacterDescriptor type argument, so
+  // ToObject returned the raw build object with lower-case data and no Data.
+  if (file.endsWith('system.mjs') && source.includes('class BaseCharacterModule'))
+    source = source.replace(/(GetDescriptor\(data\)\s*\{[\s\S]*?let result = )data\?\.ToObject\(\);/,
+      '$1data?.ToObject("CharacterDescriptor");');
   // Only match import declarations and generated await-import expressions.
   // A bare `from "..."` can also occur inside transpiled gameplay strings.
   const specifiers = [
@@ -96,16 +162,12 @@ async function loadModulePrefabs(moduleBundle, codeFile, moduleRoot, bundleDirec
     assetResolver: async asset => {
       if (asset.kind === 'model') {
         globalThis.self ??= globalThis;
-        const bytes = await readFile(member(bundleDirectory, asset.url));
+        const bytes = headlessModelBytes(await readFile(member(bundleDirectory, asset.url)));
         return new Promise((resolve, reject) => new GLTFLoader().parse(
           bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '',
           model => { orientUnityNormalMaps(model.scene ?? model); resolve(model); }, reject));
       }
-      if (asset.kind === 'texture') {
-        const texture = new THREE.Texture();
-        texture.name = asset.name ?? '';
-        return texture;
-      }
+      if (asset.kind === 'texture') return headlessPreviewTexture(asset, bundleDirectory, runtime);
       if (asset.kind === 'audio') return new ArrayBuffer(0);
       if (asset.kind === 'uiFont') {
         const font = new Font();
@@ -491,7 +553,9 @@ export async function assemblePreviewScene(projectRoot, project) {
       codeEntry: relative(projectRoot, member(moduleRoot,
         manifest.code.browserEntry ?? manifest.code.entry)).replaceAll('\\', '/'),
       ...(manifest.previewAnimation?.entry ? { animationEntry: relative(projectRoot,
-        member(moduleRoot, manifest.previewAnimation.entry)).replaceAll('\\', '/') } : {}) });
+        member(moduleRoot, manifest.previewAnimation.entry)).replaceAll('\\', '/') } : {}),
+      ...(manifest.previewAvatarCalibration?.entry ? { avatarCalibrationEntry: relative(projectRoot,
+        member(moduleRoot, manifest.previewAvatarCalibration.entry)).replaceAll('\\', '/') } : {}) });
     if (moduleBundle.previewDiagnostics?.length)
       diagnostics.push({ severity: 'warning', phase: 'module-assets',
         message: `${manifest.name ?? manifest.moduleId}: ${moduleBundle.previewDiagnostics.length} asset approximations or unsupported values; see the module asset bundle for details` });
@@ -549,8 +613,13 @@ export async function assemblePreviewScene(projectRoot, project) {
         const prepared = module.prefabs.get(templateId);
         const template = module.moduleBundle.itemTemplates?.[templateId]
           ?? (prepared ? { id: templateId, name: prepared.prefab.name, prefab: '' } : null);
-        let object = await call(module, 'CreateItem', gameItem, template,
-          JToken.As(findBuildItem(build, gameItem.buildId ?? gameItem.BuildId), JObject));
+        const buildItem = findBuildItem(build, gameItem.buildId ?? gameItem.BuildId);
+        let object;
+        try {
+          object = await call(module, 'CreateItem', gameItem, template, JToken.As(buildItem, JObject));
+        } catch (error) {
+          throw new Error(`Preview item ${gameItem.id ?? gameItem.Id} (${gameItem.name ?? gameItem.Name ?? templateId}, build ${gameItem.buildId ?? gameItem.BuildId ?? 'none'}, matched ${buildItem != null}) failed: ${error.message}`, { cause: error });
+        }
         if (object == null && prepared) {
           object = UnityObject.Instantiate(prepared.prefab);
           applyPrefabModels(object, prepared.root);

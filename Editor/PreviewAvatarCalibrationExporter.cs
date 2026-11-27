@@ -96,23 +96,29 @@ namespace Plyground.Preview.Editor
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var prefab in prefabs.Where(value => value != null).Distinct())
             {
-                var source = prefab.GetComponentInChildren<Animator>(true);
-                if (source == null || source.avatar == null || !source.avatar.isHuman)
-                    continue;
-                var id = GlobalObjectId.GetGlobalObjectIdSlow(source.avatar).ToString();
-                if (!seen.Add(id)) continue;
+                var sources = prefab.GetComponentsInChildren<Animator>(true)
+                    .Where(value => value.avatar != null && value.avatar.isHuman)
+                    .Select(value => GlobalObjectId.GetGlobalObjectIdSlow(value.avatar).ToString())
+                    .Where(id => seen.Add(id)).ToArray();
+                if (sources.Length == 0) continue;
                 var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
                 try
                 {
-                    var animator = instance.GetComponentInChildren<Animator>(true);
-                    animator.transform.SetPositionAndRotation(Vector3.zero,
-                        Quaternion.identity);
-                    animator.Rebind();
-                    try { records.Add(Capture(animator, id)); }
-                    catch (Exception error)
+                    var pending = new HashSet<string>(sources, StringComparer.Ordinal);
+                    foreach (var animator in instance.GetComponentsInChildren<Animator>(true))
                     {
-                        Debug.LogWarning("Preview Avatar calibration skipped for "
-                            + source.avatar.name + ": " + error.Message);
+                        if (animator.avatar == null || !animator.avatar.isHuman) continue;
+                        var id = GlobalObjectId.GetGlobalObjectIdSlow(animator.avatar).ToString();
+                        if (!pending.Remove(id)) continue;
+                        animator.transform.SetPositionAndRotation(Vector3.zero,
+                            Quaternion.identity);
+                        animator.Rebind();
+                        try { records.Add(Capture(animator, id)); }
+                        catch (Exception error)
+                        {
+                            Debug.LogWarning("Preview Avatar calibration skipped for "
+                                + animator.avatar.name + ": " + error.Message);
+                        }
                     }
                 }
                 finally { UnityEngine.Object.DestroyImmediate(instance); }

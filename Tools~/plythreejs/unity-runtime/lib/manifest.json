@@ -4,7 +4,7 @@
     "name": "terser",
     "version": "5.51.4"
   },
-  "revision": "sha256:3699631acb64e498ceed471f8171237cd591d2fbba128d21266e43b8b8771b3f",
+  "revision": "sha256:cd6cc77459e6403418c256e8293351eb77e9d554bfe6995e63e38e29f862fd9d",
   "files": [
     {
       "path": "ai-api-stubs.js",
@@ -425,14 +425,14 @@
     {
       "path": "index.js",
       "readable": {
-        "bytes": 1041058,
-        "gzipBytes": 221169,
-        "sha256": "ef6cc141a61f88f818dc9843bbcbd2fbd5d7725329391557c705331e8c33c666"
+        "bytes": 1041475,
+        "gzipBytes": 221320,
+        "sha256": "0226ea8d57b3fb0af873fbdecc872186130573dc77f4825b954ce7e7c8dbe6d3"
       },
       "browser": {
-        "bytes": 687970,
-        "gzipBytes": 174659,
-        "sha256": "efbdbd9d13703d752ddcc19abf67291b92db86d62fb6f1c8fb10bcc7c973a1af"
+        "bytes": 688124,
+        "gzipBytes": 174713,
+        "sha256": "99d8c3f237810e27b6dd096b7b7b9ff973cc21c9840e8af5cf5762bf239b14f0"
       }
     },
     {
@@ -607,14 +607,14 @@
     {
       "path": "preview-api-coverage.js",
       "readable": {
-        "bytes": 3601,
-        "gzipBytes": 1468,
-        "sha256": "d771db8358a6b094b3bbbbbe1ec2d89955f16fe015b18ffbe9c5b97148931e7d"
+        "bytes": 3812,
+        "gzipBytes": 1550,
+        "sha256": "bdf84111bddb8f99c3b22baa6cdec19f1c8320933c4000723a3e6f49616a2866"
       },
       "browser": {
-        "bytes": 2245,
-        "gzipBytes": 1162,
-        "sha256": "d01dbc1048bcecc203a46dcf33620df4853485725d94bb59bce70957b2f052c1"
+        "bytes": 2266,
+        "gzipBytes": 1173,
+        "sha256": "32854f59ab2faa6a6b60a436835239fb265414b8acac951a5bac4f1c1d792c92"
       }
     },
     {
@@ -633,27 +633,27 @@
     {
       "path": "preview-build.js",
       "readable": {
-        "bytes": 14090,
-        "gzipBytes": 4449,
-        "sha256": "55fb5f54adbe8ccb72257bc640766734458f0f5fa4d5b05894f9c6de82398e2d"
+        "bytes": 14730,
+        "gzipBytes": 4593,
+        "sha256": "7bad85c5c0702d4821dd7be3ed39c124cab55b9c9e8153c95bfc62e85a7bf924"
       },
       "browser": {
-        "bytes": 9020,
-        "gzipBytes": 3578,
-        "sha256": "c84d895b55c7980896748b8c7346d710688a0f8fc99e3ab1d65c513717a77b40"
+        "bytes": 9453,
+        "gzipBytes": 3667,
+        "sha256": "8ca422f2c7d7332d1ffe2a7b88b60768864bb2dc8e761b67b0dd441f3b954170"
       }
     },
     {
       "path": "preview-controller-animation.js",
       "readable": {
-        "bytes": 49587,
-        "gzipBytes": 12294,
-        "sha256": "776edd0c8e0ade3949db8eea16570e3585deeaa0b9a17f750619e0d7e69ad5c4"
+        "bytes": 50256,
+        "gzipBytes": 12424,
+        "sha256": "6f12f497e1c556e8a0141e32320bb5a51a292baa11cf82e541f5e6d721043c6d"
       },
       "browser": {
-        "bytes": 27503,
-        "gzipBytes": 8201,
-        "sha256": "05d8aaf75ef3d9976f43d9471d4c7e2dcb40d33fb9f45b6734332f58e1536b36"
+        "bytes": 27870,
+        "gzipBytes": 8296,
+        "sha256": "998e7765a59659a07e0115aeab5ea06f19e8148d7698fbba9573faa0d8b8cd27"
       }
     },
     {
@@ -696,6 +696,19 @@
       }
     },
     {
+      "path": "preview-headless-assets.test.js",
+      "readable": {
+        "bytes": 2834,
+        "gzipBytes": 1223,
+        "sha256": "9cecc47f62dd3939d6a9775b6c8454228450f10ec278fb8b7e563eb7762378c5"
+      },
+      "browser": {
+        "bytes": 2012,
+        "gzipBytes": 1043,
+        "sha256": "2b4372f4551e99b891b9286a895ee35b6fbd11dfdad817faa2d42d440fcbdd20"
+      }
+    },
+    {
       "path": "preview-humanoid-animation.js",
       "readable": {
         "bytes": 23668,
@@ -719,6 +732,19 @@
         "bytes": 7507,
         "gzipBytes": 2739,
         "sha256": "918901b13b435d06ccc11880e830e92f2340d9e7df7e4f348ae08b6df1a518f0"
+      }
+    },
+    {
+      "path": "preview-legacy-editor.test.js",
+      "readable": {
+        "bytes": 2753,
+        "gzipBytes": 1007,
+        "sha256": "1a747f9d35923a59bbf18bf4badd524dfd9d3d2f0ede4281739e24e6aa4ec254"
+      },
+      "browser": {
+        "bytes": 2053,
+        "gzipBytes": 934,
+        "sha256": "06362906e51fc8683aea80f878f2c6d870cc196d503246635e102eb650fd227a"
       }
     },
     {
@@ -802,40 +828,53 @@
     {
       "path": "preview-player.js",
       "readable": {
-        "bytes": 14368,
-        "gzipBytes": 4590,
-        "sha256": "1a8c6a4015ab6b582fd5e306274d930365738f1455d96a00f60f87d5ac5fdd5e"
+        "bytes": 15154,
+        "gzipBytes": 4747,
+        "sha256": "b7ee9cba2ff3918184ca010da302cf4c6f0404594b61a02610392656b19d8fd3"
       },
       "browser": {
-        "bytes": 8680,
-        "gzipBytes": 3741,
-        "sha256": "4e261d33dbf6dbdb64d7bc06e2a727c9f752d3d5c8144095624ed86b3a30191b"
+        "bytes": 9207,
+        "gzipBytes": 3868,
+        "sha256": "8cd88aa8bea62412e38c4b9fe9b8d9ff26e20ee10ff4d3b6f4702251140ed537"
+      }
+    },
+    {
+      "path": "preview-png.js",
+      "readable": {
+        "bytes": 2775,
+        "gzipBytes": 1107,
+        "sha256": "29fc9757a982418c362063c1de8f1adfdbb06a9d96a8e8fb6f5f5208384a6035"
+      },
+      "browser": {
+        "bytes": 1405,
+        "gzipBytes": 789,
+        "sha256": "a63933daabe8679f4da74b80feae41a889bb1989f835da80724906df3a787f89"
       }
     },
     {
       "path": "preview-resource-links.js",
       "readable": {
-        "bytes": 1264,
-        "gzipBytes": 568,
-        "sha256": "8f679a2f170a297dd4ce568de59df6923c9703fa10e53b95c48b26cd2b4e0c3e"
+        "bytes": 1378,
+        "gzipBytes": 590,
+        "sha256": "705b4956f42a372700ccdd916e54a44a930fd3b324880e75f0d588233a6dd9aa"
       },
       "browser": {
-        "bytes": 794,
-        "gzipBytes": 432,
-        "sha256": "9dd8e575779c60d1bf178a7d43c5a0e2b162cbc8aaa4ec44af6a94ca4ee2bcec"
+        "bytes": 878,
+        "gzipBytes": 450,
+        "sha256": "d6427a53fe5550578337e293f831d37768e46503c6850109f1b0d6bef5822f1c"
       }
     },
     {
       "path": "preview-resource-links.test.js",
       "readable": {
-        "bytes": 1192,
-        "gzipBytes": 501,
-        "sha256": "0e7ed78ce2dd33babb6d6385516ead599360565036d9e64b778aaa3834baa76a"
+        "bytes": 1373,
+        "gzipBytes": 540,
+        "sha256": "41cac4811c776109404675119678987b015e8edd205d0e8624b5c30a900a812b"
       },
       "browser": {
-        "bytes": 905,
-        "gzipBytes": 443,
-        "sha256": "1c65e260da6b1d3bde3a422d53171b5fb965a909e30e86784da11b5765cf909f"
+        "bytes": 1053,
+        "gzipBytes": 473,
+        "sha256": "3500b4fb46a4a5ce8ceab51cdd70c815f74182c58df028c184faaf4939308347"
       }
     },
     {
@@ -867,14 +906,14 @@
     {
       "path": "preview-scene.js",
       "readable": {
-        "bytes": 36064,
-        "gzipBytes": 9393,
-        "sha256": "6919be71f4c18c5937291fd9d03f2659b2aa2657b61ef69a84baaba271ac434e"
+        "bytes": 40059,
+        "gzipBytes": 10628,
+        "sha256": "48a116ba942c893a66ec4de1329585fbc076fb55fa5ece59ccbefe1a0d7b4275"
       },
       "browser": {
-        "bytes": 20263,
-        "gzipBytes": 6967,
-        "sha256": "26ac1f78b967f358881254e90c129888334d3fc1c742ab6553b1f8c504c89e7d"
+        "bytes": 22458,
+        "gzipBytes": 7810,
+        "sha256": "befbd9c7d48403de86ce2f69cd18f33fefb2b283831d135fb759ad2f97de8bd1"
       }
     },
     {
@@ -893,14 +932,14 @@
     {
       "path": "preview-validate.js",
       "readable": {
-        "bytes": 4152,
-        "gzipBytes": 1559,
-        "sha256": "e7aad247790182d3293b90b9f0b47821c8e0f98702209fcc5d0406bc52017706"
+        "bytes": 4201,
+        "gzipBytes": 1576,
+        "sha256": "2dcdc3c6ffedfc18093bf844a4bbcaa8be8cd414279d9ba44aa4cab7ee8ab5bd"
       },
       "browser": {
-        "bytes": 2827,
-        "gzipBytes": 1308,
-        "sha256": "e11c58b0a18ea97b4e30cf639c22624ae9c1f9c9abbf9b6e9e0a8264167886f9"
+        "bytes": 2850,
+        "gzipBytes": 1321,
+        "sha256": "1968c1ab7275593f3bd88d3c115f6662c2d0db7a42fac0fc22d52aaf500dcf94"
       }
     },
     {
@@ -1127,12 +1166,12 @@
   ],
   "totals": {
     "readable": {
-      "bytes": 2283080,
-      "gzipBytes": 511859
+      "bytes": 2298504,
+      "gzipBytes": 517173
     },
     "browser": {
-      "bytes": 1510120,
-      "gzipBytes": 404313
+      "bytes": 1519542,
+      "gzipBytes": 408359
     }
   }
 }

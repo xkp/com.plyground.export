@@ -2,7 +2,7 @@ import { readFile, stat, writeFile } from 'node:fs/promises';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { AssetBundleLoader, Component, PhysicsSystem, PlygroundItem, ScriptableObject, THREE, UnityRuntime } from './index.js';
-import { importPreparedModule } from './preview-scene.js';
+import { headlessPreviewTexture, importPreparedModule } from './preview-scene.js';
 
 /** Load a built browser Preview under Node and run deterministic simulation frames. */
 export async function validatePreview(outputRoot, { frames = 3 } = {}) {
@@ -44,7 +44,7 @@ export async function validatePreview(outputRoot, { frames = 3 } = {}) {
     components, scriptableObjects, types,
     assetResolver: async asset => {
       if (asset.kind === 'model') return new THREE.Group();
-      if (asset.kind === 'texture') return new THREE.Texture();
+      if (asset.kind === 'texture') return headlessPreviewTexture(asset, root, runtime);
       if (asset.kind === 'audio') return new ArrayBuffer(0);
       if (asset.kind === 'navMesh') throw new Error('Headless Preview navMesh validation needs an asset decoder');
       throw new Error(`Unsupported Preview asset kind: ${asset.kind}`);

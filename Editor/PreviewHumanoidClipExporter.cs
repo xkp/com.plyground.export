@@ -160,9 +160,7 @@ namespace Plyground.Preview.Editor
                     controllers = rawRecords.ToArray() }));
             var calibrationPath = Path.Combine(Path.GetDirectoryName(path),
                 "avatar-calibrations.json.gz");
-            var calibrated = PreviewAvatarCalibrationExporter.Export(calibrationPath,
-                selected.Concat(records.Select(record =>
-                    AssetDatabase.LoadAssetAtPath<GameObject>(record.sourcePrefab))));
+            var calibrated = File.Exists(calibrationPath);
             File.WriteAllText(path, JsonUtility.ToJson(new Report {
                 controllers = records.ToArray(), rawMotionEntry = "humanoid-curves.json.gz",
                 calibrationEntry = calibrated ? "avatar-calibrations.json.gz" : null }),

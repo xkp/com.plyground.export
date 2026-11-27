@@ -216,6 +216,9 @@ export class PreviewControllerAnimation extends MonoBehaviour {
     this.animator = animator;
     this._animatorUpdateDriver = animator;
     this.body = body;
+    this.targetCalibration = rawData?.avatarCalibrations?.get(animator.avatarData?.id)
+      ?? rawData?.calibrations?.avatars.find(value =>
+        value.avatarId === animator.avatarData?.id) ?? null;
     this.sharedCalibratedClips = calibratedClipsByRecord.get(record);
     if (!this.sharedCalibratedClips) {
       this.sharedCalibratedClips = new Map();
@@ -523,12 +526,15 @@ export class PreviewControllerAnimation extends MonoBehaviour {
     this.rawChecked.add(key);
     const sampled = this.clips.get(key);
     if (!sampled) return;
-    const cached = this.sharedCalibratedClips.get(key);
+    const calibration = this.targetCalibration ?? this.rawCalibration;
+    const cacheKey = `${calibration.avatarId}:${key}`;
+    this.sharedCalibratedClips ??= new Map();
+    const cached = this.sharedCalibratedClips.get(cacheKey);
     if (cached) { this.clips.set(key, cached); return; }
     try {
       const rawClip = this.rawClips.get(key);
       const candidate = buildCalibratedHumanoidClip(rawClip,
-        this.rawMuscleNames, this.rawCalibration, sampled,
+        this.rawMuscleNames, calibration, sampled,
         this.rawBodyReadyClips?.has(key) ? {
           sampleBodyPose: time => sampleHumanoidEvaluatedBody(
             rawClip.evaluatedBody, time),
@@ -537,7 +543,7 @@ export class PreviewControllerAnimation extends MonoBehaviour {
               rawClip.evaluatedBody, sample.muscles, time)
             : undefined,
         } : undefined);
-      if (this.rawRootMotionFallback.has(key)) {
+      if (this.rawRootMotionFallback?.has(key)) {
         const trajectory = sampled.rootMotion.positions;
         const hips = candidate.bones.find(bone => bone.index === 0);
         for (let frame = 0; frame < sampled.times.length; frame++)
@@ -551,7 +557,7 @@ export class PreviewControllerAnimation extends MonoBehaviour {
       if (!candidate.bones?.length || candidate.bones.some(bone =>
         bone.rotations.some(value => !Number.isFinite(value))))
         throw new TypeError('Raw Humanoid pose contains invalid rotations');
-      if (sampled.bones?.length) {
+      if (sampled.bones?.length && calibration === this.rawCalibration) {
         const assessment = assessCalibratedHumanoidClip(candidate, sampled,
           PREVIEW_HUMANOID_LIMITS);
         if (!assessment.accepted) {
@@ -562,8 +568,9 @@ export class PreviewControllerAnimation extends MonoBehaviour {
       candidate.bonesByIndex = new Map(candidate.bones.map(bone =>
         [bone.index, { ...bone, restInverse: new THREE.Quaternion()
           .fromArray(bone.restRotation).invert() }]));
+      candidate.targetAvatarId = calibration.avatarId;
       this.clips.set(key, candidate);
-      this.sharedCalibratedClips.set(key, candidate);
+      this.sharedCalibratedClips.set(cacheKey, candidate);
     } catch (error) {
       console.error(`Preview raw Humanoid ${name} unavailable; animation pose will remain inactive.`, error);
     }
@@ -707,7 +714,9 @@ export class PreviewControllerAnimation extends MonoBehaviour {
           // avatar and the target avatar can have very different arm axes.
           let target;
           if ((clip.poseSpace ?? this.poseSpace) === 'actor') {
-            const parentBinding = binding.retargetLocal ? binding.poseParent
+            const targetAvatarPose = clip.targetAvatarId
+              && clip.targetAvatarId === this.targetCalibration?.avatarId;
+            const parentBinding = !targetAvatarPose && binding.retargetLocal ? binding.poseParent
               : binding.humanoidParent;
             const sampledParent = clip.bonesByIndex.get(parentBinding?.index);
             const parentPose = sampledParent && sampleRotation(clip, sampledParent, clipTime);
@@ -718,7 +727,8 @@ export class PreviewControllerAnimation extends MonoBehaviour {
               ? parentBinding.bone.getWorldQuaternion(new THREE.Quaternion())
               : this.animator.gameObject.object3D.getWorldQuaternion(new THREE.Quaternion());
             target = rootRotation.clone().invert().multiply(parentWorld);
-            if (binding.retargetLocal) target.multiply(binding.retargetLocal);
+            if (!targetAvatarPose && binding.retargetLocal)
+              target.multiply(binding.retargetLocal);
             if (parentPose) target.multiply(parentPose.invert());
             target.multiply(pose);
           } else target = binding.rest.clone()

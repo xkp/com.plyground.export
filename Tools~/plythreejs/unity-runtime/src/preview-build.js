@@ -80,16 +80,20 @@ export async function buildPreview(request, { copyRuntime = true } = {}) {
   const project = JSON.parse((await readFile(manifestPath, 'utf8')).replace(/^\uFEFF/, ''));
   if (project.variationId !== request.variationId || project.runtime?.id !== request.runtime?.id
     || project.runtime?.apiVersion !== request.runtime?.apiVersion) throw new Error('Preview project and request disagree');
+  if (request.moduleResources != null && !['cloud', 'local'].includes(request.moduleResources))
+    throw new Error('Unsupported Preview module resource mode');
   const { bundle, modules, diagnostics = [] } = await assemblePreviewScene(projectRoot, project);
   const variationCode = await applyVariationBindings(projectRoot, project, bundle);
   validateManifest(bundle, BUNDLE_FORMAT);
-  // Published modules are not copied into output, so check their code in the
-  // prepared project before linking it into the browser result.
+  // Check the published module code in the prepared project before linking it.
   await assertPreviewApiCoverage(projectRoot);
   const sourceCodeEntries = modules.map(module => module.codeEntry);
   const sourceAssetPaths = new Map(bundle.assets.filter(asset => asset.url)
     .map(asset => [asset.id, asset.url]));
-  const linkedModules = linkModuleResources(bundle, modules);
+  // The local editor hardlinks the downloaded, immutable cloud sidecars so
+  // browser loading does not depend on the public CDN being reachable.
+  const linkedModules = request.moduleResources === 'local'
+    ? new Set() : linkModuleResources(bundle, modules);
   const linkedAssetSources = new Map(bundle.assets.filter(asset => asset.url?.startsWith('https://'))
     .map(asset => [asset.url, inside(projectRoot, sourceAssetPaths.get(asset.id))]));
   const existing = await readdir(outputRoot).catch(error => error.code === 'ENOENT' ? [] : Promise.reject(error));
@@ -175,6 +179,10 @@ export async function buildPreview(request, { copyRuntime = true } = {}) {
   for (const module of modules) if (module.animationEntry && !module.animationEntry.startsWith('https://')
     && !(await lstat(inside(outputRoot, module.animationEntry)).catch(() => null))?.isFile())
     throw new Error(`Preview module animation is missing: ${module.animationEntry}`);
+  for (const module of modules) if (module.avatarCalibrationEntry
+    && !module.avatarCalibrationEntry.startsWith('https://')
+    && !(await lstat(inside(outputRoot, module.avatarCalibrationEntry)).catch(() => null))?.isFile())
+    throw new Error(`Preview module Avatar calibration is missing: ${module.avatarCalibrationEntry}`);
   const startup = startupAssetIds(bundle, { includeResources: false });
   const prefabDependencies = new Map(bundle.assets.filter(asset => asset.kind === 'prefab')
     .map(asset => [asset.id, [...assetDependencyIds(bundle, asset.id)]

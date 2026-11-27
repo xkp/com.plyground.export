@@ -210,6 +210,7 @@ public partial class ModuleExporter
         public PreviewEntry editor;
         public PreviewPath assets;
         public PreviewEntry previewAnimation;
+        public PreviewEntry previewAvatarCalibration;
         public PreviewPath solution;
     }
 
@@ -430,14 +431,17 @@ public partial class ModuleExporter
             string assetPreprocessor = Path.Combine(toolRoot, "unity-runtime", "src", "preview-module-assets.js");
             if (!File.Exists(assetPreprocessor)) throw new FileNotFoundException("Preview asset preprocessor is missing.", assetPreprocessor);
             RunPreviewTool("node", assetPreprocessor, assetSource, Path.Combine(preview, "assets"), itemMapPath);
+            string avatarCalibration = Path.Combine(preview,
+                "animation", "avatar-calibrations.json.gz");
+            bool hasAvatarCalibration = Plyground.Preview.Editor.PreviewAvatarCalibrationExporter.Export(
+                avatarCalibration, itemPrefabs.Select(value => value.prefab)
+                    .Concat(catalogAssets.OfType<GameObject>()));
             string animationPath = Path.Combine(preview, "animation", "humanoid-controllers.json");
             bool hasHumanoidAnimation = Plyground.Preview.Editor.PreviewHumanoidClipExporter.Export(
                 animationPath, catalogAssets, itemPrefabs.Select(value => value.prefab));
             if (hasHumanoidAnimation)
             {
-                string avatarCalibration = Path.Combine(preview,
-                    "animation", "avatar-calibrations.json.gz");
-                if (!File.Exists(avatarCalibration))
+                if (!hasAvatarCalibration)
                     throw new InvalidOperationException("Humanoid Preview requires Avatar calibration; sampled animation bones cannot be published.");
                 string selector = Path.Combine(toolRoot, "unity-runtime", "tools",
                     "select-raw-humanoid-clips.mjs");
@@ -527,6 +531,8 @@ public partial class ModuleExporter
                 assets = new PreviewPath { bundle = "Preview/assets/bundle.json" },
                 previewAnimation = hasHumanoidAnimation
                     ? new PreviewEntry { entry = "Preview/animation/humanoid-controllers.json" } : null,
+                previewAvatarCalibration = hasAvatarCalibration
+                    ? new PreviewEntry { entry = "Preview/animation/avatar-calibrations.json.gz" } : null,
                 solution = new PreviewPath { manifest = "Preview/solution/manifest.json" },
                 revision = ComputePreviewRevision(preview)
             };
