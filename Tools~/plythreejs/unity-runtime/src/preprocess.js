@@ -95,6 +95,7 @@ export async function preprocess(sourceFile, outputDirectory, additionalSources 
   const assetEntries = sources.flatMap(({ root, manifest }) => manifest.assets
     .map(asset => ({ asset, root, manifest })))
     .sort((a, b) => a.asset.id.localeCompare(b.asset.id));
+  const externalImages = new Map();
   for (const { asset, root: sourceRoot, manifest } of assetEntries) {
     if (asset.kind === 'inputActionAsset') {
       addAsset({ id: asset.id, kind: asset.kind, name: asset.name,
@@ -125,7 +126,13 @@ export async function preprocess(sourceFile, outputDirectory, additionalSources 
     let bytes;
     try {
       if (extension === '.unitymesh.json')
-        bytes = compileUnityMesh(JSON.parse(await readFile(file, 'utf8')));
+        bytes = compileUnityMesh(JSON.parse(await readFile(file, 'utf8')), {
+          externalImage: png => {
+            const name = `${createHash('sha256').update(png).digest('hex')}.png`;
+            if (!externalImages.has(name)) externalImages.set(name, png);
+            return name;
+          },
+        });
       else if (extension === '.unitynavmesh.json') {
         const triangulation = JSON.parse(await readFile(file, 'utf8'));
         try {
@@ -167,6 +174,8 @@ export async function preprocess(sourceFile, outputDirectory, additionalSources 
       ...(asset.kind === 'audio' ? { length: asset.length, samples: asset.samples,
         frequency: asset.frequency, channels: asset.channels } : {}) });
   }
+  for (const [name, png] of externalImages)
+    await writeFile(join(outputRoot, 'assets', name), png);
   const scenes = [];
   for (const { manifest } of sources.slice(1)) {
     const scene = manifest.scene;

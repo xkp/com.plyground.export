@@ -4,7 +4,7 @@
     "name": "terser",
     "version": "5.51.4"
   },
-  "revision": "sha256:2d9512945b333172a1237f849dbdaedccb3b39a05f4b85ec557dd6e5100830d8",
+  "revision": "sha256:3699631acb64e498ceed471f8171237cd591d2fbba128d21266e43b8b8771b3f",
   "files": [
     {
       "path": "ai-api-stubs.js",
@@ -579,16 +579,29 @@
       }
     },
     {
-      "path": "preprocess.js",
+      "path": "preprocess-shared-images.test.js",
       "readable": {
-        "bytes": 11133,
-        "gzipBytes": 3387,
-        "sha256": "0b1a7367aeb67b71202cfa64542c94d6d29eaf0cafc6c4cab473d588c35a176c"
+        "bytes": 2750,
+        "gzipBytes": 1178,
+        "sha256": "30a97a7971065675298bc4d003f7bf634762036b9485e7a6a4f37f1c0da9f78b"
       },
       "browser": {
-        "bytes": 6972,
-        "gzipBytes": 2820,
-        "sha256": "8d15dbe2b19b2f54a82a8776746afc9f7f8552440c738871566527238848ce2a"
+        "bytes": 1953,
+        "gzipBytes": 1030,
+        "sha256": "060990bcab5151bd3509c219f8fba2193b75dbdc5a001a124543659704931819"
+      }
+    },
+    {
+      "path": "preprocess.js",
+      "readable": {
+        "bytes": 11523,
+        "gzipBytes": 3491,
+        "sha256": "b3760020753cb6c6c450be5cb6a9541021ae6bb895cf73d556893ceea4709fcf"
+      },
+      "browser": {
+        "bytes": 7132,
+        "gzipBytes": 2884,
+        "sha256": "dd9ab18149b638cd7fc43895904c504e69be51a039cd27bc7515e49c386706ef"
       }
     },
     {
@@ -1088,14 +1101,14 @@
     {
       "path": "unity-mesh.js",
       "readable": {
-        "bytes": 19668,
-        "gzipBytes": 4856,
-        "sha256": "e4e3b17eccd5565fcde74693a8c4923ee2b4d7e0d81dc0a66c5f8ccba7079c71"
+        "bytes": 19469,
+        "gzipBytes": 4937,
+        "sha256": "55a78e4a0ef9accc39806058b75a7799c1d66b659871c2ddd70350cccc39708b"
       },
       "browser": {
-        "bytes": 11780,
-        "gzipBytes": 3851,
-        "sha256": "840410c278f48ed0099c5e1d1b107447daf0aa96273f44d326ec74bb6da76e0f"
+        "bytes": 11564,
+        "gzipBytes": 3933,
+        "sha256": "3c5a33d6aa8a3f6d32c308fc382f2d26a32f36be63dcca40e7c9c4edd511343b"
       }
     },
     {
@@ -1114,12 +1127,12 @@
   ],
   "totals": {
     "readable": {
-      "bytes": 2280139,
-      "gzipBytes": 510496
+      "bytes": 2283080,
+      "gzipBytes": 511859
     },
     "browser": {
-      "bytes": 1508223,
-      "gzipBytes": 403137
+      "bytes": 1510120,
+      "gzipBytes": 404313
     }
   }
 }

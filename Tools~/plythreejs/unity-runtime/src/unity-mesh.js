@@ -4,7 +4,7 @@ const align = size => (size + 3) & ~3;
 const clamp01 = value => Math.max(0, Math.min(1, value));
 
 /** Compile Unity Editor mesh data into a self-contained glTF 2.0 binary. */
-export function compileUnityMesh(source) {
+export function compileUnityMesh(source, { externalImage = null } = {}) {
   if (source?.format !== 'unity-bridge-mesh' || source.version !== 1) {
     throw new AssetFormatError('Expected unity-bridge-mesh version 1');
   }
@@ -131,6 +131,14 @@ export function compileUnityMesh(source) {
 
   const images = [];
   const textures = [];
+  const addImage = (png, textureId) => {
+    const image = externalImage
+      ? { uri: externalImage(png) }
+      : { bufferView: view(png), mimeType: 'image/png' };
+    images.push({ ...image, extras: { unityTextureId: textureId ?? null } });
+    textures.push({ source: images.length - 1 });
+    return textures.length - 1;
+  };
   const gltfMaterials = materials.map(material => {
     const color = material?.color ?? [1, 1, 1, 1];
     if (!Array.isArray(color) || color.length !== 4 || !color.every(Number.isFinite)) {
@@ -144,10 +152,7 @@ export function compileUnityMesh(source) {
       if (png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a') {
         throw new AssetFormatError('Material texture is not PNG');
       }
-      images.push({ bufferView: view(png), mimeType: 'image/png',
-        extras: { unityTextureId: material.textureId ?? null } });
-      textures.push({ source: images.length - 1 });
-      pbr.baseColorTexture = { index: textures.length - 1 };
+      pbr.baseColorTexture = { index: addImage(png, material.textureId) };
       const scale = material.textureScale ?? [1, 1];
       const offset = material.textureOffset ?? [0, 0];
       if (![scale, offset].every(values => Array.isArray(values) && values.length === 2
@@ -163,15 +168,13 @@ export function compileUnityMesh(source) {
       const png = Buffer.from(material.metallicRoughnessTexturePng, 'base64');
       if (png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a')
         throw new AssetFormatError('Material metallic/roughness texture is not PNG');
-      images.push({ bufferView: view(png), mimeType: 'image/png',
-        extras: { unityTextureId: material.metallicRoughnessTextureId ?? null } });
-      textures.push({ source: images.length - 1 });
+      const textureIndex = addImage(png, material.metallicRoughnessTextureId);
       const scale = material.metallicRoughnessTextureScale ?? [1, 1];
       const offset = material.metallicRoughnessTextureOffset ?? [0, 0];
       if (![scale, offset].every(values => Array.isArray(values) && values.length === 2
         && values.every(Number.isFinite)))
         throw new AssetFormatError('Material metallic/roughness texture transform is invalid');
-      pbr.metallicRoughnessTexture = { index: textures.length - 1 };
+      pbr.metallicRoughnessTexture = { index: textureIndex };
       if (scale[0] !== 1 || scale[1] !== 1 || offset[0] !== 0 || offset[1] !== 0)
         pbr.metallicRoughnessTexture.extensions = { KHR_texture_transform: {
           scale, offset: [offset[0], 1 - scale[1] - offset[1]],
@@ -195,15 +198,13 @@ export function compileUnityMesh(source) {
       const png = Buffer.from(material.normalTexturePng, 'base64');
       if (png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a')
         throw new AssetFormatError('Material normal texture is not PNG');
-      images.push({ bufferView: view(png), mimeType: 'image/png',
-        extras: { unityTextureId: material.normalTextureId ?? null } });
-      textures.push({ source: images.length - 1 });
+      const textureIndex = addImage(png, material.normalTextureId);
       const scale = material.normalTextureScale ?? [1, 1];
       const offset = material.normalTextureOffset ?? [0, 0];
       if (![scale, offset].every(values => Array.isArray(values) && values.length === 2
         && values.every(Number.isFinite)))
         throw new AssetFormatError('Material normal texture transform is invalid');
-      result.normalTexture = { index: textures.length - 1,
+      result.normalTexture = { index: textureIndex,
         scale: Number.isFinite(material.normalScale) ? material.normalScale : 1 };
       if (scale[0] !== 1 || scale[1] !== 1 || offset[0] !== 0 || offset[1] !== 0)
         result.normalTexture.extensions = { KHR_texture_transform: {
@@ -217,9 +218,7 @@ export function compileUnityMesh(source) {
       const png = Buffer.from(material.occlusionTexturePng, 'base64');
       if (png.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a')
         throw new AssetFormatError('Material occlusion texture is not PNG');
-      images.push({ bufferView: view(png), mimeType: 'image/png',
-        extras: { unityTextureId: material.occlusionTextureId ?? null } });
-      textures.push({ source: images.length - 1 });
+      const textureIndex = addImage(png, material.occlusionTextureId);
       const scale = material.occlusionTextureScale ?? [1, 1];
       const offset = material.occlusionTextureOffset ?? [0, 0];
       if (![scale, offset].every(values => Array.isArray(values) && values.length === 2
@@ -227,7 +226,7 @@ export function compileUnityMesh(source) {
         throw new AssetFormatError('Material occlusion texture transform is invalid');
       if (!Number.isFinite(material.occlusionStrength ?? 1))
         throw new AssetFormatError('Material occlusion strength is invalid');
-      result.occlusionTexture = { index: textures.length - 1,
+      result.occlusionTexture = { index: textureIndex,
         strength: clamp01(material.occlusionStrength ?? 1) };
       if (scale[0] !== 1 || scale[1] !== 1 || offset[0] !== 0 || offset[1] !== 0)
         result.occlusionTexture.extensions = { KHR_texture_transform: {
